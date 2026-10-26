@@ -3,12 +3,13 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { Shell } from "@/components/shell";
-import { Card, EmptyState, LinkButton, Pill, SectionTitle } from "@/components/ui";
+import { Button, Card, EmptyState, LinkButton, Pill, SectionTitle } from "@/components/ui";
 import { requireTeacher } from "@/lib/auth";
 import { getPracticeWeek, getStudent, listLessons, listParentsForStudent, listRepertoire } from "@/lib/data";
 import { capitalize, formatDate } from "@/lib/format";
 import { WeekStrip } from "@/components/week-strip";
 import { RepertoireMap } from "@/components/repertoire-map";
+import { startLessonForRecording } from "@/app/lessons/recording-actions";
 
 type Params = Promise<{ id: string }>;
 
@@ -55,6 +56,12 @@ async function Body({ params }: { params: Params }) {
             Pre-lesson brief
           </LinkButton>
           <LinkButton href={`/students/${id}/lessons/new`}>Record lesson</LinkButton>
+          <form action={startLessonForRecording} className="col-span-2">
+            <input type="hidden" name="student_id" value={id} />
+            <Button variant="secondary" className="w-full">
+              Upload today&apos;s lesson video
+            </Button>
+          </form>
         </div>
 
         <Card>

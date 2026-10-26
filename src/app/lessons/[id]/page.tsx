@@ -8,9 +8,12 @@ import { approveLesson, deleteLesson, unapproveLesson } from "@/app/lessons/acti
 import { requireTeacher } from "@/lib/auth";
 import { getLesson, getStudent } from "@/lib/data";
 import { formatDate, humanize } from "@/lib/format";
+import { listRecordingsForLesson } from "@/lib/recordings";
+import { RecordingList } from "@/components/recording-player";
+import { RecordingUploader } from "@/components/recording-uploader";
 
 type Params = Promise<{ id: string }>;
-type SP = Promise<{ approved?: string }>;
+type SP = Promise<{ approved?: string; upload?: string }>;
 
 export default function LessonPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
@@ -23,8 +26,8 @@ export default function LessonPage({ params, searchParams }: { params: Params; s
 async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
   await requireTeacher();
   const { id } = await params;
-  const { approved } = await searchParams;
-  const lesson = await getLesson(id);
+  const { approved, upload } = await searchParams;
+  const [lesson, recordings] = await Promise.all([getLesson(id), listRecordingsForLesson(id)]);
   if (!lesson) notFound();
   const student = await getStudent(lesson.student_id);
   if (!student) notFound();
@@ -106,6 +109,17 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             </Row>
           )}
         </Card>
+
+        <section id="recordings" className="scroll-mt-4">
+          <SectionTitle>Lesson video</SectionTitle>
+          <div className="flex flex-col gap-3">
+            <RecordingList recordings={recordings} editable />
+            <RecordingUploader lessonId={id} autoOpen={!!upload} />
+            {!isDraft && recordings.length > 0 && (
+              <p className="text-sm text-muted">The family can watch these from Home practice.</p>
+            )}
+          </div>
+        </section>
 
         <section>
           <SectionTitle>Practice assignments</SectionTitle>

@@ -8,6 +8,8 @@ import { getViewer } from "@/lib/auth";
 import { getCurrentPlan, getPracticeLog, getPracticeWeek, getStudent, getTeacherForStudent, listPracticeLogs } from "@/lib/data";
 import { addDays, capitalize, formatDate, relativeDay, todayISO } from "@/lib/format";
 import { savePractice } from "../actions";
+import { listRecordingsForLesson } from "@/lib/recordings";
+import { RecordingList } from "@/components/recording-player";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ date?: string; saved?: string; error?: string }>;
@@ -38,6 +40,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     listPracticeLogs(studentId, 30),
     getTeacherForStudent(student),
   ]);
+  const recordings = plan ? (await listRecordingsForLesson(plan.id)).filter((r) => r.url) : [];
   const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
   const firstName = student.name.split(" ")[0];
   const completed = new Set(log?.completed_assignment_ids ?? []);
@@ -85,6 +88,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 </Row>
               )}
             </Card>
+
+            {recordings.length > 0 && (
+              <section>
+                <SectionTitle>Lesson video</SectionTitle>
+                <RecordingList recordings={recordings} />
+              </section>
+            )}
 
             <section>
               <div className="mb-2 flex items-center justify-between gap-2">
