@@ -266,6 +266,73 @@ export type Database = {
           },
         ];
       };
+      recordings: {
+        Row: {
+          created_at: string;
+          duration_seconds: number | null;
+          file_name: string;
+          id: string;
+          label: string | null;
+          lesson_id: string;
+          mime_type: string;
+          size_bytes: number;
+          status: string;
+          storage_path: string;
+          student_id: string;
+          teacher_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          duration_seconds?: number | null;
+          file_name: string;
+          id?: string;
+          label?: string | null;
+          lesson_id: string;
+          mime_type?: string;
+          size_bytes?: number;
+          status?: string;
+          storage_path: string;
+          student_id: string;
+          teacher_id: string;
+        };
+        Update: {
+          created_at?: string;
+          duration_seconds?: number | null;
+          file_name?: string;
+          id?: string;
+          label?: string | null;
+          lesson_id?: string;
+          mime_type?: string;
+          size_bytes?: number;
+          status?: string;
+          storage_path?: string;
+          student_id?: string;
+          teacher_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "recordings_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recordings_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "students";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "recordings_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "teachers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       repertoire: {
         Row: {
           book: string | null;

@@ -17,3 +17,6 @@ export const PIECE_ACTIVITIES: { value: Enums<"piece_activity">; label: string }
   { value: "reviewed", label: "Reviewed" },
   { value: "performed", label: "Performed" },
 ];
+
+/** Private storage bucket for lesson videos (see the lesson_recordings migration). */
+export const RECORDINGS_BUCKET = "lesson-recordings";
