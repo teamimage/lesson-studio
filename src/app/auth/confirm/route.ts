@@ -3,17 +3,26 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 // The sign-in email links here. Exchanges the token for a session.
+//
+// Two link formats are accepted:
+// - ?token_hash=...&type=email (our email template). Works in any browser,
+//   including when the link opens in a different app than the one that asked.
+// - ?code=... (Supabase's default template). Only works in the same browser
+//   that requested the link, because it relies on a cookie set at that time.
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
+  const code = searchParams.get("code");
+
+  const supabase = await createClient();
 
   if (token_hash && type) {
-    const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ type, token_hash });
-    if (!error) {
-      return NextResponse.redirect(`${origin}/`);
-    }
+    if (!error) return NextResponse.redirect(`${origin}/`);
+  } else if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) return NextResponse.redirect(`${origin}/`);
   }
 
   return NextResponse.redirect(`${origin}/login?error=link`);

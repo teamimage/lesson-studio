@@ -1,19 +1,59 @@
 import { Suspense } from "react";
-import { sendMagicLink } from "./actions";
+import { sendMagicLink, verifyCode } from "./actions";
 
 const ERRORS: Record<string, string> = {
   email: "Enter your email address.",
-  send: "We couldn't send the link. Try again in a minute.",
-  link: "That sign-in link has expired or was already used.",
+  send: "We couldn't send the email. Try again in a minute.",
+  link: "That sign-in link has expired or was already used. Enter the code from the email instead, or send a new one.",
+  code: "That code didn't work. Check it, or send a new one.",
 };
 
-type SearchParams = Promise<{ sent?: string; error?: string }>;
+const input = "rounded border px-3 py-2";
+const primary =
+  "rounded bg-black px-3 py-2 text-white dark:bg-white dark:text-black";
+
+type SearchParams = Promise<{ email?: string; error?: string }>;
 
 async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
-  const { sent, error } = await searchParams;
+  const { email, error } = await searchParams;
+  const message = error && ERRORS[error];
 
-  if (sent) return <p>Check your email for a sign-in link.</p>;
+  // Step 2: the email was sent. Let the user type the code.
+  if (email) {
+    return (
+      <div className="flex flex-col gap-4">
+        <p>
+          We emailed a sign-in code to <strong>{email}</strong>. Type it below,
+          or click the link in the email.
+        </p>
+        <form action={verifyCode} className="flex flex-col gap-3">
+          <input type="hidden" name="email" value={email} />
+          <label htmlFor="code" className="text-sm font-medium">
+            Code
+          </label>
+          <input
+            id="code"
+            name="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9 ]{6,12}"
+            required
+            autoFocus
+            className={`${input} tracking-widest`}
+          />
+          <button type="submit" className={primary}>
+            Sign in
+          </button>
+          {message && <p className="text-sm text-red-600">{message}</p>}
+        </form>
+        <a href="/login" className="text-sm underline">
+          Use a different email or send a new code
+        </a>
+      </div>
+    );
+  }
 
+  // Step 1: ask for the email address.
   return (
     <form action={sendMagicLink} className="flex flex-col gap-3">
       <label htmlFor="email" className="text-sm font-medium">
@@ -25,17 +65,12 @@ async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
         type="email"
         required
         autoComplete="email"
-        className="rounded border px-3 py-2"
+        className={input}
       />
-      <button
-        type="submit"
-        className="rounded bg-black px-3 py-2 text-white dark:bg-white dark:text-black"
-      >
-        Email me a sign-in link
+      <button type="submit" className={primary}>
+        Email me a sign-in code
       </button>
-      {error && ERRORS[error] && (
-        <p className="text-sm text-red-600">{ERRORS[error]}</p>
-      )}
+      {message && <p className="text-sm text-red-600">{message}</p>}
     </form>
   );
 }
