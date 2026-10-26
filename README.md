@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lesson Studio
 
-## Getting Started
+Lesson organization for private music teachers: lesson summaries, practice
+suggestions, per-student history and parent sheets.
 
-First, run the development server:
+Stack: Next.js (App Router) on Vercel, Supabase for auth, database and storage.
+
+## What's here so far
+
+- Email magic-link sign-in (`/login`, `/auth/confirm`)
+- `src/proxy.ts` refreshes the Supabase session on every request and sends
+  signed-out visitors to `/login`
+- Supabase clients for the browser (`src/lib/supabase/client.ts`) and the
+  server (`src/lib/supabase/server.ts`)
+
+## Environment variables
+
+Two values, both safe to expose to the browser (data is protected by Row Level
+Security in Supabase, not by hiding these):
+
+| Name | Where to find it |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase > Project Settings > Data API |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase > Project Settings > API Keys |
+
+Set them in Vercel under Project > Settings > Environment Variables. For local
+development, copy `.env.example` to `.env.local`.
+
+Never put the Supabase **secret** (service role) key in a `NEXT_PUBLIC_`
+variable or commit it.
+
+## Supabase auth settings
+
+In Supabase > Authentication > URL Configuration, set **Site URL** to the
+Vercel production URL and add `http://localhost:3000/**` and
+`https://*-teamimage.vercel.app/**` to **Redirect URLs** so sign-in links
+work locally and on preview deploys.
+
+## Local development
 
 ```bash
+npm install
+cp .env.example .env.local   # then fill in the two values
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
