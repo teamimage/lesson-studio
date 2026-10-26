@@ -16,6 +16,8 @@ import {
   staleReview,
 } from "@/lib/data";
 import { addDays, capitalize, formatDate, humanize, parseISODate, relativeDay, todayISO } from "@/lib/format";
+import { RecordingList } from "@/components/recording-player";
+import { listRecordingsForStudent } from "@/lib/recordings";
 import { assignmentCounts, bookPosition, listPracticeRange, nextLesson, practiced } from "@/lib/teacher-data";
 
 type SearchParams = Promise<{ student?: string }>;
@@ -117,12 +119,13 @@ function StudentSwitcher({
 async function StudentPanel({ student }: { student: Student }) {
   const id = student.id;
   const today = todayISO();
-  const [lessons, week, month, repertoire, parents] = await Promise.all([
+  const [lessons, week, month, repertoire, parents, recordings] = await Promise.all([
     listLessons(id, 20),
     getPracticeWeek(id),
     listPracticeRange(id, 28),
     listRepertoire(id),
     listParentsForStudent(id),
+    listRecordingsForStudent(id, 3),
   ]);
 
   const latest = lessons[0] ?? null;
@@ -364,8 +367,31 @@ async function StudentPanel({ student }: { student: Student }) {
           </section>
         </div>
 
-        {/* Right column: profile and repertoire */}
+        {/* Right column: recordings, profile and repertoire */}
         <div className="flex min-w-0 flex-col gap-5">
+          <section>
+            <SectionTitle
+              action={
+                latest && (
+                  <Link href={`/lessons/${latest.id}#recordings`} className="text-sm text-accent-ink underline">
+                    Upload
+                  </Link>
+                )
+              }
+            >
+              Recordings
+            </SectionTitle>
+            {recordings.length === 0 ? (
+              <p className="text-sm text-muted">
+                {latest
+                  ? "No videos yet. Upload one on the lesson it belongs to."
+                  : "Record a lesson first, then upload its video there."}
+              </p>
+            ) : (
+              <RecordingList recordings={recordings} />
+            )}
+          </section>
+
           <section>
             <SectionTitle
               action={
