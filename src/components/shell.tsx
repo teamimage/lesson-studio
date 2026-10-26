@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cx } from "./ui";
 
-type Tab = "studio" | "family" | "settings";
+type Tab = "studio" | "desk" | "family" | "settings";
 
 // Page frame: header with optional back link, content column, bottom tabs on
 // phones. Keep it free of session reads so it prerenders instantly.
@@ -67,8 +67,9 @@ export function Shell({
       </main>
 
       <nav className="no-print fixed inset-x-0 bottom-0 z-10 border-t border-rule bg-sheet/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className="mx-auto grid max-w-2xl grid-cols-3">
+        <div className="mx-auto grid max-w-2xl grid-cols-4">
           <TabLink href="/" active={tab === "studio"} label="Studio" icon="♪" />
+          <TabLink href="/teacher" active={tab === "desk"} label="Desk" icon="▦" />
           <TabLink href="/family" active={tab === "family"} label="Home practice" icon="⌂" />
           <TabLink href="/settings" active={tab === "settings"} label="Settings" icon="⚙" />
         </div>
