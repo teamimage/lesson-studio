@@ -8,10 +8,45 @@ Stack: Next.js (App Router) on Vercel, Supabase for auth, database and storage.
 ## What's here so far
 
 - Email sign-in with a one-time code or a link (`/login`, `/auth/confirm`)
+- **Teacher side** (`/`): studio dashboard with every student, practice days
+  this week, and lesson records waiting for approval
+  - `/students/new`, `/students/[id]`, `/students/[id]/edit`: student
+    profiles, repertoire list, lesson history, linked parents
+  - `/students/[id]/lessons/new`, `/lessons/[id]`, `/lessons/[id]/edit`: the
+    lesson record (pieces worked on, "today we", focus point, practice
+    assignments, note to the parent, teacher-only suggestions and notes).
+    Records start as drafts; **approving** publishes them to the family and
+    updates the repertoire list.
+  - `/students/[id]/brief`: the two-minute pre-lesson brief
+  - `/lessons/[id]/sheet`: printable one-page lesson sheet (letter size)
+- **Family side** (`/family`, `/family/[studentId]`): this week's plan from
+  the latest approved lesson, a daily checklist, minutes, listening, and a
+  note for the teacher. Parents see only their own children and only
+  approved records.
+- `/settings`: teacher name and studio name, sign out
 - `src/proxy.ts` refreshes the Supabase session on every request and sends
   signed-out visitors to `/login`
 - Supabase clients for the browser (`src/lib/supabase/client.ts`) and the
-  server (`src/lib/supabase/server.ts`)
+  server (`src/lib/supabase/server.ts`); generated types in
+  `src/lib/supabase/types.ts`
+
+## Database
+
+The schema lives in `supabase/migrations/` and is applied to the Supabase
+project. Every table has row-level security:
+
+- A teacher (a row in `teachers` tied to their auth user) manages their own
+  `students`, `parents`, `lessons`, `lesson_pieces`, `assignments`,
+  `repertoire` and `practice_logs`.
+- A parent is matched by `parents.user_id` or, before they first sign in, by
+  their email. They can read their children, approved lessons and
+  assignments, and read and write practice logs.
+- Whoever signs in with no teacher row and no parent invitation becomes a
+  teacher.
+
+`supabase/seed/family.sql` holds the sample family data (two Suzuki
+students, lessons, assignments, a week of practice). Names are placeholders
+to rename in the app.
 
 ## Environment variables
 

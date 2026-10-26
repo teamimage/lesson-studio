@@ -1,26 +1,95 @@
 @import "tailwindcss";
 
+/* Warm, mild palette: cream paper, terracotta accent, sage for "done",
+   plum for the family (parent) side. Dark mode stays warm. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #f7f1e8;
+  --sheet: #fffcf7;
+  --ink: #2b2521;
+  --muted: #74685d;
+  --rule: #e6dbcc;
+  --accent: #b4623c;
+  --accent-ink: #8f4a2a;
+  --accent-soft: #f6e3d7;
+  --sage: #5f8068;
+  --sage-soft: #e2ece3;
+  --plum: #6e5c90;
+  --plum-soft: #ebe5f4;
+  --amber: #b98630;
+  --amber-soft: #f7ebd2;
+  --danger: #a8433a;
+  --danger-soft: #f7dfdc;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #1e1a17;
+    --sheet: #2a2420;
+    --ink: #f1e9df;
+    --muted: #b4a697;
+    --rule: #3f352d;
+    --accent: #e0916a;
+    --accent-ink: #f0ad8a;
+    --accent-soft: #3f2c22;
+    --sage: #8fb597;
+    --sage-soft: #273329;
+    --plum: #b3a3d6;
+    --plum-soft: #2e2839;
+    --amber: #dcae5a;
+    --amber-soft: #3b3020;
+    --danger: #e08078;
+    --danger-soft: #3f2624;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-plum: var(--plum);
+  --color-plum-soft: var(--plum-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-body), system-ui, sans-serif;
+  --font-display: var(--font-display), Georgia, serif;
+}
+
+html {
+  background: var(--paper);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, .display {
+  font-family: var(--font-display), Georgia, serif;
+  letter-spacing: -0.01em;
+}
+
+/* Form controls inherit the warm theme. */
+input, textarea, select {
+  background: var(--sheet);
+  color: var(--ink);
+}
+input::placeholder, textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+@media print {
+  html, body { background: #fff; color: #000; }
+  .no-print { display: none !important; }
 }
