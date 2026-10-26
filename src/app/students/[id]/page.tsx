@@ -6,8 +6,9 @@ import { Shell } from "@/components/shell";
 import { Card, EmptyState, LinkButton, Pill, SectionTitle } from "@/components/ui";
 import { requireTeacher } from "@/lib/auth";
 import { getPracticeWeek, getStudent, listLessons, listParentsForStudent, listRepertoire } from "@/lib/data";
-import { capitalize, formatDate, humanize } from "@/lib/format";
+import { capitalize, formatDate } from "@/lib/format";
 import { WeekStrip } from "@/components/week-strip";
+import { RepertoireMap } from "@/components/repertoire-map";
 
 type Params = Promise<{ id: string }>;
 
@@ -138,28 +139,8 @@ async function Body({ params }: { params: Params }) {
         </section>
 
         <section>
-          <SectionTitle>Repertoire</SectionTitle>
-          {repertoire.length === 0 ? (
-            <p className="text-sm text-muted">
-              Pieces appear here when a lesson record that names them is approved.
-            </p>
-          ) : (
-            <Card className="divide-y divide-rule p-0">
-              {repertoire.map((r) => (
-                <div key={r.id} className="flex items-center gap-3 px-4 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{r.title}</div>
-                    <div className="text-xs text-muted">
-                      {r.last_played_on ? `last played ${formatDate(r.last_played_on)}` : "not played yet"}
-                    </div>
-                  </div>
-                  <Pill tone={r.status === "learning" ? "accent" : r.status === "polishing" ? "amber" : r.status === "review" ? "sage" : "muted"}>
-                    {humanize(r.status)}
-                  </Pill>
-                </div>
-              ))}
-            </Card>
-          )}
+          <SectionTitle>Repertoire map</SectionTitle>
+          <RepertoireMap studentId={id} instrument={student.instrument} repertoire={repertoire} editable />
         </section>
 
         <section>

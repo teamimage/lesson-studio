@@ -7,6 +7,7 @@ import { saveLesson } from "@/app/lessons/actions";
 import { requireTeacher } from "@/lib/auth";
 import { getCurrentPlan, getStudent, listRepertoire } from "@/lib/data";
 import { addDays, todayISO } from "@/lib/format";
+import { booksFor } from "@/lib/suzuki";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ error?: string }>;
@@ -39,6 +40,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         studentName={student.name}
         action={saveLesson}
         knownPieces={repertoire.map((r) => r.title)}
+        books={booksFor(student.instrument)}
         previousAssignments={(plan?.assignments ?? []).map((a) => ({
           kind: a.kind,
           title: a.title,

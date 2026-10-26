@@ -7,6 +7,7 @@ import { saveLesson } from "@/app/lessons/actions";
 import { requireTeacher } from "@/lib/auth";
 import { getLesson, getStudent, listLessons, listRepertoire } from "@/lib/data";
 import { formatDate } from "@/lib/format";
+import { booksFor } from "@/lib/suzuki";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ error?: string }>;
@@ -52,6 +53,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         isApproved={lesson.status === "approved"}
         action={saveLesson}
         knownPieces={repertoire.map((r) => r.title)}
+        books={booksFor(student.instrument)}
         previousAssignments={(previous?.assignments ?? []).map((a) => ({
           kind: a.kind,
           title: a.title,

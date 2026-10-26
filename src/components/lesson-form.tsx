@@ -13,6 +13,8 @@ type Props = {
   initial: Omit<LessonInput, "student_id">;
   /** Titles the teacher has used before, for quick picking. */
   knownPieces: string[];
+  /** The student's Suzuki books, for one-tap adding. */
+  books?: { book: string; pieces: string[] }[];
   /** Assignments from the previous approved lesson, for "carry forward". */
   previousAssignments: AssignmentInput[];
   action: (fd: FormData) => Promise<void>;
@@ -28,6 +30,7 @@ export function LessonForm({
   lessonId,
   initial,
   knownPieces,
+  books = [],
   previousAssignments,
   action,
   isApproved,
@@ -76,6 +79,14 @@ export function LessonForm({
     setAssignments((as) => {
       const filled = as.filter((a) => a.title);
       return [...filled, { kind: p.activity === "reviewed" ? "review" : "piece", title: p.title, how: "", every_day: true }];
+    });
+  }
+  function addFromBook(title: string) {
+    if (!title) return;
+    setPieces((ps) => {
+      const filled = ps.filter((p) => p.title);
+      if (filled.some((p) => p.title.toLowerCase() === title.toLowerCase())) return ps;
+      return [...filled, { title, activity: "worked_on", notes: "" }];
     });
   }
   function carryForward() {
@@ -176,7 +187,28 @@ export function LessonForm({
               </div>
             </div>
           ))}
-          <AddButton onClick={() => setPieces((ps) => [...ps, { ...emptyPiece }])}>Add a piece</AddButton>
+          <div className="flex gap-2">
+            <AddButton onClick={() => setPieces((ps) => [...ps, { ...emptyPiece }])}>Add a piece</AddButton>
+            {books.length > 0 && (
+              <select
+                className={cx(inputClass, "flex-1 text-sm")}
+                value=""
+                onChange={(e) => addFromBook(e.target.value)}
+                aria-label="Add a piece from a Suzuki book"
+              >
+                <option value="">From the Suzuki book…</option>
+                {books.map((b) => (
+                  <optgroup key={b.book} label={b.book}>
+                    {b.pieces.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
       </Section>
 
@@ -325,7 +357,7 @@ function AddButton({ onClick, children }: { onClick: () => void; children: React
     <button
       type="button"
       onClick={onClick}
-      className="min-h-11 rounded-xl border border-dashed border-rule text-sm font-medium text-accent-ink hover:bg-accent-soft"
+      className="min-h-11 flex-1 rounded-xl border border-dashed border-rule px-3 text-sm font-medium text-accent-ink hover:bg-accent-soft"
     >
       + {children}
     </button>
