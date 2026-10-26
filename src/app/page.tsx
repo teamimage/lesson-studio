@@ -94,8 +94,13 @@ async function Dashboard() {
       <section>
         <SectionTitle
           action={
-            <span className="text-sm text-muted">
+            <span className="flex items-center gap-3 text-sm text-muted">
               {active.length} {active.length === 1 ? "student" : "students"}
+              {active.length > 0 && (
+                <Link href="/teacher" className="font-medium text-accent-ink underline">
+                  Teacher desk
+                </Link>
+              )}
             </span>
           }
         >
