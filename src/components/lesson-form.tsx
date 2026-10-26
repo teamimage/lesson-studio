@@ -86,7 +86,7 @@ export function LessonForm({
     });
   }
 
-  function submit(intent: "draft" | "approve") {
+  function submit(intent: "draft" | "approve" | "update") {
     const fd = new FormData();
     fd.set("payload", JSON.stringify(payload));
     fd.set("intent", intent);
@@ -98,7 +98,7 @@ export function LessonForm({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        submit(isApproved ? "approve" : "draft");
+        submit(isApproved ? "update" : "draft");
       }}
       className="flex flex-col gap-7"
     >

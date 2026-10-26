@@ -22,7 +22,7 @@ function studentFields(fd: FormData) {
     notes: str(fd, "notes"),
     lesson_day: str(fd, "lesson_day"),
     lesson_time: str(fd, "lesson_time"),
-    active: fd.get("active") !== "off",
+    active: fd.has("active") ? fd.getAll("active").includes("on") : true,
   };
 }
 
@@ -85,7 +85,7 @@ async function linkParent(teacherId: string, studentId: string, name: string, em
     .from("parents")
     .select("id")
     .eq("teacher_id", teacherId)
-    .ilike("email", lower)
+    .eq("email", lower)
     .maybeSingle();
   let parentId = existing?.id;
   if (!parentId) {

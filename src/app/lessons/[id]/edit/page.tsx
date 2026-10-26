@@ -69,6 +69,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           parent_message: lesson.parent_message ?? "",
           pieces: lesson.lesson_pieces.map((p) => ({ title: p.title, activity: p.activity, notes: p.notes ?? "" })),
           assignments: lesson.assignments.map((a) => ({
+            id: a.id,
             kind: a.kind,
             title: a.title,
             how: a.how ?? "",

@@ -6,6 +6,7 @@ import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Enums } from "@/lib/supabase/types";
 import { Constants } from "@/lib/supabase/types";
+import { todayISO } from "@/lib/format";
 
 export type PieceInput = {
   title: string;
@@ -13,6 +14,8 @@ export type PieceInput = {
   notes: string;
 };
 export type AssignmentInput = {
+  /** Existing row id when editing, so parents' checkmarks survive. */
+  id?: string;
   kind: Enums<"assignment_kind">;
   title: string;
   how: string;
@@ -45,7 +48,7 @@ function parsePayload(fd: FormData): LessonInput {
   const kinds = Constants.public.Enums.assignment_kind;
   return {
     student_id: clean(raw.student_id),
-    lesson_date: clean(raw.lesson_date) || new Date().toISOString().slice(0, 10),
+    lesson_date: clean(raw.lesson_date) || todayISO(),
     duration_minutes:
       raw.duration_minutes && Number.isFinite(Number(raw.duration_minutes)) ? Number(raw.duration_minutes) : null,
     summary: clean(raw.summary),
@@ -63,6 +66,7 @@ function parsePayload(fd: FormData): LessonInput {
       .filter((p) => p.title),
     assignments: (raw.assignments ?? [])
       .map((a) => ({
+        id: typeof a.id === "string" && /^[0-9a-f-]{36}$/.test(a.id) ? a.id : undefined,
         kind: kinds.includes(a.kind as never) ? (a.kind as Enums<"assignment_kind">) : "piece",
         title: clean(a.title),
         how: clean(a.how),
@@ -78,7 +82,8 @@ export async function saveLesson(fd: FormData) {
   const supabase = await createClient();
   const input = parsePayload(fd);
   const lessonId = clean(fd.get("lesson_id"));
-  const approve = fd.get("intent") === "approve";
+  const intent = String(fd.get("intent") ?? "draft");
+  const approve = intent === "approve";
   if (!input.student_id) redirect("/");
 
   const base = {
@@ -99,7 +104,6 @@ export async function saveLesson(fd: FormData) {
     const { error } = await supabase.from("lessons").update(base).eq("id", id);
     if (error) redirect(`/lessons/${id}/edit?error=save`);
     await supabase.from("lesson_pieces").delete().eq("lesson_id", id);
-    await supabase.from("assignments").delete().eq("lesson_id", id);
   } else {
     const { data, error } = await supabase.from("lessons").insert(base).select("id").single();
     if (error || !data) redirect(`/students/${input.student_id}/lessons/new?error=save`);
@@ -117,21 +121,35 @@ export async function saveLesson(fd: FormData) {
       })),
     );
   }
-  if (input.assignments.length) {
-    await supabase.from("assignments").insert(
-      input.assignments.map((a, i) => ({
-        lesson_id: id,
-        student_id: input.student_id,
-        kind: a.kind,
-        title: a.title,
-        how: orNull(a.how),
-        every_day: a.every_day,
-        sort_order: i + 1,
-      })),
-    );
+  // Assignments are updated in place where possible: practice logs point at
+  // their ids, and a re-insert would lose the family's checkmarks.
+  const { data: existingRows } = await supabase.from("assignments").select("id").eq("lesson_id", id);
+  const existing = new Set((existingRows ?? []).map((r) => r.id));
+  const keep = new Set<string>();
+  const inserts = [];
+  for (const [i, a] of input.assignments.entries()) {
+    const row = {
+      lesson_id: id,
+      student_id: input.student_id,
+      kind: a.kind,
+      title: a.title,
+      how: orNull(a.how),
+      every_day: a.every_day,
+      sort_order: i + 1,
+    };
+    if (a.id && existing.has(a.id)) {
+      keep.add(a.id);
+      await supabase.from("assignments").update(row).eq("id", a.id);
+    } else {
+      inserts.push(row);
+    }
   }
+  const stale = [...existing].filter((x) => !keep.has(x));
+  if (stale.length) await supabase.from("assignments").delete().in("id", stale);
+  if (inserts.length) await supabase.from("assignments").insert(inserts);
 
   if (approve) await approveById(id);
+  else if (intent === "update") await syncRepertoire(id);
 
   revalidateLesson(id, input.student_id);
   redirect(`/lessons/${id}${approve ? "?approved=1" : ""}`);
@@ -167,9 +185,19 @@ export async function deleteLesson(fd: FormData) {
   redirect(studentId ? `/students/${studentId}` : "/");
 }
 
-// Approving publishes the record to parents and syncs the repertoire list:
-// every piece named in the lesson gets (or updates) a repertoire row.
+// Approving publishes the record to parents and syncs the repertoire list.
 async function approveById(id: string) {
+  const supabase = await createClient();
+
+  await supabase
+    .from("lessons")
+    .update({ status: "approved", approved_at: new Date().toISOString() })
+    .eq("id", id);
+  await syncRepertoire(id);
+}
+
+// Every piece named in the lesson gets (or updates) a repertoire row.
+async function syncRepertoire(id: string) {
   const supabase = await createClient();
   const { data: lesson } = await supabase
     .from("lessons")
@@ -177,11 +205,6 @@ async function approveById(id: string) {
     .eq("id", id)
     .maybeSingle();
   if (!lesson) return;
-
-  await supabase
-    .from("lessons")
-    .update({ status: "approved", approved_at: new Date().toISOString() })
-    .eq("id", id);
 
   const { data: rep } = await supabase.from("repertoire").select("*").eq("student_id", lesson.student_id);
   const byTitle = new Map((rep ?? []).map((r) => [r.title.toLowerCase(), r]));

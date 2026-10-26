@@ -23,23 +23,27 @@ export async function getViewer(): Promise<Viewer> {
 
   const [{ data: teacher }, { data: parentRows }] = await Promise.all([
     supabase.from("teachers").select("*").eq("user_id", userId).maybeSingle(),
-    supabase.from("parents").select("*"),
+    supabase
+      .from("parents")
+      .select("*")
+      .or(`user_id.eq.${userId},email.ilike.${email.replace(/[%,()]/g, "")}`),
   ]);
 
   let teacherRow = teacher ?? null;
   const parents = parentRows ?? [];
 
   if (!teacherRow && parents.length === 0) {
-    const { data: created } = await supabase
+    // Two components may race here on first load; the unique index on
+    // user_id makes the second insert a no-op, so re-read after.
+    await supabase
       .from("teachers")
-      .insert({ user_id: userId, name: "", studio_name: "" })
-      .select("*")
-      .single();
+      .upsert({ user_id: userId, name: "", studio_name: "" }, { onConflict: "user_id", ignoreDuplicates: true });
+    const { data: created } = await supabase.from("teachers").select("*").eq("user_id", userId).maybeSingle();
     teacherRow = created ?? null;
   }
 
   // Claim parent rows that were matched by email so later lookups are by id.
-  const unclaimed = parents.filter((p) => !p.user_id);
+  const unclaimed = parents.filter((p) => !p.user_id && p.email.toLowerCase() === email.toLowerCase());
   if (unclaimed.length > 0) {
     await supabase
       .from("parents")
