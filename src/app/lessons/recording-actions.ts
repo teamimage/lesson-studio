@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
-import { todayISO } from "@/lib/format";
+import { findOrCreateTodayLesson } from "@/lib/lesson-today";
 
 export type StartRecordingInput = {
   lessonId: string;
@@ -13,6 +13,8 @@ export type StartRecordingInput = {
   sizeBytes: number;
   mimeType: string;
   durationSeconds: number | null;
+  /** First-frame time read from the video file's metadata, if found. */
+  startedAt?: string | null;
 };
 export type StartRecordingResult = { id: string; path: string } | { error: string };
 
@@ -54,6 +56,8 @@ export async function startRecording(input: StartRecordingInput): Promise<StartR
   const id = crypto.randomUUID();
   const path = `${teacher.id}/${lesson.student_id}/${id}/${safeName(fileName)}`;
   const duration = Number(input.durationSeconds);
+  const startedMs = input.startedAt ? Date.parse(input.startedAt) : NaN;
+  const startedAt = Number.isFinite(startedMs) ? new Date(startedMs).toISOString() : null;
   const { error } = await supabase.from("recordings").insert({
     id,
     teacher_id: teacher.id,
@@ -64,6 +68,7 @@ export async function startRecording(input: StartRecordingInput): Promise<StartR
     mime_type: input.mimeType || "video/mp4",
     size_bytes: sizeBytes,
     duration_seconds: Number.isFinite(duration) && duration > 0 ? duration : null,
+    ...(startedAt ? { started_at: startedAt, started_at_source: "file" } : {}),
   });
   if (error) return { error: "Couldn't start the upload. Try again." };
   return { id, path };
@@ -111,17 +116,39 @@ export async function deleteRecording(fd: FormData) {
   revalidatePath(`/family/${rec.student_id}`);
 }
 
-/** Starts a draft lesson for today so a video can be uploaded before notes exist. */
+/** Opens today's lesson (or starts a draft) so a video can be uploaded before notes exist. */
 export async function startLessonForRecording(fd: FormData) {
   const { teacher } = await requireTeacher();
   const studentId = String(fd.get("student_id") ?? "");
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("lessons")
-    .insert({ student_id: studentId, teacher_id: teacher.id, lesson_date: todayISO(), status: "draft" })
-    .select("id")
-    .single();
-  if (error || !data) redirect(`/students/${studentId}?error=lesson`);
+  const lessonId = await findOrCreateTodayLesson(studentId, teacher.id);
+  if (!lessonId) redirect(`/students/${studentId}?error=lesson`);
   revalidatePath(`/students/${studentId}`);
-  redirect(`/lessons/${data.id}?upload=1#recordings`);
+  redirect(`/lessons/${lessonId}?upload=1#recordings`);
+}
+
+/**
+ * Saves when a recording's first frame happened (wall-clock), so the music
+ * stand's page turns can be placed on the video.
+ */
+export async function setRecordingStart(
+  id: string,
+  startedAt: string | null,
+  source: "file" | "lineup",
+): Promise<{ ok: boolean }> {
+  await requireTeacher();
+  const t = startedAt ? Date.parse(startedAt) : NaN;
+  if (startedAt && !Number.isFinite(t)) return { ok: false };
+  const supabase = await createClient();
+  const { data: rec } = await supabase
+    .from("recordings")
+    .update({
+      started_at: startedAt ? new Date(t).toISOString() : null,
+      started_at_source: startedAt ? source : null,
+    })
+    .eq("id", id)
+    .select("lesson_id")
+    .maybeSingle();
+  if (!rec) return { ok: false };
+  revalidatePath(`/lessons/${rec.lesson_id}`);
+  return { ok: true };
 }

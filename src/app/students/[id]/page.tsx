@@ -10,6 +10,7 @@ import { capitalize, formatDate } from "@/lib/format";
 import { WeekStrip } from "@/components/week-strip";
 import { RepertoireMap } from "@/components/repertoire-map";
 import { startLessonForRecording } from "@/app/lessons/recording-actions";
+import { openMusicStand } from "@/app/students/music-actions";
 
 type Params = Promise<{ id: string }>;
 
@@ -56,6 +57,15 @@ async function Body({ params }: { params: Params }) {
             Pre-lesson brief
           </LinkButton>
           <LinkButton href={`/students/${id}/lessons/new`}>Record lesson</LinkButton>
+          <form action={openMusicStand}>
+            <input type="hidden" name="student_id" value={id} />
+            <Button variant="secondary" className="w-full">
+              Music stand
+            </Button>
+          </form>
+          <LinkButton href={`/students/${id}/music`} variant="secondary">
+            Music
+          </LinkButton>
           <form action={startLessonForRecording} className="col-span-2">
             <input type="hidden" name="student_id" value={id} />
             <Button variant="secondary" className="w-full">

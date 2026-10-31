@@ -8,6 +8,7 @@ import { RECORDINGS_BUCKET } from "@/lib/constants";
 import { formatBytes } from "@/lib/format";
 import { finishRecording, startRecording } from "@/app/lessons/recording-actions";
 import { cx } from "@/components/ui";
+import { readVideoStartTime } from "@/lib/video-start-time";
 
 // Supabase requires 6 MB chunks for resumable uploads.
 const CHUNK_SIZE = 6 * 1024 * 1024;
@@ -102,13 +103,14 @@ export function RecordingUploader({ lessonId, autoOpen = false }: { lessonId: st
     const { file, key } = item;
     patch(key, { state: "uploading", progress: 0, error: undefined });
     const type = contentType(file);
-    const duration = await readDuration(file);
+    const [duration, startedAt] = await Promise.all([readDuration(file), readVideoStartTime(file)]);
     const started = await startRecording({
       lessonId,
       fileName: file.name,
       sizeBytes: file.size,
       mimeType: type,
       durationSeconds: duration,
+      startedAt: startedAt?.toISOString() ?? null,
     });
     if ("error" in started) {
       patch(key, { state: "error", error: started.error });
