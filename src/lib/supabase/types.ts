@@ -276,6 +276,8 @@ export type Database = {
           lesson_id: string;
           mime_type: string;
           size_bytes: number;
+          started_at: string | null;
+          started_at_source: string | null;
           status: string;
           storage_path: string;
           student_id: string;
@@ -290,6 +292,8 @@ export type Database = {
           lesson_id: string;
           mime_type?: string;
           size_bytes?: number;
+          started_at?: string | null;
+          started_at_source?: string | null;
           status?: string;
           storage_path: string;
           student_id: string;
@@ -304,6 +308,8 @@ export type Database = {
           lesson_id?: string;
           mime_type?: string;
           size_bytes?: number;
+          started_at?: string | null;
+          started_at_source?: string | null;
           status?: string;
           storage_path?: string;
           student_id?: string;
@@ -373,6 +379,138 @@ export type Database = {
             columns: ["student_id"];
             isOneToOne: false;
             referencedRelation: "students";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      scores: {
+        Row: {
+          archived: boolean;
+          created_at: string;
+          id: string;
+          kind: string;
+          pages: Json;
+          repertoire_id: string | null;
+          sort_order: number;
+          student_id: string;
+          teacher_id: string;
+          title: string;
+        };
+        Insert: {
+          archived?: boolean;
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          pages?: Json;
+          repertoire_id?: string | null;
+          sort_order?: number;
+          student_id: string;
+          teacher_id: string;
+          title: string;
+        };
+        Update: {
+          archived?: boolean;
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          pages?: Json;
+          repertoire_id?: string | null;
+          sort_order?: number;
+          student_id?: string;
+          teacher_id?: string;
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "scores_repertoire_id_fkey";
+            columns: ["repertoire_id"];
+            isOneToOne: false;
+            referencedRelation: "repertoire";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "scores_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "students";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "scores_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "teachers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      stand_events: {
+        Row: {
+          at: string;
+          created_at: string;
+          id: string;
+          kind: string;
+          lesson_id: string;
+          note: string | null;
+          page: number | null;
+          rect: Json | null;
+          score_id: string | null;
+          student_id: string;
+          teacher_id: string;
+        };
+        Insert: {
+          at: string;
+          created_at?: string;
+          id?: string;
+          kind: string;
+          lesson_id: string;
+          note?: string | null;
+          page?: number | null;
+          rect?: Json | null;
+          score_id?: string | null;
+          student_id: string;
+          teacher_id: string;
+        };
+        Update: {
+          at?: string;
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          lesson_id?: string;
+          note?: string | null;
+          page?: number | null;
+          rect?: Json | null;
+          score_id?: string | null;
+          student_id?: string;
+          teacher_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stand_events_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "lessons";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stand_events_score_id_fkey";
+            columns: ["score_id"];
+            isOneToOne: false;
+            referencedRelation: "scores";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stand_events_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "students";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stand_events_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "teachers";
             referencedColumns: ["id"];
           },
         ];

@@ -11,6 +11,8 @@ import { formatDate, humanize } from "@/lib/format";
 import { listRecordingsForLesson } from "@/lib/recordings";
 import { RecordingList } from "@/components/recording-player";
 import { RecordingUploader } from "@/components/recording-uploader";
+import { LessonTimeline } from "@/components/lesson-timeline";
+import { listScores, listStandEvents } from "@/lib/scores";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ approved?: string; upload?: string }>;
@@ -27,9 +29,16 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   await requireTeacher();
   const { id } = await params;
   const { approved, upload } = await searchParams;
-  const [lesson, recordings] = await Promise.all([getLesson(id), listRecordingsForLesson(id)]);
+  const [lesson, recordings, standEvents] = await Promise.all([
+    getLesson(id),
+    listRecordingsForLesson(id),
+    listStandEvents(id),
+  ]);
   if (!lesson) notFound();
-  const student = await getStudent(lesson.student_id);
+  const [student, scores] = await Promise.all([
+    getStudent(lesson.student_id),
+    standEvents.length ? listScores(lesson.student_id, { includeArchived: true }) : Promise.resolve([]),
+  ]);
   if (!student) notFound();
   const isDraft = lesson.status === "draft";
 
@@ -119,6 +128,19 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               <p className="text-sm text-muted">The family can watch these from Home practice.</p>
             )}
           </div>
+        </section>
+
+        <section id="timeline" className="scroll-mt-4">
+          <SectionTitle
+            action={
+              <Link href={`/lessons/${id}/stand`} className="text-sm font-medium text-accent-ink">
+                Open music stand
+              </Link>
+            }
+          >
+            Music &amp; video
+          </SectionTitle>
+          <LessonTimeline recordings={recordings} events={standEvents} scores={scores} />
         </section>
 
         <section>

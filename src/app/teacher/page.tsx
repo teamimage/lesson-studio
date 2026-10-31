@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { Shell } from "@/components/shell";
-import { Card, EmptyState, LinkButton, Pill, SectionTitle, cx } from "@/components/ui";
+import { Button, Card, EmptyState, LinkButton, Pill, SectionTitle, cx } from "@/components/ui";
+import { openMusicStand } from "@/app/students/music-actions";
 import { requireTeacher } from "@/lib/auth";
 import {
   type PracticeLog,
@@ -194,6 +195,15 @@ async function StudentPanel({ student }: { student: Student }) {
           )}
           <LinkButton href={`/students/${id}`} variant="secondary" className="text-sm">
             Full profile
+          </LinkButton>
+          <form action={openMusicStand} className="col-span-2 sm:col-span-2">
+            <input type="hidden" name="student_id" value={id} />
+            <Button variant="secondary" className="w-full text-sm">
+              Open music stand
+            </Button>
+          </form>
+          <LinkButton href={`/students/${id}/music`} variant="secondary" className="col-span-2 text-sm sm:col-span-2">
+            Music for the stand
           </LinkButton>
         </div>
       </Card>
