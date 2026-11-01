@@ -28,14 +28,14 @@ export function Shell({
       <header className="no-print sticky top-0 z-10 border-b border-rule/80 bg-paper/90 backdrop-blur supports-[backdrop-filter]:bg-paper/75">
         <div
           className={cx(
-            "mx-auto flex w-full items-center gap-3 px-4 py-3",
+            "mx-auto flex w-full items-center gap-3 px-4 py-1",
             wide ? "max-w-5xl" : "max-w-2xl",
           )}
         >
           {back ? (
             <Link
               href={back.href}
-              className="-ml-1 flex min-h-10 items-center gap-1 rounded-lg px-1 text-accent-ink"
+              className="-ml-1 flex min-h-9 items-center gap-1 rounded-lg px-1 text-accent-ink"
             >
               <span aria-hidden>‹</span>
               <span className="text-sm font-medium">{back.label}</span>
@@ -51,17 +51,17 @@ export function Shell({
 
       <main
         className={cx(
-          "mx-auto w-full flex-1 px-4 pb-28 pt-5",
+          "mx-auto w-full flex-1 px-4 pb-28 pt-3",
           wide ? "max-w-5xl" : "max-w-2xl",
         )}
       >
-        <div className="mb-5">
+        <div className="mb-4">
           {eyebrow && (
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-accent-ink">
               {eyebrow}
             </div>
           )}
-          <h1 className="text-[28px] font-semibold leading-tight">{title}</h1>
+          <h1 className="text-[26px] font-medium leading-tight">{title}</h1>
         </div>
         {children}
       </main>
