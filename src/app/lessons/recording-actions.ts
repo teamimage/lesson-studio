@@ -92,20 +92,6 @@ export async function finishRecording(id: string): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
-export async function renameRecording(fd: FormData) {
-  await requireTeacher();
-  const id = String(fd.get("recording_id") ?? "");
-  const label = String(fd.get("label") ?? "").trim().slice(0, 80);
-  const supabase = await createClient();
-  const { data: rec } = await supabase
-    .from("recordings")
-    .update({ label: label || null })
-    .eq("id", id)
-    .select("lesson_id")
-    .maybeSingle();
-  if (rec) revalidatePath(`/lessons/${rec.lesson_id}`);
-}
-
 export async function deleteRecording(fd: FormData) {
   await requireTeacher();
   const id = String(fd.get("recording_id") ?? "");

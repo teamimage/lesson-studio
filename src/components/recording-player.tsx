@@ -1,5 +1,5 @@
 import type { RecordingWithUrl } from "@/lib/recordings";
-import { deleteRecording, renameRecording } from "@/app/lessons/recording-actions";
+import { deleteRecording } from "@/app/lessons/recording-actions";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { Pill } from "@/components/ui";
 import { LessonVideo } from "@/components/lesson-video";
@@ -7,7 +7,8 @@ import { StreamStatus } from "@/components/stream-status";
 import { streamingEnabled } from "@/lib/stream";
 
 /**
- * Lesson videos with playback. Teachers (editable) can rename and delete;
+ * Lesson videos with playback. Each video is named by its original file
+ * name (e.g. IMG_1962.MOV). Teachers (editable) can delete;
  * parents just watch. Rows still uploading show as pending. When fast
  * streaming is set up, teachers also see the streaming copy being prepared.
  */
@@ -60,17 +61,7 @@ export function RecordingList({ recordings, editable = false }: { recordings: Re
             </div>
           )}
           {editable && (
-            <div className="flex flex-wrap items-center gap-2 border-t border-rule px-3 py-2 text-sm">
-              <form action={renameRecording} className="flex flex-1 items-center gap-2">
-                <input type="hidden" name="recording_id" value={r.id} />
-                <input
-                  name="label"
-                  defaultValue={r.label ?? ""}
-                  placeholder="Name it, e.g. Piano camera"
-                  className="min-h-9 min-w-0 flex-1 rounded-lg border border-rule bg-paper px-2"
-                />
-                <button className="font-medium text-accent-ink">Save</button>
-              </form>
+            <div className="flex justify-end border-t border-rule px-3 py-2 text-sm">
               <form action={deleteRecording}>
                 <input type="hidden" name="recording_id" value={r.id} />
                 <button className="text-danger underline">Delete</button>
