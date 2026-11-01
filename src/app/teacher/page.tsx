@@ -1,3 +1,5 @@
+import { listScoreIndex } from "@/lib/scores";
+import { MusicPreviewLinks } from "@/components/music-preview-links";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
@@ -73,12 +75,13 @@ async function Desk({ searchParams }: { searchParams: SearchParams }) {
 async function StudentPanel({ student }: { student: Student }) {
   const id = student.id;
   const today = todayISO();
-  const [lessons, week, month, repertoire, recordings] = await Promise.all([
+  const [lessons, week, month, repertoire, recordings, music] = await Promise.all([
     listLessons(id, 20),
     getPracticeWeek(id),
     listPracticeRange(id, 28),
     listRepertoire(id),
     listRecordingsForStudent(id, 50),
+    listScoreIndex(id),
   ]);
 
   const latest = lessons[0] ?? null;
@@ -146,6 +149,7 @@ async function StudentPanel({ student }: { student: Student }) {
             </Button>
           </form>
         </div>
+        <MusicPreviewLinks studentId={id} scores={music} />
         <div className="grid gap-2 sm:grid-cols-2">
           <DeskLink
             href={`/teacher/${id}`}

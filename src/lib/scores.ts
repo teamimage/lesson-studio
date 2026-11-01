@@ -81,3 +81,33 @@ export async function listStandEvents(lessonId: string): Promise<StandEvent[]> {
     at: e.at,
   }));
 }
+
+/** A light list of a student's music (no page links), for linking to the viewer. */
+export async function listScoreIndex(studentId: string): Promise<
+  {
+    id: string;
+    title: string;
+    book: string;
+    sections: StandScore["sections"];
+    pageCount: number;
+  }[]
+> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("scores")
+    .select("id, title, analysis, pages, archived")
+    .eq("student_id", studentId)
+    .eq("archived", false)
+    .order("sort_order")
+    .order("created_at");
+  return (data ?? []).map((r) => {
+    const a = parseAnalysis(r.analysis);
+    return {
+      id: r.id,
+      title: r.title,
+      book: a?.book ?? "",
+      sections: a?.sections ?? [],
+      pageCount: parsePages(r.pages).length,
+    };
+  });
+}

@@ -13,6 +13,8 @@ import { RepertoireMap } from "@/components/repertoire-map";
 import { AddLesson } from "@/components/add-lesson";
 import { openMusicStand } from "@/app/students/music-actions";
 import { startLesson } from "@/app/lessons/live-actions";
+import { listScoreIndex } from "@/lib/scores";
+import { MusicPreviewLinks } from "@/components/music-preview-links";
 
 type Params = Promise<{ id: string }>;
 
@@ -29,11 +31,12 @@ async function Body({ params }: { params: Params }) {
   const { id } = await params;
   const student = await getStudent(id);
   if (!student) notFound();
-  const [lessons, week, repertoire, parents] = await Promise.all([
+  const [lessons, week, repertoire, parents, music] = await Promise.all([
     listLessons(id),
     getPracticeWeek(id),
     listRepertoire(id),
     listParentsForStudent(id),
+    listScoreIndex(id),
   ]);
 
   return (
@@ -75,6 +78,7 @@ async function Body({ params }: { params: Params }) {
           <LinkButton href={`/students/${id}/music`} variant="secondary">
             Music
           </LinkButton>
+          <MusicPreviewLinks studentId={id} scores={music} className="col-span-2 px-1" />
           <div className="col-span-2">
             <AddLesson studentId={id} />
           </div>
@@ -168,7 +172,13 @@ async function Body({ params }: { params: Params }) {
 
         <section>
           <SectionTitle>Repertoire map</SectionTitle>
-          <RepertoireMap studentId={id} instrument={student.instrument} repertoire={repertoire} editable />
+          <RepertoireMap
+            studentId={id}
+            instrument={student.instrument}
+            repertoire={repertoire}
+            scores={music}
+            editable
+          />
         </section>
 
         <section>
