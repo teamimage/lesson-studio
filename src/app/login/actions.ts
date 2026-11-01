@@ -3,17 +3,18 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createMailerClient } from "@/lib/supabase/mailer";
 
-// Sends an email with both a sign-in link and a one-time code.
+// Sends a sign-in email. It always has a link (handled by EmailLinkHandler
+// on /login); it also shows a 6-digit code if the Supabase template has {{ .Token }}.
 export async function sendMagicLink(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   if (!email) redirect("/login?error=email");
 
   const origin = (await headers()).get("origin") ?? "";
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await createMailerClient().auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: `${origin}/auth/confirm` },
+    options: { emailRedirectTo: `${origin}/login` },
   });
 
   if (error) redirect("/login?error=send");
@@ -53,15 +54,16 @@ export async function signInWithPassword(formData: FormData) {
 }
 
 // Emails a link that signs the user in and opens Settings to choose a
-// new password. /auth/confirm handles both link formats (token_hash or code).
+// new password (see EmailLinkHandler).
 export async function sendPasswordReset(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   if (!email) redirect("/login?mode=reset&error=email");
 
   const origin = (await headers()).get("origin") ?? "";
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/confirm?next=${encodeURIComponent("/settings?password=reset")}`,
+  // Works for accounts that never had a password too: the link signs them
+  // in and opens Settings, where they choose one.
+  const { error } = await createMailerClient().auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/login`,
   });
 
   if (error) redirect(`/login?mode=reset&error=send&for=${encodeURIComponent(email)}`);
