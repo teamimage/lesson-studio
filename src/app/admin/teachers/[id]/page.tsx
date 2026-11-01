@@ -6,7 +6,7 @@ import { AdminDeleteButton, AdminEditForm, AdminNotices, Fold } from "@/componen
 import { ConfirmButton } from "@/components/confirm-button";
 import { Button, Card, Field, Input, Pill, Select, SectionTitle } from "@/components/ui";
 import { requireAdmin } from "@/lib/admin";
-import { INSTRUMENTS } from "@/lib/constants";
+import { INSTRUMENTS, instrumentLabel } from "@/lib/constants";
 import { capitalize } from "@/lib/format";
 import { adminCreateStudent, adminDeleteAccount } from "../../actions";
 
@@ -82,7 +82,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                   <Select name="instrument" defaultValue="piano">
                     {INSTRUMENTS.map((i) => (
                       <option key={i} value={i}>
-                        {capitalize(i)}
+                        {instrumentLabel(i)}
                       </option>
                     ))}
                   </Select>

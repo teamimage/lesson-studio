@@ -1,7 +1,6 @@
-import { Button, Field, Input, Select, Textarea } from "@/components/ui";
-import { INSTRUMENTS } from "@/lib/constants";
+import { Button, Field, Input, Textarea } from "@/components/ui";
+import { InstrumentBookFields } from "@/components/instrument-book-fields";
 import type { Student } from "@/lib/data";
-import { capitalize } from "@/lib/format";
 
 export function StudentForm({
   student,
@@ -21,25 +20,14 @@ export function StudentForm({
         <Input name="name" required defaultValue={student?.name ?? ""} autoComplete="off" placeholder="First name" />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Instrument">
-          <Select name="instrument" defaultValue={student?.instrument ?? "piano"}>
-            {INSTRUMENTS.map((i) => (
-              <option key={i} value={i}>
-                {capitalize(i)}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        <InstrumentBookFields instrument={student?.instrument} currentBook={student?.current_book} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
         <Field label="Age">
           <Input name="age" type="number" inputMode="numeric" min={2} max={99} defaultValue={student?.age ?? ""} />
         </Field>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
         <Field label="Method">
           <Input name="method" defaultValue={student?.method ?? "Suzuki"} />
-        </Field>
-        <Field label="Current book">
-          <Input name="current_book" defaultValue={student?.current_book ?? ""} placeholder="Suzuki Book 1" />
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">

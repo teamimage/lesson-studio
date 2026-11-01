@@ -1,7 +1,7 @@
-import { ASSIGNMENT_KINDS, INSTRUMENTS, PIECE_ACTIVITIES, SCORE_KINDS } from "@/lib/constants";
+import { ASSIGNMENT_KINDS, PIECE_ACTIVITIES, SCORE_KINDS } from "@/lib/constants";
 
 // Which columns the admin site may edit, per table, and how to show them.
-export type FieldKind = "text" | "longtext" | "int" | "date" | "bool" | "email" | "select";
+export type FieldKind = "text" | "longtext" | "int" | "date" | "bool" | "email" | "select" | "instrument" | "book";
 export type FieldSpec = {
   label: string;
   kind: FieldKind;
@@ -22,15 +22,11 @@ export const ADMIN_FIELDS = {
   },
   students: {
     name: { label: "Name", kind: "text", required: true },
-    instrument: {
-      label: "Instrument",
-      kind: "select",
-      required: true,
-      options: INSTRUMENTS.map((i) => ({ value: i, label: i[0].toUpperCase() + i.slice(1) })),
-    },
+    // "instrument" draws the instrument and Suzuki book pickers together; "book" is drawn there.
+    instrument: { label: "Instrument", kind: "instrument", required: true },
     age: { label: "Age", kind: "int" },
     method: { label: "Method", kind: "text", required: true },
-    current_book: { label: "Current book", kind: "text" },
+    current_book: { label: "Current book", kind: "book" },
     lesson_day: { label: "Lesson day", kind: "text" },
     lesson_time: { label: "Lesson time", kind: "text" },
     goals: { label: "Goals (parents see these)", kind: "longtext" },
