@@ -16,6 +16,12 @@ export type Database = {
   };
   public: {
     Tables: {
+      app_admins: {
+        Row: { user_id: string; created_at: string };
+        Insert: { user_id: string; created_at?: string };
+        Update: { user_id?: string; created_at?: string };
+        Relationships: [];
+      };
       assignments: {
         Row: {
           created_at: string;
@@ -630,6 +636,13 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_delete_user: { Args: { uid: string }; Returns: undefined };
+      admin_list_users: {
+        Args: never;
+        Returns: { id: string; email: string; created_at: string; last_sign_in_at: string | null }[];
+      };
+      admin_make_teacher: { Args: { uid: string }; Returns: string };
+      is_app_admin: { Args: never; Returns: boolean };
       my_parent_ids: { Args: never; Returns: string[] };
       my_teacher_id: { Args: never; Returns: string };
       parents_student: { Args: { sid: string }; Returns: boolean };
