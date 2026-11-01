@@ -1,11 +1,9 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
-import { findOrCreateTodayLesson } from "@/lib/lesson-today";
 
 export type StartRecordingInput = {
   lessonId: string;
@@ -114,16 +112,6 @@ export async function deleteRecording(fd: FormData) {
   revalidatePath(`/lessons/${rec.lesson_id}`);
   revalidatePath(`/students/${rec.student_id}`);
   revalidatePath(`/family/${rec.student_id}`);
-}
-
-/** Opens today's lesson (or starts a draft) so a video can be uploaded before notes exist. */
-export async function startLessonForRecording(fd: FormData) {
-  const { teacher } = await requireTeacher();
-  const studentId = String(fd.get("student_id") ?? "");
-  const lessonId = await findOrCreateTodayLesson(studentId, teacher.id);
-  if (!lessonId) redirect(`/students/${studentId}?error=lesson`);
-  revalidatePath(`/students/${studentId}`);
-  redirect(`/lessons/${lessonId}?upload=1#recordings`);
 }
 
 /**

@@ -10,7 +10,7 @@ import { capitalize, formatDate } from "@/lib/format";
 import { TodayDate } from "@/components/today-date";
 import { WeekStrip } from "@/components/week-strip";
 import { RepertoireMap } from "@/components/repertoire-map";
-import { startLessonForRecording } from "@/app/lessons/recording-actions";
+import { AddLesson } from "@/components/add-lesson";
 import { openMusicStand } from "@/app/students/music-actions";
 import { startLesson } from "@/app/lessons/live-actions";
 
@@ -75,12 +75,9 @@ async function Body({ params }: { params: Params }) {
           <LinkButton href={`/students/${id}/music`} variant="secondary">
             Music
           </LinkButton>
-          <form action={startLessonForRecording} className="col-span-2">
-            <input type="hidden" name="student_id" value={id} />
-            <Button variant="secondary" className="w-full">
-              Upload today&apos;s lesson video
-            </Button>
-          </form>
+          <div className="col-span-2">
+            <AddLesson studentId={id} />
+          </div>
         </div>
 
         <section>
