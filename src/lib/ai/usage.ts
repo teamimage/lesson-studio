@@ -5,6 +5,8 @@ import { latestTranscript, stateOf, type ProcessState } from "./process-lesson";
 export type LessonAi = {
   state: ProcessState;
   transcript: string | null;
+  /** What Claude drafted (moments and assignment video times live here). */
+  draft: unknown;
   costUsd: number;
 };
 
@@ -18,6 +20,7 @@ export async function getLessonAi(lessonId: string): Promise<LessonAi> {
   return {
     state: stateOf(row),
     transcript: row?.transcript ?? null,
+    draft: row?.draft ?? null,
     costUsd: (usage ?? []).reduce((s, u) => s + Number(u.cost_usd), 0),
   };
 }
