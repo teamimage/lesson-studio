@@ -167,6 +167,15 @@ export function MusicStand({
     [teacherId, studentId, lessonId, persist, flush],
   );
 
+  // The first time the stand opens for a lesson, note it (as "no piece open"),
+  // so the lesson card on the teacher's phone sees the stand is running.
+  const openedLogged = useRef(priorEvents.length > 0);
+  useEffect(() => {
+    if (openedLogged.current) return;
+    openedLogged.current = true;
+    if (queue.current.length === 0) log("close");
+  }, [log]);
+
   // ------------------------------------------------------------ navigation
   const score = current ? byId.get(current.scoreId) : undefined;
   const page = score && current ? score.pages[current.page - 1] : undefined;
@@ -348,7 +357,7 @@ export function MusicStand({
   return (
     <div className="fixed inset-0 flex flex-col bg-[#ece6dc] text-ink dark:bg-[#1c1916]">
       <header className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-rule bg-sheet px-2 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))]">
-        <Link href={`/lessons/${lessonId}`} className="flex min-h-10 shrink-0 items-center px-2 text-sm text-accent-ink">
+        <Link href={`/lessons/${lessonId}/live`} className="flex min-h-10 shrink-0 items-center px-2 text-sm text-accent-ink">
           ‹ Lesson
         </Link>
         <button

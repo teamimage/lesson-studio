@@ -12,6 +12,7 @@ import { WeekStrip } from "@/components/week-strip";
 import { RepertoireMap } from "@/components/repertoire-map";
 import { startLessonForRecording } from "@/app/lessons/recording-actions";
 import { openMusicStand } from "@/app/students/music-actions";
+import { startLesson } from "@/app/lessons/live-actions";
 
 type Params = Promise<{ id: string }>;
 
@@ -57,7 +58,7 @@ async function Body({ params }: { params: Params }) {
     >
       <div className="flex flex-col gap-6">
         <div className="grid grid-cols-2 gap-2">
-          <form action={openMusicStand} className="col-span-2">
+          <form action={startLesson} className="col-span-2">
             <input type="hidden" name="student_id" value={id} />
             <Button className="min-h-14 w-full text-lg">Start lesson</Button>
           </form>
