@@ -2,25 +2,31 @@ import type { RecordingWithUrl } from "@/lib/recordings";
 import { deleteRecording, renameRecording } from "@/app/lessons/recording-actions";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { Pill } from "@/components/ui";
+import { LessonVideo } from "@/components/lesson-video";
+import { StreamStatus } from "@/components/stream-status";
+import { streamingEnabled } from "@/lib/stream";
 
 /**
  * Lesson videos with playback. Teachers (editable) can rename and delete;
- * parents just watch. Rows still uploading show as pending.
+ * parents just watch. Rows still uploading show as pending. When fast
+ * streaming is set up, teachers also see the streaming copy being prepared.
  */
 export function RecordingList({ recordings, editable = false }: { recordings: RecordingWithUrl[]; editable?: boolean }) {
   const shown = editable ? recordings : recordings.filter((r) => r.url);
   if (shown.length === 0) return null;
+  const streaming = streamingEnabled();
   return (
     <ul className="flex flex-col gap-3">
       {shown.map((r) => (
         <li key={r.id} className="overflow-hidden rounded-2xl border border-rule bg-sheet">
           {r.url ? (
-            // #t=0.1 makes iPhone Safari show the first frame instead of a black box.
-            <video
+            <LessonVideo
+              recordingId={r.id}
+              src={r.url}
+              streamReady={r.streamReady}
               controls
               playsInline
               preload="metadata"
-              src={`${r.url}#t=0.1`}
               className="aspect-video w-full bg-black"
             />
           ) : (
@@ -31,6 +37,7 @@ export function RecordingList({ recordings, editable = false }: { recordings: Re
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm">
             <span className="font-medium">{r.label || r.file_name}</span>
             {r.status !== "ready" && <Pill tone="amber">Uploading</Pill>}
+            {editable && r.streamReady && <Pill tone="sage">Fast streaming</Pill>}
             <span className="text-muted">
               {[r.duration_seconds ? formatDuration(Number(r.duration_seconds)) : null, formatBytes(Number(r.size_bytes))]
                 .filter(Boolean)
@@ -38,10 +45,15 @@ export function RecordingList({ recordings, editable = false }: { recordings: Re
             </span>
             {r.url && (
               <a href={r.url} target="_blank" rel="noreferrer" className="ml-auto text-accent-ink underline">
-                Open
+                {r.streamReady ? "Original" : "Open"}
               </a>
             )}
           </div>
+          {editable && streaming && r.status === "ready" && !r.streamReady && (
+            <div className="border-t border-rule px-3 py-2">
+              <StreamStatus recordingId={r.id} initialStatus={r.stream_status} initialError={r.stream_error} />
+            </div>
+          )}
           {editable && (
             <div className="flex flex-wrap items-center gap-2 border-t border-rule px-3 py-2 text-sm">
               <form action={renameRecording} className="flex flex-1 items-center gap-2">

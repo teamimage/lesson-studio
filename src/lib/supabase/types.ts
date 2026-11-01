@@ -390,6 +390,10 @@ export type Database = {
           started_at_source: string | null;
           status: string;
           storage_path: string;
+          stream_error: string | null;
+          stream_hls_url: string | null;
+          stream_status: string | null;
+          stream_uid: string | null;
           student_id: string;
           teacher_id: string;
         };
@@ -406,6 +410,10 @@ export type Database = {
           started_at_source?: string | null;
           status?: string;
           storage_path: string;
+          stream_error?: string | null;
+          stream_hls_url?: string | null;
+          stream_status?: string | null;
+          stream_uid?: string | null;
           student_id: string;
           teacher_id: string;
         };
@@ -422,6 +430,10 @@ export type Database = {
           started_at_source?: string | null;
           status?: string;
           storage_path?: string;
+          stream_error?: string | null;
+          stream_hls_url?: string | null;
+          stream_status?: string | null;
+          stream_uid?: string | null;
           student_id?: string;
           teacher_id?: string;
         };
