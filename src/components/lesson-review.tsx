@@ -82,13 +82,15 @@ export function LessonReview({ moments, multiVideo }: { moments: Moment[]; multi
             </button>
             {m.pages && (
               <div className="-mt-0.5 flex flex-wrap gap-1 pb-1.5 pl-[5.9rem] pr-3">
-                {m.pages.map((p) => (
+                {m.pages.map((p, pi) => (
                   <JumpButton
                     key={`${p.page}-${p.seconds}`}
                     jump={{
                       recordingId: m.recordingId,
                       seconds: p.seconds,
                       label: `${m.label}, page ${p.page}`,
+                      endSeconds: m.pages![pi + 1]?.seconds ?? m.endSeconds,
+                      summary: m.summary,
                     }}
                     className="min-h-6 px-1.5 font-medium"
                   >

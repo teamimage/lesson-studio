@@ -12,7 +12,15 @@ import { buildBlocks, buildSegments, formatClock, type StandEvent } from "@/lib/
 export type MomentKind = "piece" | "mark" | "ai";
 
 /** A spot in a lesson video. */
-export type Jump = { recordingId: string; seconds: number; label: string };
+export type Jump = {
+  recordingId: string;
+  seconds: number;
+  label: string;
+  /** Where the clip stops: the next bookmark (null or missing = end of video). */
+  endSeconds?: number | null;
+  /** What the clip is for, shown above the popup player. */
+  summary?: string[];
+};
 
 export type Moment = Jump & {
   id: string;
@@ -220,6 +228,58 @@ export function assignmentJumps(
       };
   }
   return out;
+}
+
+/** The start of the next bookmark after `seconds` in the same video. */
+export function clipEnd(moments: Moment[], recordingId: string, seconds: number): number | null {
+  let end: number | null = null;
+  for (const m of moments) {
+    if (m.recordingId !== recordingId || m.seconds <= seconds + 1) continue;
+    if (end === null || m.seconds < end) end = m.seconds;
+  }
+  return end;
+}
+
+/**
+ * Gives every moment and assignment jump its clip end (the next bookmark)
+ * and a short summary for the popup: the moment's detail, notes on the piece
+ * it is about, and the practice assignments worked on during the clip.
+ */
+export function withClipInfo(
+  moments: Moment[],
+  jumps: Record<string, Jump>,
+  assignments: { id: string; title: string; how: string | null }[],
+  pieces: { title: string; notes: string | null }[],
+): { moments: Moment[]; jumps: Record<string, Jump> } {
+  const outMoments = moments.map((m) => {
+    const endSeconds = clipEnd(moments, m.recordingId, m.seconds);
+    const lines: string[] = [];
+    if (m.detail) lines.push(m.detail);
+    const have = new Set(words(m.label));
+    for (const p of pieces) {
+      const want = words(p.title);
+      if (p.notes && want.length && want.filter((w) => have.has(w)).length / want.length >= 0.6)
+        lines.push(`${p.title}: ${p.notes}`);
+    }
+    for (const a of assignments) {
+      const j = jumps[a.id];
+      if (!j || j.recordingId !== m.recordingId) continue;
+      if (j.seconds >= m.seconds - 1 && (endSeconds === null || j.seconds < endSeconds))
+        lines.push(`Practice: ${a.title}${a.how ? `. ${a.how}` : ""}`);
+    }
+    return { ...m, endSeconds, summary: lines };
+  });
+  const outJumps: Record<string, Jump> = {};
+  for (const a of assignments) {
+    const j = jumps[a.id];
+    if (!j) continue;
+    outJumps[a.id] = {
+      ...j,
+      endSeconds: clipEnd(moments, j.recordingId, j.seconds),
+      summary: a.how ? [a.how] : [],
+    };
+  }
+  return { moments: outMoments, jumps: outJumps };
 }
 
 export { formatClock };
