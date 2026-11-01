@@ -7,6 +7,7 @@ import { Button, Card, EmptyState, LinkButton, Pill, SectionTitle } from "@/comp
 import { requireTeacher } from "@/lib/auth";
 import { getPracticeWeek, getStudent, listLessons, listParentsForStudent, listRepertoire } from "@/lib/data";
 import { capitalize, formatDate } from "@/lib/format";
+import { TodayDate } from "@/components/today-date";
 import { WeekStrip } from "@/components/week-strip";
 import { RepertoireMap } from "@/components/repertoire-map";
 import { startLessonForRecording } from "@/app/lessons/recording-actions";
@@ -46,13 +47,20 @@ async function Body({ params }: { params: Params }) {
       back={{ href: "/", label: "Studio" }}
       tab="studio"
       actions={
-        <Link href={`/students/${id}/edit`} className="text-sm font-medium text-accent-ink">
-          Edit
-        </Link>
+        <>
+          <TodayDate className="text-sm text-muted" />
+          <Link href={`/students/${id}/edit`} className="ml-2 text-sm font-medium text-accent-ink">
+            Edit
+          </Link>
+        </>
       }
     >
       <div className="flex flex-col gap-6">
         <div className="grid grid-cols-2 gap-2">
+          <form action={openMusicStand} className="col-span-2">
+            <input type="hidden" name="student_id" value={id} />
+            <Button className="min-h-14 w-full text-lg">Start lesson</Button>
+          </form>
           <LinkButton href={`/students/${id}/brief`} variant="secondary">
             Pre-lesson brief
           </LinkButton>
@@ -73,52 +81,6 @@ async function Body({ params }: { params: Params }) {
             </Button>
           </form>
         </div>
-
-        <Card>
-          <div className="mb-2 flex items-baseline justify-between">
-            <div className="font-semibold">Practice this week</div>
-            <div className="text-sm text-muted">
-              {week.daysPracticed}/7 days · {week.totalMinutes} min
-            </div>
-          </div>
-          <WeekStrip week={week} />
-          {week.notes.length > 0 && (
-            <ul className="mt-3 flex flex-col gap-1.5 text-sm">
-              {week.notes.map((n) => (
-                <li key={n.id} className="rounded-xl bg-plum-soft px-3 py-2">
-                  <span className="font-medium text-plum">{formatDate(n.practice_date)}:</span> {n.parent_note}
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link href={`/family/${id}`} className="mt-3 inline-block text-sm text-accent-ink underline">
-            Open the parent view
-          </Link>
-        </Card>
-
-        {(student.goals || student.notes || student.lesson_day) && (
-          <Card className="flex flex-col gap-2 text-[15px]">
-            {student.lesson_day && (
-              <div>
-                <span className="text-muted">Lessons: </span>
-                {student.lesson_day}
-                {student.lesson_time ? ` at ${student.lesson_time}` : ""}
-              </div>
-            )}
-            {student.goals && (
-              <div>
-                <span className="text-muted">Goals: </span>
-                {student.goals}
-              </div>
-            )}
-            {student.notes && (
-              <div>
-                <span className="text-muted">Private notes: </span>
-                {student.notes}
-              </div>
-            )}
-          </Card>
-        )}
 
         <section>
           <SectionTitle>Lesson history</SectionTitle>
@@ -154,6 +116,57 @@ async function Body({ params }: { params: Params }) {
             </div>
           )}
         </section>
+
+        <section>
+          <SectionTitle
+            action={
+              <span className="text-sm text-muted">
+                {week.daysPracticed}/7 days · {week.totalMinutes} min
+              </span>
+            }
+          >
+            Practice this week
+          </SectionTitle>
+          <Card>
+            <WeekStrip week={week} />
+            {week.notes.length > 0 && (
+              <ul className="mt-3 flex flex-col gap-1.5 text-sm">
+                {week.notes.map((n) => (
+                  <li key={n.id} className="rounded-xl bg-plum-soft px-3 py-2">
+                    <span className="font-medium text-plum">{formatDate(n.practice_date)}:</span> {n.parent_note}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link href={`/family/${id}`} className="mt-3 inline-block text-sm text-accent-ink underline">
+              Open the parent view
+            </Link>
+          </Card>
+        </section>
+
+        {(student.goals || student.notes || student.lesson_day) && (
+          <Card className="flex flex-col gap-2 text-[15px]">
+            {student.lesson_day && (
+              <div>
+                <span className="text-muted">Lessons: </span>
+                {student.lesson_day}
+                {student.lesson_time ? ` at ${student.lesson_time}` : ""}
+              </div>
+            )}
+            {student.goals && (
+              <div>
+                <span className="text-muted">Goals: </span>
+                {student.goals}
+              </div>
+            )}
+            {student.notes && (
+              <div>
+                <span className="text-muted">Private notes: </span>
+                {student.notes}
+              </div>
+            )}
+          </Card>
+        )}
 
         <section>
           <SectionTitle>Repertoire map</SectionTitle>
