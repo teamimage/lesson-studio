@@ -14,7 +14,7 @@ const INCLUDED_BYTES = 100 * 1024 ** 3;
 const OVERAGE_PER_GB = 0.0213;
 const BUCKET_NAMES: Record<string, string> = {
   "lesson-recordings": "Lesson videos",
-  "lesson-scores": "Sheet music pages",
+  "lesson-scores": "Sheet music (pages and original files)",
 };
 
 type SP = Promise<{ deleted?: string; error?: string }>;

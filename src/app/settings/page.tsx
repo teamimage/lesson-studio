@@ -119,7 +119,8 @@ function monthLabel(ym: string): string {
   return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-// Running totals of what processing lesson videos has cost (transcription + Claude).
+// Running totals of what the AI has cost: lesson videos (transcription +
+// Claude) and reading uploaded sheet music.
 async function AiCosts({ teacherId }: { teacherId: string }) {
   const usage = await getUsageSummary(teacherId);
   return (
@@ -138,7 +139,7 @@ async function AiCosts({ teacherId }: { teacherId: string }) {
         </div>
         {usage.lessons.length === 0 ? (
           <p className="text-sm text-muted">
-            Nothing yet. Costs show up here after you press Process video on a lesson.
+            Nothing yet. Costs show up here after a lesson video is processed or sheet music is read.
           </p>
         ) : (
           <>
@@ -154,12 +155,24 @@ async function AiCosts({ teacherId }: { teacherId: string }) {
               </ul>
             </div>
             <div>
-              <div className="mb-1 text-sm font-semibold">By lesson</div>
+              <div className="mb-1 text-sm font-semibold">By lesson and music</div>
               <ul className="divide-y divide-rule text-sm">
                 {usage.lessons.slice(0, 30).map((l) => (
-                  <li key={l.lessonId ?? "deleted"} className="flex items-baseline justify-between gap-3 py-1.5">
+                  <li
+                    key={l.key}
+                    className="flex items-baseline justify-between gap-3 py-1.5"
+                  >
                     <span className="min-w-0">
-                      {l.lessonId ? (
+                      {l.music ? (
+                        l.scoreTitle ? (
+                          <span className="font-medium">
+                            Sheet music: {l.scoreTitle}
+                            {l.studentName ? ` (${l.studentName})` : ""}
+                          </span>
+                        ) : (
+                          <span className="text-muted">Deleted sheet music</span>
+                        )
+                      ) : l.lessonId ? (
                         <Link href={`/lessons/${l.lessonId}`} className="font-medium text-accent-ink">
                           {l.studentName ?? "Lesson"}
                           {l.lessonDate ? `, ${formatDate(l.lessonDate)}` : ""}

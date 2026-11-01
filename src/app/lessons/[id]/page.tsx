@@ -72,6 +72,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     })),
     events: standEvents,
     scoreTitles: Object.fromEntries(scores.map((s) => [s.id, s.title])),
+    scoreSections: Object.fromEntries(scores.map((s) => [s.id, s.sections])),
     ai: aiRecording ? { recordingId: aiRecording, moments: aiMoments } : null,
   });
   const { moments, jumps } = withClipInfo(

@@ -13,12 +13,36 @@ import {
   type StandEventKind,
   type StandScore,
 } from "@/lib/stand-timeline";
+import { pageRange, sectionAt, sectionLabel } from "@/lib/score-analysis";
 
 type Row = TablesInsert<"stand_events"> & { id: string; at: string };
 type Current = { scoreId: string; page: number } | null;
 type Mark = { id: string; scoreId: string | null; page: number | null; rect: Rect };
 
 const FLUSH_EVERY_MS = 4000;
+
+// Browser full screen, with the older webkit names iPad Safari still uses.
+type FsDoc = Document & { webkitFullscreenElement?: Element | null; webkitExitFullscreen?: () => Promise<void> | void };
+type FsEl = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+function fullscreenElement(): Element | null {
+  const d = document as FsDoc;
+  return d.fullscreenElement ?? d.webkitFullscreenElement ?? null;
+}
+async function enterFullscreen(): Promise<void> {
+  const el = document.documentElement as FsEl;
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: "hide" });
+    else await el.webkitRequestFullscreen?.();
+  } catch {}
+}
+async function exitFullscreen(): Promise<void> {
+  const d = document as FsDoc;
+  if (!fullscreenElement()) return;
+  try {
+    if (d.exitFullscreen) await d.exitFullscreen();
+    else await d.webkitExitFullscreen?.();
+  } catch {}
+}
 
 function lastPosition(events: StandEvent[]): Current {
   for (let i = events.length - 1; i >= 0; i--) {
@@ -73,6 +97,9 @@ export function MusicStand({
   const [pickerOpen, setPickerOpen] = useState(() => lastPosition(priorEvents) === null);
   const [markMode, setMarkMode] = useState(false);
   const [fitWidth, setFitWidth] = useState(false);
+  // Full screen: only the music shows (browser full screen where it exists,
+  // and the stand's own bars hidden everywhere).
+  const [full, setFull] = useState(false);
   const [flash, setFlash] = useState(false);
   const [synced, setSynced] = useState(() => priorEvents.some((e) => e.kind === "sync"));
   const [syncHintHidden, setSyncHintHidden] = useState(false);
@@ -180,6 +207,25 @@ export function MusicStand({
   const score = current ? byId.get(current.scoreId) : undefined;
   const page = score && current ? score.pages[current.page - 1] : undefined;
 
+  const toggleFull = useCallback(() => {
+    if (full) void exitFullscreen();
+    else void enterFullscreen();
+    setFull(!full);
+  }, [full]);
+  // Leaving browser full screen (Esc, a swipe) brings the bars back too.
+  useEffect(() => {
+    const onChange = () => {
+      if (!fullscreenElement()) setFull(false);
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+      void exitFullscreen();
+    };
+  }, []);
+
   const go = useCallback(
     (next: Current) => {
       setCurrent(next);
@@ -198,6 +244,11 @@ export function MusicStand({
       go({ scoreId: current.scoreId, page: p });
     },
     [current, score, go],
+  );
+
+  const piece = useMemo(
+    () => (score && current ? sectionAt(score.sections, current.page) : null),
+    [score, current],
   );
 
   // Page-turner pedals and keyboards send arrow / page keys.
@@ -356,7 +407,7 @@ export function MusicStand({
   // ------------------------------------------------------------ render
   return (
     <div className="fixed inset-0 flex flex-col bg-[#ece6dc] text-ink dark:bg-[#1c1916]">
-      <header className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-rule bg-sheet px-2 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))]">
+      <header className={cx(full && "hidden", "flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-rule bg-sheet px-2 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))]")}>
         <Link href={`/lessons/${lessonId}/live`} className="flex min-h-10 shrink-0 items-center px-2 text-sm text-accent-ink">
           ‹ Lesson
         </Link>
@@ -364,7 +415,9 @@ export function MusicStand({
           onClick={() => setPickerOpen(true)}
           className="flex min-h-10 min-w-0 shrink items-center gap-1 rounded-lg px-2 text-left font-semibold hover:bg-accent-soft"
         >
-          <span className="truncate">{score ? score.title : "Choose music"}</span>
+          <span className="truncate">
+            {score ? (piece ? sectionLabel(piece, false) : score.title) : "Choose music"}
+          </span>
           <span aria-hidden className="text-muted">
             ▾
           </span>
@@ -384,6 +437,7 @@ export function MusicStand({
         <ToolButton active={fitWidth} disabled={!page} onClick={() => setFitWidth((f) => !f)}>
           ↔ Fit
         </ToolButton>
+        <ToolButton onClick={toggleFull}>⤢ Full screen</ToolButton>
         <span
           title={pending ? `${pending} change(s) waiting to save` : "Saved"}
           className={cx(
@@ -396,7 +450,16 @@ export function MusicStand({
         </button>
       </header>
 
-      {!synced && !syncHintHidden && (
+      {full && (
+        <button
+          onClick={toggleFull}
+          aria-label="Leave full screen"
+          className="absolute right-[max(0.5rem,env(safe-area-inset-right))] top-[max(0.5rem,env(safe-area-inset-top))] z-20 flex h-10 min-w-10 items-center justify-center rounded-full bg-black/25 px-3 text-sm font-semibold text-white opacity-60 hover:opacity-100"
+        >
+          {score && current ? `${current.page}/${score.pages.length} ` : ""}⤡
+        </button>
+      )}
+      {!full && !synced && !syncHintHidden && (
         <div className="flex shrink-0 items-center gap-2 bg-amber-soft px-3 py-1.5 text-sm">
           <span className="flex-1">
             Camera rolling? Tap <b>◉ Sync</b> once where the camera can hear it. It lines the video up with the music.
@@ -406,7 +469,7 @@ export function MusicStand({
           </button>
         </div>
       )}
-      {markMode && (
+      {markMode && !full && (
         <div className="shrink-0 bg-accent-soft px-3 py-1.5 text-sm">
           Drag a box around the bars to mark. They will show with a link to this moment in the video.
         </div>
@@ -495,7 +558,8 @@ export function MusicStand({
               </button>
             )}
           </div>
-          <div className="grid flex-1 auto-rows-min grid-cols-2 gap-3 overflow-y-auto p-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="grid auto-rows-min grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-5">
             {scores.map((s) => (
               <button
                 key={s.id}
@@ -527,6 +591,40 @@ export function MusicStand({
               <span className="font-semibold">No music</span>
               <span className="text-xs text-muted">Scales, games, talking</span>
             </button>
+          </div>
+          {scores
+            .filter((s) => s.sections.length > 1)
+            .map((s) => (
+              <section key={s.id} className="px-3 pb-4">
+                <h2 className="mb-1.5 text-sm font-semibold uppercase tracking-[0.08em] text-muted">
+                  Pieces in {s.title}
+                </h2>
+                <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                  {s.sections.map((sec, i) => {
+                    const here = current?.scoreId === s.id && sectionAt(s.sections, current.page) === sec;
+                    return (
+                      <li key={`${sec.start_page}-${i}`}>
+                        <button
+                          onClick={() => {
+                            setPickerOpen(false);
+                            go({ scoreId: s.id, page: Math.min(sec.start_page, s.pages.length) });
+                          }}
+                          className={cx(
+                            "flex min-h-11 w-full items-baseline gap-2 rounded-xl border bg-sheet px-3 py-2 text-left text-sm",
+                            here ? "border-accent ring-2 ring-accent/30" : "border-rule",
+                            sec.status === "current" && "font-semibold",
+                          )}
+                        >
+                          <span className="min-w-0 flex-1">{sectionLabel(sec)}</span>
+                          {sec.status === "current" && <span className="shrink-0 text-xs text-accent-ink">Now</span>}
+                          <span className="shrink-0 tabular-nums text-xs text-muted">{pageRange(sec)}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
           </div>
           {scores.length === 0 && (
             <p className="p-4 text-center text-sm text-muted">

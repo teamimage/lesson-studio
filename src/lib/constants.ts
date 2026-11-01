@@ -58,6 +58,7 @@ export const RECORDINGS_BUCKET = "lesson-recordings";
 /** Private storage bucket for score page images (see the music_stand migration). */
 export const SCORES_BUCKET = "lesson-scores";
 export const SCORE_KINDS: { value: string; label: string }[] = [
+  { value: "book", label: "Book" },
   { value: "piece", label: "Piece" },
   { value: "exercise", label: "Exercise" },
   { value: "scale", label: "Scales" },

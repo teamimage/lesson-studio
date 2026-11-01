@@ -18,6 +18,7 @@ export type Database = {
     Tables: {
       ai_usage: {
         Row: {
+          score_id: string | null;
           audio_seconds: number;
           cache_read_tokens: number;
           cache_write_tokens: number;
@@ -34,6 +35,7 @@ export type Database = {
           teacher_id: string;
         };
         Insert: {
+          score_id?: string | null;
           audio_seconds?: number;
           cache_read_tokens?: number;
           cache_write_tokens?: number;
@@ -50,6 +52,7 @@ export type Database = {
           teacher_id: string;
         };
         Update: {
+          score_id?: string | null;
           audio_seconds?: number;
           cache_read_tokens?: number;
           cache_write_tokens?: number;
@@ -66,6 +69,13 @@ export type Database = {
           teacher_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "ai_usage_score_id_fkey";
+            columns: ["score_id"];
+            isOneToOne: false;
+            referencedRelation: "scores";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "ai_usage_lesson_id_fkey";
             columns: ["lesson_id"];
@@ -510,6 +520,14 @@ export type Database = {
       };
       scores: {
         Row: {
+          analysis: Json | null;
+          analysis_at: string | null;
+          analysis_error: string | null;
+          analysis_status: string;
+          source_name: string | null;
+          source_path: string | null;
+          source_size: number | null;
+          title_auto: boolean;
           archived: boolean;
           created_at: string;
           id: string;
@@ -522,6 +540,14 @@ export type Database = {
           title: string;
         };
         Insert: {
+          analysis?: Json | null;
+          analysis_at?: string | null;
+          analysis_error?: string | null;
+          analysis_status?: string;
+          source_name?: string | null;
+          source_path?: string | null;
+          source_size?: number | null;
+          title_auto?: boolean;
           archived?: boolean;
           created_at?: string;
           id?: string;
@@ -534,6 +560,14 @@ export type Database = {
           title: string;
         };
         Update: {
+          analysis?: Json | null;
+          analysis_at?: string | null;
+          analysis_error?: string | null;
+          analysis_status?: string;
+          source_name?: string | null;
+          source_path?: string | null;
+          source_size?: number | null;
+          title_auto?: boolean;
           archived?: boolean;
           created_at?: string;
           id?: string;

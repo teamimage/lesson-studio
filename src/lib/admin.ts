@@ -31,9 +31,10 @@ export async function removeStudentFiles(db: Db, studentIds: string[], lessonId?
   if (videoPaths.length) await db.storage.from(RECORDINGS_BUCKET).remove(videoPaths);
   if (lessonId) return;
 
-  const { data: scores } = await db.from("scores").select("pages").in("student_id", studentIds);
-  const pagePaths = (scores ?? []).flatMap((s) =>
-    Array.isArray(s.pages) ? (s.pages as { path?: string }[]).map((p) => p.path).filter((p): p is string => !!p) : [],
-  );
+  const { data: scores } = await db.from("scores").select("pages, source_path").in("student_id", studentIds);
+  const pagePaths = (scores ?? []).flatMap((s) => [
+    ...(Array.isArray(s.pages) ? (s.pages as { path?: string }[]).map((p) => p.path).filter((p): p is string => !!p) : []),
+    ...(s.source_path ? [s.source_path] : []),
+  ]);
   if (pagePaths.length) await db.storage.from(SCORES_BUCKET).remove(pagePaths);
 }
