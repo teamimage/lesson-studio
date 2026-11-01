@@ -24,6 +24,7 @@ import {
   draftAssignmentTimes,
   draftMoments,
   parseTimelineText,
+  withClipInfo,
 } from "@/lib/lesson-moments";
 
 type Params = Promise<{ id: string }>;
@@ -61,7 +62,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const aiRecording = playable.some((r) => r.id === ai.state.recordingId) ? ai.state.recordingId! : null;
   const fromDraft = draftMoments(ai.draft);
   const aiMoments = fromDraft.length ? fromDraft : parseTimelineText(lesson.teacher_notes);
-  const moments = buildMoments({
+  const allMoments = buildMoments({
     recordings: playable.map((r) => ({
       id: r.id,
       startedAt: r.started_at,
@@ -71,10 +72,15 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     scoreTitles: Object.fromEntries(scores.map((s) => [s.id, s.title])),
     ai: aiRecording ? { recordingId: aiRecording, moments: aiMoments } : null,
   });
-  const jumps = assignmentJumps(
+  const { moments, jumps } = withClipInfo(
+    allMoments,
+    assignmentJumps(
+      lesson.assignments,
+      allMoments,
+      aiRecording ? { recordingId: aiRecording, times: draftAssignmentTimes(ai.draft) } : null,
+    ),
     lesson.assignments,
-    moments,
-    aiRecording ? { recordingId: aiRecording, times: draftAssignmentTimes(ai.draft) } : null,
+    lesson.lesson_pieces,
   );
   const videoNames =
     playable.length > 1 ? Object.fromEntries(playable.map((r) => [r.id, r.label || r.file_name])) : undefined;
@@ -164,28 +170,14 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             )}
           </Card>
 
-          {moments.length > 0 && (
-            <section id="review" className="scroll-mt-4">
-              <SectionTitle>Lesson review</SectionTitle>
-              <LessonReview moments={moments} multiVideo={videoNames} />
-            </section>
-          )}
-
-          <section>
-            <SectionTitle>Practice assignments</SectionTitle>
-            {lesson.assignments.length === 0 ? (
-              <p className="text-sm text-muted">No assignments yet.</p>
-            ) : (
-              <AssignmentList assignments={lesson.assignments} jumps={jumps} />
-            )}
-          </section>
-
           <section id="recordings" className="scroll-mt-4">
             <SectionTitle>Lesson video</SectionTitle>
             <div className="flex flex-col gap-3">
               <RecordingList recordings={recordings} editable />
               <RecordingUploader lessonId={id} autoOpen={!!upload} />
               <ProcessVideo
+                // Remount when the server state moves (e.g. processing started on upload).
+                key={`${ai.state.status}-${ai.state.recordingId ?? ""}`}
                 lessonId={id}
                 isDraft={isDraft}
                 initial={ai.state}
@@ -216,6 +208,22 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 <p className="text-sm text-muted">The family can watch these from Home practice.</p>
               )}
             </div>
+          </section>
+
+          {moments.length > 0 && (
+            <section id="review" className="scroll-mt-4">
+              <SectionTitle>Lesson review</SectionTitle>
+              <LessonReview moments={moments} multiVideo={videoNames} />
+            </section>
+          )}
+
+          <section>
+            <SectionTitle>Practice assignments</SectionTitle>
+            {lesson.assignments.length === 0 ? (
+              <p className="text-sm text-muted">No assignments yet.</p>
+            ) : (
+              <AssignmentList assignments={lesson.assignments} jumps={jumps} />
+            )}
           </section>
 
           <section id="timeline" className="scroll-mt-4">

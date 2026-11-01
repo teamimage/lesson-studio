@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
 import { syncStream } from "@/lib/recording-stream";
 import { deleteStream } from "@/lib/stream";
+import { latestTranscript, start as startProcessing } from "@/lib/ai/process-lesson";
 
 export type StartRecordingInput = {
   lessonId: string;
@@ -76,7 +77,7 @@ export async function startRecording(input: StartRecordingInput): Promise<StartR
 
 /** Marks a recording ready once its file is in storage. */
 export async function finishRecording(id: string): Promise<{ ok: boolean }> {
-  await requireTeacher();
+  const { teacher } = await requireTeacher();
   const supabase = await createClient();
   const { data: rec } = await supabase.from("recordings").select("*").eq("id", id).maybeSingle();
   if (!rec) return { ok: false };
@@ -86,6 +87,7 @@ export async function finishRecording(id: string): Promise<{ ok: boolean }> {
   // Start the fast streaming copy right away. Best effort: if it fails, the
   // lesson page shows why and offers Try again; the original still plays.
   await syncStream({ ...rec, status: "ready" });
+  await autoProcess(teacher.id, rec.lesson_id, rec.id);
   revalidatePath(`/lessons/${rec.lesson_id}`);
   revalidatePath(`/students/${rec.student_id}`);
   revalidatePath(`/family/${rec.student_id}`);
@@ -131,4 +133,24 @@ export async function setRecordingStart(
   if (!rec) return { ok: false };
   revalidatePath(`/lessons/${rec.lesson_id}`);
   return { ok: true };
+}
+
+/**
+ * Starts the AI processing (transcript, then Claude's draft) as soon as a
+ * lesson's first video is uploaded. Only for draft lessons with no processing
+ * yet, so a second camera angle or an approved lesson doesn't pay again; the
+ * Process video button on the lesson page still covers those. Best effort:
+ * a missing API key or table just leaves the button there.
+ */
+async function autoProcess(teacherId: string, lessonId: string, recordingId: string) {
+  try {
+    const supabase = await createClient();
+    const { data: lesson } = await supabase.from("lessons").select("status").eq("id", lessonId).maybeSingle();
+    if (lesson?.status !== "draft") return;
+    if (await latestTranscript(supabase, lessonId)) return;
+    if (!process.env.ANTHROPIC_API_KEY || !process.env.ASSEMBLYAI_API_KEY) return;
+    await startProcessing(teacherId, lessonId, recordingId);
+  } catch {
+    // The lesson page shows Process video for a manual start.
+  }
 }
