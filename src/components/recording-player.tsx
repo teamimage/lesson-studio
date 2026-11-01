@@ -2,6 +2,7 @@ import type { RecordingWithUrl } from "@/lib/recordings";
 import { deleteRecording } from "@/app/lessons/recording-actions";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { Pill } from "@/components/ui";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { LessonVideo } from "@/components/lesson-video";
 import { StreamStatus } from "@/components/stream-status";
 import { streamingEnabled } from "@/lib/stream";
@@ -64,7 +65,14 @@ export function RecordingList({ recordings, editable = false }: { recordings: Re
             <div className="flex justify-end border-t border-rule px-3 py-2 text-sm">
               <form action={deleteRecording}>
                 <input type="hidden" name="recording_id" value={r.id} />
-                <button className="text-danger underline">Delete</button>
+                <ConfirmSubmit
+                  className="text-danger underline"
+                  message={`Delete "${r.label || r.file_name}"${
+                    r.duration_seconds ? ` (${formatDuration(Number(r.duration_seconds))})` : ""
+                  } for good?\n\nThis removes the original full-quality file and the streaming copy, plus its transcript. It can't be undone. The written lesson notes stay.`}
+                >
+                  Delete video
+                </ConfirmSubmit>
               </form>
             </div>
           )}
