@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type Ref, type VideoHTMLAttributes } from "react";
+import { CONTAINED_VIDEO_PROPS, useContainedVideo } from "@/lib/use-contained-video";
 
 type Props = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src" | "ref"> & {
   recordingId: string;
@@ -19,6 +20,7 @@ type Props = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src" | "ref"> & {
  */
 export function LessonVideo({ recordingId, src, streamReady, ref, ...rest }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  useContainedVideo(videoRef);
 
   const setRef = (el: HTMLVideoElement | null) => {
     videoRef.current = el;
@@ -79,5 +81,5 @@ export function LessonVideo({ recordingId, src, streamReady, ref, ...rest }: Pro
     };
   }, [recordingId, src, streamReady]);
 
-  return <video ref={setRef} {...rest} />;
+  return <video ref={setRef} {...rest} {...CONTAINED_VIDEO_PROPS} />;
 }

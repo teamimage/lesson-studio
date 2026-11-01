@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
+import { ContainedVideo } from "@/components/contained-video";
 
 export const metadata = { title: "Full quality video" };
 
@@ -47,7 +48,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         <span>Full quality. Large file, so it can take a moment to start.</span>
       </div>
       {/* #t=0.1 makes iPhone Safari show the first frame instead of a black box. */}
-      <video
+      <ContainedVideo
         controls
         autoPlay
         playsInline
