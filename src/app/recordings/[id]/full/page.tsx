@@ -7,6 +7,7 @@ import { RECORDINGS_BUCKET } from "@/lib/constants";
 export const metadata = { title: "Full quality video" };
 
 type Params = Promise<{ id: string }>;
+type SP = Promise<{ t?: string }>;
 
 /**
  * The original, full-quality lesson video in its own window. The lesson page
@@ -14,19 +15,21 @@ type Params = Promise<{ id: string }>;
  * who can see the recording row (its teacher, or a parent of an approved
  * lesson) can open it.
  */
-export default function FullQualityPage({ params }: { params: Params }) {
+export default function FullQualityPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
     <div className="flex min-h-dvh flex-1 flex-col bg-black text-white">
       <Suspense fallback={null}>
-        <Body params={params} />
+        <Body params={params} searchParams={searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function Body({ params }: { params: Params }) {
+async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
   await getViewer();
   const { id } = await params;
+  // ?t=seconds starts the video there (the popup player passes where it was).
+  const start = Math.max(0, Math.floor(Number((await searchParams).t) || 0)) || 0.1;
   const supabase = await createClient();
   const { data: rec } = await supabase
     .from("recordings")
@@ -49,7 +52,7 @@ async function Body({ params }: { params: Params }) {
         autoPlay
         playsInline
         preload="auto"
-        src={`${link.signedUrl}#t=0.1`}
+        src={`${link.signedUrl}#t=${start}`}
         className="min-h-0 w-full flex-1 bg-black object-contain"
       />
     </>

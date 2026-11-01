@@ -15,7 +15,11 @@ export type DraftAssignment = {
   title: string;
   how: string;
   every_day: boolean;
+  /** Where in the video it was worked on, "m:ss" (or "" if nowhere). */
+  video_time?: string;
 };
+/** A moment in the video worth jumping back to, "m:ss" from the start. */
+export type DraftMoment = { time: string; label: string };
 export type LessonDraft = {
   summary: string;
   focus_points: string;
@@ -24,6 +28,7 @@ export type LessonDraft = {
   teacher_notes: string;
   pieces: DraftPiece[];
   assignments: DraftAssignment[];
+  moments?: DraftMoment[];
 };
 
 export type DraftContext = {
@@ -41,7 +46,7 @@ export type DraftContext = {
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "focus_points", "parent_message", "suggestions", "teacher_notes", "pieces", "assignments"],
+  required: ["summary", "focus_points", "parent_message", "suggestions", "teacher_notes", "pieces", "assignments", "moments"],
   properties: {
     summary: { type: "string" },
     focus_points: { type: "string" },
@@ -66,12 +71,25 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["kind", "title", "how", "every_day"],
+        required: ["kind", "title", "how", "every_day", "video_time"],
         properties: {
           kind: { type: "string", enum: [...Constants.public.Enums.assignment_kind] },
           title: { type: "string" },
           how: { type: "string" },
           every_day: { type: "boolean" },
+          video_time: { type: "string" },
+        },
+      },
+    },
+    moments: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["time", "label"],
+        properties: {
+          time: { type: "string" },
+          label: { type: "string" },
         },
       },
     },
@@ -88,10 +106,11 @@ Fill the fields like this:
 - summary: "Today we..." in 2-4 sentences. What was worked on, in lesson order.
 - focus_points: the one to three teaching points that matter most this week, each on its own line.
 - pieces: every piece played or discussed. Use the exact title from the student's book list when it matches. activity is started (first time), worked_on, polished, reviewed (older piece), or performed. notes: a short phrase on what was worked on.
-- assignments: the home practice the teacher asked for, or that clearly follows from the lesson. title names the piece, passage or exercise; how says how to practise it (tempo, repetitions, what to listen or watch for). Use kind piece, review, technique, listening, game, theory or other. every_day is true unless it is an occasional task.
+- assignments: the home practice the teacher asked for, or that clearly follows from the lesson. Keep them short: they show as one-line rows that open on a tap. title is at most six words and names the piece, passage or exercise ("Perpetual Motion: shifts"). how is one or two short sentences on how to practise it (tempo, repetitions, what to listen or watch for). Use kind piece, review, technique, listening, game, theory or other. every_day is true unless it is an occasional task. video_time is the timestamp (m:ss, as in the transcript) where the teacher demonstrated or worked on it, so the family can watch that spot; "" if there is none.
 - parent_message: one or two friendly sentences to the parent, for the printed sheet.
 - suggestions: teacher-only ideas for next lesson.
-- teacher_notes: teacher-only. Observations on posture, tone, attention and progress, then a short timeline of the lesson ("4:10 Perpetual Motion, shifting"), so the teacher can jump to moments in the video.
+- teacher_notes: teacher-only. Observations on posture, tone, attention and progress.
+- moments: the lesson's timeline, so the teacher can jump to each part of the video: every change of piece or activity and every important teaching point, in order. time is m:ss from the transcript; label is a few words ("Perpetual Motion, shifting"). Usually 6 to 20 entries.
 
 Only include what the transcript supports; leave a field empty rather than invent. Keep it short enough to fit a one-page sheet.`;
 
