@@ -3,6 +3,8 @@ import { Shell } from "@/components/shell";
 import { Button, Card, Field, Input, Notice, SectionTitle } from "@/components/ui";
 import { PasswordInput } from "@/components/password-input";
 import { getViewer } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
+import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import { setPassword, updateTeacher } from "./actions";
 
@@ -31,10 +33,20 @@ export default function SettingsPage({ searchParams }: { searchParams: SP }) {
 async function Body({ searchParams }: { searchParams: SP }) {
   const viewer = await getViewer();
   const { saved, password } = await searchParams;
+  const admin = await isAdmin();
   const passwordNotice = password ? PASSWORD_NOTICES[password] : undefined;
   return (
     <div className="flex flex-col gap-8">
       {saved && <Notice tone="sage">Saved.</Notice>}
+      {admin && (
+        <Link
+          href="/admin"
+          className="flex min-h-12 items-center justify-between rounded-2xl border border-accent/30 bg-accent-soft px-4 font-semibold text-accent-ink"
+        >
+          Admin: all teachers and students
+          <span aria-hidden>›</span>
+        </Link>
+      )}
       {viewer.teacher && (
         <section>
           <SectionTitle>Teacher</SectionTitle>
