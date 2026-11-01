@@ -8,6 +8,7 @@
 // moment whose label best matches the assignment's title.
 
 import { buildBlocks, buildSegments, formatClock, type StandEvent } from "@/lib/stand-timeline";
+import { sectionAt, sectionLabel, type ScoreSection } from "@/lib/score-analysis";
 
 export type MomentKind = "piece" | "mark" | "ai";
 
@@ -93,11 +94,14 @@ export function buildMoments({
   recordings,
   events,
   scoreTitles,
+  scoreSections = {},
   ai,
 }: {
   recordings: MomentRecording[];
   events: StandEvent[];
   scoreTitles: Record<string, string>;
+  /** Pieces Claude found in each score, so a book's stretch splits by piece. */
+  scoreSections?: Record<string, ScoreSection[]>;
   ai: { recordingId: string; moments: AiMoment[] } | null;
 }): Moment[] {
   const out: Moment[] = [];
@@ -114,7 +118,13 @@ export function buildMoments({
   };
 
   if (events.length && placed.length) {
-    const blocks = buildBlocks(buildSegments(events));
+    const pieceOf = (scoreId: string | null, page: number | null) =>
+      scoreId ? sectionAt(scoreSections[scoreId] ?? [], page) : null;
+    const blocks = buildBlocks(buildSegments(events), (s) => {
+      if (!s.scoreId) return null;
+      const sec = pieceOf(s.scoreId, s.page);
+      return sec ? `${s.scoreId}#${sec.start_page}` : s.scoreId;
+    });
     blocks.forEach((b, i) => {
       if (!b.scoreId) return;
       const at = place(b.start);
@@ -131,7 +141,10 @@ export function buildMoments({
         kind: "piece",
         recordingId: at.recordingId,
         seconds: at.seconds,
-        label: scoreTitles[b.scoreId] ?? "Music",
+        label: (() => {
+          const sec = pieceOf(b.scoreId, b.segments[0]?.page ?? null);
+          return sec ? sectionLabel(sec) : (scoreTitles[b.scoreId] ?? "Music");
+        })(),
         detail: minutes ? `about ${minutes} min` : undefined,
         pages: pages.length > 1 ? pages : undefined,
       });
@@ -141,7 +154,8 @@ export function buildMoments({
       if (m.kind !== "mark") continue;
       const at = place(Date.parse(m.at));
       if (!at) continue;
-      const title = m.score_id ? scoreTitles[m.score_id] : undefined;
+      const sec = pieceOf(m.score_id, m.page);
+      const title = sec ? sectionLabel(sec, false) : m.score_id ? scoreTitles[m.score_id] : undefined;
       out.push({
         id: `mark-${m.id}`,
         kind: "mark",

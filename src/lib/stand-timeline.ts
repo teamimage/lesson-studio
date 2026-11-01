@@ -2,6 +2,7 @@
 // turning the stand's log of page turns into a timeline on a lesson video.
 
 import type { Json } from "@/lib/supabase/types";
+import type { AnalysisStatus, ScoreAnalysis, ScoreSection } from "@/lib/score-analysis";
 
 export type ScorePage = { path: string; w: number; h: number };
 /** A score page with a signed image URL. */
@@ -12,6 +13,13 @@ export type StandScore = {
   kind: string;
   archived: boolean;
   pages: ScorePageWithUrl[];
+  /** Pieces and movements Claude found, with page ranges ([] if none yet). */
+  sections: ScoreSection[];
+  analysis: ScoreAnalysis | null;
+  analysisStatus: AnalysisStatus;
+  analysisError: string | null;
+  /** The file as uploaded (PDFs), with a download link when asked for. */
+  source: { name: string; size: number | null; url: string | null } | null;
 };
 export type Rect = { x: number; y: number; w: number; h: number };
 export type StandEventKind = "open" | "close" | "sync" | "mark" | "end";
@@ -73,16 +81,23 @@ export function buildSegments(events: StandEvent[]): Segment[] {
   return out.filter((s, i) => i === out.length - 1 || s.end === null || s.end - s.start >= 2000);
 }
 
-export function buildBlocks(segments: Segment[]): Block[] {
+/**
+ * Groups consecutive segments on the same score, or with `keyOf`, on the same
+ * piece within a score (so a book splits into its pieces).
+ */
+export function buildBlocks(segments: Segment[], keyOf: (s: Segment) => string | null = (s) => s.scoreId): Block[] {
   const blocks: Block[] = [];
+  let lastKey: string | null | undefined;
   for (const s of segments) {
+    const key = keyOf(s);
     const last = blocks[blocks.length - 1];
-    if (last && last.scoreId === s.scoreId) {
+    if (last && lastKey === key) {
       last.segments.push(s);
       last.end = s.end;
     } else {
       blocks.push({ scoreId: s.scoreId, start: s.start, end: s.end, segments: [s] });
     }
+    lastKey = key;
   }
   return blocks;
 }

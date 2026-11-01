@@ -114,7 +114,7 @@ Fill the fields like this:
 
 Only include what the transcript supports; leave a field empty rather than invent. Keep it short enough to fit a one-page sheet.`;
 
-function client(): Anthropic {
+export function anthropicClient(): Anthropic {
   if (!process.env.ANTHROPIC_API_KEY) throw new MissingKeyError("ANTHROPIC_API_KEY isn't set in Vercel yet.");
   return new Anthropic();
 }
@@ -142,7 +142,7 @@ function contextText(c: DraftContext): string {
 }
 
 export async function draftLesson(ctx: DraftContext): Promise<{ draft: LessonDraft; usage: ClaudeUsage[] }> {
-  const anthropic = client();
+  const anthropic = anthropicClient();
   const stream = anthropic.beta.messages.stream({
     model: lessonModel(),
     max_tokens: 32000,
@@ -183,7 +183,7 @@ export class DraftError extends Error {
 
 // One usage row per model that ran (a refused request that fell back to
 // another model bills both).
-function usageRows(message: Anthropic.Beta.BetaMessage): ClaudeUsage[] {
+export function usageRows(message: Anthropic.Beta.BetaMessage): ClaudeUsage[] {
   const u = message.usage;
   const iterations = (u.iterations ?? []).filter(
     (it): it is Extract<typeof it, { type: "message" | "fallback_message" }> =>

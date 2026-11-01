@@ -16,6 +16,9 @@ const body = Source_Sans_3({
 export const metadata: Metadata = {
   title: { default: "Lesson Studio", template: "%s · Lesson Studio" },
   description: "Lesson organization for private music teachers",
+  // Added to an iPad or iPhone home screen, the app opens without Safari's
+  // address bar and tabs, so the music stand gets the whole screen.
+  appleWebApp: { capable: true, title: "Lesson Studio", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

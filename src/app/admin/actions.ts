@@ -73,10 +73,11 @@ export async function adminDelete(fd: FormData) {
     if (data?.stream_uid) await deleteStream(data.stream_uid);
   }
   if (table === "scores") {
-    const { data } = await db.from("scores").select("pages").eq("id", id).maybeSingle();
+    const { data } = await db.from("scores").select("pages, source_path").eq("id", id).maybeSingle();
     const paths = Array.isArray(data?.pages)
       ? (data.pages as { path?: string }[]).map((p) => p.path).filter((p): p is string => !!p)
       : [];
+    if (data?.source_path) paths.push(data.source_path);
     if (paths.length) await db.storage.from(SCORES_BUCKET).remove(paths);
   }
 

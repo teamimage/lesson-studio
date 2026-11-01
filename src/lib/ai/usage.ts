@@ -28,6 +28,10 @@ export async function getLessonAi(lessonId: string): Promise<LessonAi> {
 export type MonthTotal = { month: string; costUsd: number; calls: number };
 export type LessonTotal = {
   lessonId: string | null;
+  key: string;
+  /** Reading sheet music (not tied to a lesson); scoreTitle null once deleted. */
+  music: boolean;
+  scoreTitle: string | null;
   lessonDate: string | null;
   studentName: string | null;
   costUsd: number;
@@ -47,7 +51,9 @@ export async function getUsageSummary(teacherId: string): Promise<UsageSummary> 
   const db = await createClient();
   const { data } = await db
     .from("ai_usage")
-    .select("lesson_id, kind, cost_usd, audio_seconds, created_at, lessons(lesson_date, students(name))")
+    .select(
+      "lesson_id, score_id, kind, cost_usd, audio_seconds, created_at, lessons(lesson_date, students(name)), scores(title, students(name))",
+    )
     .eq("teacher_id", teacherId)
     .order("created_at", { ascending: false })
     .limit(5000);
@@ -65,13 +71,17 @@ export async function getUsageSummary(teacherId: string): Promise<UsageSummary> 
     m.calls += 1;
     months.set(month, m);
 
-    const key = r.lesson_id ?? "deleted";
+    const music = r.kind === "music";
+    const key = music ? `music-${r.score_id ?? "deleted"}` : (r.lesson_id ?? "deleted");
     const l =
       lessons.get(key) ??
       ({
-        lessonId: r.lesson_id,
-        lessonDate: r.lessons?.lesson_date ?? null,
-        studentName: r.lessons?.students?.name ?? null,
+        lessonId: music ? null : r.lesson_id,
+        key,
+        music,
+        scoreTitle: music ? (r.scores?.title ?? null) : null,
+        lessonDate: music ? null : (r.lessons?.lesson_date ?? null),
+        studentName: music ? (r.scores?.students?.name ?? null) : (r.lessons?.students?.name ?? null),
         costUsd: 0,
         transcriptionUsd: 0,
         claudeUsd: 0,
