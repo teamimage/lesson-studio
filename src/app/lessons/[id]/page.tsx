@@ -134,7 +134,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               initial={ai.state}
               recordings={recordings
                 .filter((r) => r.status === "ready")
-                .map((r) => ({ id: r.id, name: r.label || r.file_name, sizeBytes: r.size_bytes }))}
+                .map((r) => ({
+                  id: r.id,
+                  name: r.label || r.file_name,
+                  sizeBytes: r.size_bytes,
+                  durationSeconds: r.duration_seconds,
+                }))}
             />
             {(ai.transcript || ai.costUsd > 0) && (
               <details className="rounded-2xl border border-rule bg-sheet px-4 py-3 text-sm">

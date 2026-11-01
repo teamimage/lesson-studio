@@ -6,7 +6,7 @@ import { Button, Card, Notice, Select } from "@/components/ui";
 import { formatBytes } from "@/lib/format";
 import type { ProcessState } from "@/lib/ai/process-lesson";
 
-type Rec = { id: string; name: string; sizeBytes: number };
+type Rec = { id: string; name: string; sizeBytes: number; durationSeconds: number | null };
 
 const POLL_MS = 10_000;
 
@@ -31,6 +31,7 @@ export function ProcessVideo({
   const [busy, setBusy] = useState(false);
   const [recordingId, setRecordingId] = useState(initial.recordingId ?? recordings[0]?.id ?? "");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [now, setNow] = useState(0); // 0 until mounted, so server and browser render the same
 
   const call = useCallback(
     async (body: Record<string, string>) => {
@@ -71,6 +72,16 @@ export function ProcessVideo({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, call, router]);
 
+  // Re-render every second so the bar and elapsed time move.
+  useEffect(() => {
+    if (!running && !busy) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [running, busy]);
+
+  const rec = recordings.find((r) => r.id === (state.recordingId ?? recordingId));
+  const progress = progressFor(state, busy, now, rec?.durationSeconds ?? null);
+
   async function run(body: Record<string, string>) {
     setBusy(true);
     try {
@@ -96,13 +107,12 @@ export function ProcessVideo({
         </p>
       </div>
 
+      {progress && <ProgressBar {...progress} />}
       {state.status === "transcribing" && (
-        <Notice tone="plum">
-          Transcribing the video. This usually takes a few minutes for an hour-long lesson. You can leave this
-          page and come back; it picks up where it left off when you return.
-        </Notice>
+        <p className="text-sm text-muted">
+          You can leave this page and come back; it picks up where it left off when you return.
+        </p>
       )}
-      {state.status === "drafting" && <Notice tone="plum">Claude is writing the draft. This takes a minute or two.</Notice>}
       {state.status === "done" && (
         <Notice tone="sage">
           {state.applied
@@ -153,5 +163,69 @@ export function ProcessVideo({
         </Button>
       )}
     </Card>
+  );
+}
+
+type Progress = { label: string; step: string; fraction: number; elapsed: string };
+
+function elapsedText(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/**
+ * The services don't report percent done, so the bar is an estimate from
+ * elapsed time: transcription takes roughly a fifth of the video's length
+ * (at least a minute), drafting about a minute and a half. It never reaches
+ * the end until the step really finishes.
+ */
+function progressFor(state: ProcessState, busy: boolean, now: number, durationSeconds: number | null): Progress | null {
+  const since = state.since ? Date.parse(state.since) : now;
+  const elapsedMs = Math.max(0, now - since);
+  const ease = (ms: number, expectedMs: number) => Math.min(0.95, 1 - Math.exp(-ms / expectedMs));
+  if (state.status === "transcribing") {
+    const expected = Math.max(60, (durationSeconds ?? 3600) * 0.2) * 1000;
+    return {
+      step: "Step 1 of 2",
+      label: "Transcribing what was said",
+      fraction: 0.05 + 0.65 * ease(elapsedMs, expected),
+      elapsed: elapsedText(elapsedMs),
+    };
+  }
+  if (state.status === "drafting") {
+    return {
+      step: "Step 2 of 2",
+      label: "Claude is writing the lesson draft",
+      fraction: 0.7 + 0.3 * ease(elapsedMs, 90_000),
+      elapsed: elapsedText(elapsedMs),
+    };
+  }
+  if (busy) return { step: "Starting", label: "Sending the video to be transcribed", fraction: 0.03, elapsed: "" };
+  return null;
+}
+
+function ProgressBar({ label, step, fraction, elapsed }: Progress) {
+  return (
+    <div className="flex flex-col gap-1.5" role="status" aria-live="polite">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span>
+          <span className="font-medium">{label}</span>
+          <span className="text-muted"> · {step}</span>
+        </span>
+        {elapsed && <span className="tabular-nums text-muted">{elapsed}</span>}
+      </div>
+      <div
+        className="h-2 overflow-hidden rounded-full bg-rule"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(fraction * 100)}
+      >
+        <div
+          className="h-full rounded-full bg-plum transition-[width] duration-1000 ease-linear"
+          style={{ width: `${Math.round(fraction * 100)}%` }}
+        />
+      </div>
+    </div>
   );
 }

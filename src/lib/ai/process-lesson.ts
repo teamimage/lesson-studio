@@ -25,7 +25,12 @@ export type ProcessState = {
   error?: string | null;
   recordingId?: string;
   applied?: boolean;
+  /** When the current step began, for the progress bar. */
+  since?: string;
 };
+
+const SETUP_ERROR =
+  "The AI tables aren't set up in Supabase yet. Run ai-processing.sql in the Supabase SQL Editor, then press Process video again.";
 
 // The signed link must stay valid until AssemblyAI has fetched the file.
 const LINK_SECONDS = 24 * 60 * 60;
@@ -42,6 +47,7 @@ export function stateOf(row: Transcript | null): ProcessState {
     error: row.error,
     recordingId: row.recording_id,
     applied: draft?.applied,
+    since: row.updated_at,
   };
 }
 
@@ -68,7 +74,13 @@ export async function start(teacherId: string, lessonId: string, recordingId: st
   if (!rec || rec.lesson_id !== lessonId || rec.status !== "ready")
     return { status: "error", error: "That video isn't uploaded yet." };
 
-  const { data: existing } = await db.from("lesson_transcripts").select("*").eq("recording_id", rec.id).maybeSingle();
+  const { data: existing, error: tableError } = await db
+    .from("lesson_transcripts")
+    .select("*")
+    .eq("recording_id", rec.id)
+    .maybeSingle();
+  // Check the tables exist before paying for a transcription that couldn't be saved.
+  if (tableError) return { status: "error", error: SETUP_ERROR };
   if (existing?.status === "transcribing" || existing?.status === "drafting") return stateOf(existing);
   if (existing?.transcript) return redraft(teacherId, lessonId);
 
@@ -85,11 +97,12 @@ export async function start(teacherId: string, lessonId: string, recordingId: st
       error: null,
       updated_at: new Date().toISOString(),
     };
-    const { data: saved } = await db
+    const { data: saved, error: saveError } = await db
       .from("lesson_transcripts")
       .upsert(row, { onConflict: "recording_id" })
       .select("*")
       .single();
+    if (saveError || !saved) throw new Error(`Couldn't save the job: ${saveError?.message ?? "no row"}`);
     return stateOf(saved);
   } catch (e) {
     return { status: "error", error: messageOf(e), recordingId: rec.id };
