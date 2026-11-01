@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { Button, Input, Notice } from "@/components/ui";
+import { PasswordInput } from "@/components/password-input";
 import { EmailLinkHandler } from "./email-link-handler";
 import { sendMagicLink, sendPasswordReset, signInWithPassword, verifyCode } from "./actions";
 
@@ -122,7 +123,7 @@ async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
           Forgot password?
         </a>
       </div>
-      <Input id="password" name="password" type="password" autoComplete="current-password" />
+      <PasswordInput id="password" name="password" autoComplete="current-password" />
       <Button type="submit">Sign in</Button>
       {message && <Notice tone="danger">{message}</Notice>}
       <div className="flex items-center gap-3 text-xs text-muted" aria-hidden>

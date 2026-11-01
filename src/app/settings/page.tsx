@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Shell } from "@/components/shell";
 import { Button, Card, Field, Input, Notice, SectionTitle } from "@/components/ui";
+import { PasswordInput } from "@/components/password-input";
 import { getViewer } from "@/lib/auth";
 import { signOut } from "@/app/login/actions";
 import { setPassword, updateTeacher } from "./actions";
@@ -77,9 +78,8 @@ async function Body({ searchParams }: { searchParams: SP }) {
             {/* Lets password managers save the login under the right email. */}
             <input type="email" name="username" autoComplete="username" value={viewer.email} readOnly hidden />
             <Field label="New password" hint="At least 8 characters.">
-              <Input
+              <PasswordInput
                 name="password"
-                type="password"
                 autoComplete="new-password"
                 minLength={8}
                 required
@@ -87,7 +87,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
               />
             </Field>
             <Field label="Type it again">
-              <Input name="confirm" type="password" autoComplete="new-password" minLength={8} required />
+              <PasswordInput name="confirm" autoComplete="new-password" minLength={8} required />
             </Field>
             <Button>Save password</Button>
           </form>
