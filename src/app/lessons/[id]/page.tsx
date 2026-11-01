@@ -13,6 +13,9 @@ import { RecordingList } from "@/components/recording-player";
 import { RecordingUploader } from "@/components/recording-uploader";
 import { LessonTimeline } from "@/components/lesson-timeline";
 import { listScores, listStandEvents } from "@/lib/scores";
+import { ProcessVideo } from "@/components/process-video";
+import { getLessonAi } from "@/lib/ai/usage";
+import { formatUsd } from "@/lib/ai/pricing";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ approved?: string; upload?: string }>;
@@ -29,10 +32,11 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   await requireTeacher();
   const { id } = await params;
   const { approved, upload } = await searchParams;
-  const [lesson, recordings, standEvents] = await Promise.all([
+  const [lesson, recordings, standEvents, ai] = await Promise.all([
     getLesson(id),
     listRecordingsForLesson(id),
     listStandEvents(id),
+    getLessonAi(id),
   ]);
   if (!lesson) notFound();
   const [student, scores] = await Promise.all([
@@ -124,6 +128,28 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <div className="flex flex-col gap-3">
             <RecordingList recordings={recordings} editable />
             <RecordingUploader lessonId={id} autoOpen={!!upload} />
+            <ProcessVideo
+              lessonId={id}
+              isDraft={isDraft}
+              initial={ai.state}
+              recordings={recordings
+                .filter((r) => r.status === "ready")
+                .map((r) => ({ id: r.id, name: r.label || r.file_name, sizeBytes: r.size_bytes }))}
+            />
+            {(ai.transcript || ai.costUsd > 0) && (
+              <details className="rounded-2xl border border-rule bg-sheet px-4 py-3 text-sm">
+                <summary className="cursor-pointer font-medium">
+                  Transcript{ai.costUsd > 0 ? ` · AI cost for this lesson ${formatUsd(ai.costUsd)}` : ""}
+                </summary>
+                {ai.transcript ? (
+                  <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-muted">
+                    {ai.transcript}
+                  </pre>
+                ) : (
+                  <p className="mt-2 text-muted">No transcript yet.</p>
+                )}
+              </details>
+            )}
             {!isDraft && recordings.length > 0 && (
               <p className="text-sm text-muted">The family can watch these from Home practice.</p>
             )}

@@ -7,6 +7,9 @@ import { isAdmin } from "@/lib/admin";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import { setPassword, updateTeacher } from "./actions";
+import { getUsageSummary } from "@/lib/ai/usage";
+import { formatUsd } from "@/lib/ai/pricing";
+import { formatDate } from "@/lib/format";
 
 const PASSWORD_NOTICES: Record<string, { tone: "sage" | "danger" | "plum"; text: string }> = {
   saved: { tone: "sage", text: "Password saved. Next time, sign in with your email and this password." },
@@ -62,6 +65,8 @@ async function Body({ searchParams }: { searchParams: SP }) {
         </section>
       )}
 
+      {viewer.teacher && <AiCosts teacherId={viewer.teacher.id} />}
+
       <section>
         <SectionTitle>Account</SectionTitle>
         <Card className="flex flex-col gap-3">
@@ -106,5 +111,75 @@ async function Body({ searchParams }: { searchParams: SP }) {
         </Card>
       </section>
     </div>
+  );
+}
+
+function monthLabel(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+}
+
+// Running totals of what processing lesson videos has cost (transcription + Claude).
+async function AiCosts({ teacherId }: { teacherId: string }) {
+  const usage = await getUsageSummary(teacherId);
+  return (
+    <section id="ai-costs" className="scroll-mt-6">
+      <SectionTitle>AI costs</SectionTitle>
+      <Card className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">This month</div>
+            <div className="font-display text-2xl">{formatUsd(usage.thisMonthUsd)}</div>
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">All time</div>
+            <div className="font-display text-2xl">{formatUsd(usage.allTimeUsd)}</div>
+          </div>
+        </div>
+        {usage.lessons.length === 0 ? (
+          <p className="text-sm text-muted">
+            Nothing yet. Costs show up here after you press Process video on a lesson.
+          </p>
+        ) : (
+          <>
+            <div>
+              <div className="mb-1 text-sm font-semibold">By month</div>
+              <ul className="divide-y divide-rule text-sm">
+                {usage.months.map((m) => (
+                  <li key={m.month} className="flex justify-between py-1.5">
+                    <span>{monthLabel(m.month)}</span>
+                    <span className="tabular-nums">{formatUsd(m.costUsd)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="mb-1 text-sm font-semibold">By lesson</div>
+              <ul className="divide-y divide-rule text-sm">
+                {usage.lessons.slice(0, 30).map((l) => (
+                  <li key={l.lessonId ?? "deleted"} className="flex items-baseline justify-between gap-3 py-1.5">
+                    <span className="min-w-0">
+                      {l.lessonId ? (
+                        <Link href={`/lessons/${l.lessonId}`} className="font-medium text-accent-ink">
+                          {l.studentName ?? "Lesson"}
+                          {l.lessonDate ? `, ${formatDate(l.lessonDate)}` : ""}
+                        </Link>
+                      ) : (
+                        <span className="text-muted">Deleted lessons</span>
+                      )}
+                      <span className="block text-xs text-muted">
+                        {l.audioMinutes > 0 ? `${Math.round(l.audioMinutes)} min transcribed ${formatUsd(l.transcriptionUsd)} · ` : ""}
+                        Claude {formatUsd(l.claudeUsd)}
+                      </span>
+                    </span>
+                    <span className="tabular-nums">{formatUsd(l.costUsd)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
+      </Card>
+    </section>
   );
 }

@@ -16,6 +16,110 @@ export type Database = {
   };
   public: {
     Tables: {
+      ai_usage: {
+        Row: {
+          audio_seconds: number;
+          cache_read_tokens: number;
+          cache_write_tokens: number;
+          cost_usd: number;
+          created_at: string;
+          id: string;
+          input_tokens: number;
+          kind: string;
+          lesson_id: string | null;
+          model: string;
+          output_tokens: number;
+          provider: string;
+          recording_id: string | null;
+          teacher_id: string;
+        };
+        Insert: {
+          audio_seconds?: number;
+          cache_read_tokens?: number;
+          cache_write_tokens?: number;
+          cost_usd?: number;
+          created_at?: string;
+          id?: string;
+          input_tokens?: number;
+          kind: string;
+          lesson_id?: string | null;
+          model: string;
+          output_tokens?: number;
+          provider: string;
+          recording_id?: string | null;
+          teacher_id: string;
+        };
+        Update: {
+          audio_seconds?: number;
+          cache_read_tokens?: number;
+          cache_write_tokens?: number;
+          cost_usd?: number;
+          created_at?: string;
+          id?: string;
+          input_tokens?: number;
+          kind?: string;
+          lesson_id?: string | null;
+          model?: string;
+          output_tokens?: number;
+          provider?: string;
+          recording_id?: string | null;
+          teacher_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_lesson_id_fkey";
+            columns: ["lesson_id"];
+            isOneToOne: false;
+            referencedRelation: "lessons";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lesson_transcripts: {
+        Row: {
+          audio_seconds: number | null;
+          created_at: string;
+          draft: Json | null;
+          error: string | null;
+          id: string;
+          lesson_id: string;
+          provider_job_id: string | null;
+          recording_id: string;
+          status: string;
+          teacher_id: string;
+          transcript: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          audio_seconds?: number | null;
+          created_at?: string;
+          draft?: Json | null;
+          error?: string | null;
+          id?: string;
+          lesson_id: string;
+          provider_job_id?: string | null;
+          recording_id: string;
+          status?: string;
+          teacher_id: string;
+          transcript?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          audio_seconds?: number | null;
+          created_at?: string;
+          draft?: Json | null;
+          error?: string | null;
+          id?: string;
+          lesson_id?: string;
+          provider_job_id?: string | null;
+          recording_id?: string;
+          status?: string;
+          teacher_id?: string;
+          transcript?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       app_admins: {
         Row: { user_id: string; created_at: string };
         Insert: { user_id: string; created_at?: string };

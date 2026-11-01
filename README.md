@@ -64,6 +64,18 @@ development, copy `.env.example` to `.env.local`.
 Never put the Supabase **secret** (service role) key in a `NEXT_PUBLIC_`
 variable or commit it.
 
+AI video processing (the lesson page's "Process video" button) needs two
+server-only secrets. Never prefix these with `NEXT_PUBLIC_`:
+
+| Name | Where to get it |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | platform.claude.com > API keys (add credit under Billing) |
+| `ASSEMBLYAI_API_KEY` | assemblyai.com > Dashboard > API keys |
+| `LESSON_AI_MODEL` (optional) | Claude model for drafting; default `claude-opus-5-5` |
+
+Every AI call is logged with its cost in the `ai_usage` table; totals are in
+Settings > AI costs. Prices live in `src/lib/ai/pricing.ts`.
+
 ## Supabase auth settings
 
 In Supabase > Authentication > URL Configuration, set **Site URL** to
