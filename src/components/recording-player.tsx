@@ -1,5 +1,5 @@
-import type { RecordingWithUrl } from "@/lib/recordings";
-import { deleteRecording } from "@/app/lessons/recording-actions";
+import type { Recording, RecordingWithUrl } from "@/lib/recordings";
+import { deleteRecording, restoreRecording } from "@/app/lessons/recording-actions";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { Pill } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/confirm-submit";
@@ -9,7 +9,7 @@ import { streamingEnabled } from "@/lib/stream";
 
 /**
  * Lesson videos with playback. Each video is named by its original file
- * name (e.g. IMG_1962.MOV). Teachers (editable) can delete;
+ * name (e.g. IMG_1962.MOV). Teachers (editable) can delete (archive);
  * parents just watch. Rows still uploading show as pending. When fast
  * streaming is set up, teachers also see the streaming copy being prepared.
  */
@@ -69,13 +69,48 @@ export function RecordingList({ recordings, editable = false }: { recordings: Re
                   className="text-danger underline"
                   message={`Delete "${r.label || r.file_name}"${
                     r.duration_seconds ? ` (${formatDuration(Number(r.duration_seconds))})` : ""
-                  } for good?\n\nThis removes the original full-quality file and the streaming copy, plus its transcript. It can't be undone. The written lesson notes stay.`}
+                  } from this lesson?\n\nThe streaming copy is deleted. The original full-quality file and its transcript are kept, so you can bring it back here with Restore video. To free the space, delete it for good under Settings → Admin → Storage.`}
                 >
                   Delete video
                 </ConfirmSubmit>
               </form>
             </div>
           )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Videos taken off this lesson with Delete video. The original is kept, so
+ * Restore video puts it back and makes a new streaming copy.
+ */
+export function ArchivedRecordings({ recordings }: { recordings: Recording[] }) {
+  if (recordings.length === 0) return null;
+  return (
+    <ul className="flex flex-col gap-2">
+      {recordings.map((r) => (
+        <li
+          key={r.id}
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-dashed border-rule px-3 py-2.5 text-sm"
+        >
+          <div className="min-w-0 flex-1">
+            <span className="font-medium">{r.label || r.file_name}</span>
+            <span className="text-muted">
+              {" · "}
+              {[r.duration_seconds ? formatDuration(Number(r.duration_seconds)) : null, formatBytes(Number(r.size_bytes))]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+            <div className="text-xs text-muted">Deleted from this lesson. The original is kept.</div>
+          </div>
+          <form action={restoreRecording}>
+            <input type="hidden" name="recording_id" value={r.id} />
+            <button className="rounded-full border border-accent/40 px-3 py-1.5 font-medium text-accent-ink hover:bg-accent-soft">
+              Restore video
+            </button>
+          </form>
         </li>
       ))}
     </ul>

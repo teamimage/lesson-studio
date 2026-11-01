@@ -35,6 +35,11 @@ async function withUrls(rows: Recording[]): Promise<RecordingWithUrl[]> {
   }));
 }
 
+// Archived videos (removed from their lesson, original kept) are filtered
+// here rather than in the query, so pages keep working before the
+// archived_at column exists.
+const active = (rows: Recording[] | null) => (rows ?? []).filter((r) => !r.archived_at);
+
 export async function listRecordingsForLesson(lessonId: string): Promise<RecordingWithUrl[]> {
   const supabase = await createClient();
   const { data } = await supabase
@@ -42,7 +47,18 @@ export async function listRecordingsForLesson(lessonId: string): Promise<Recordi
     .select("*")
     .eq("lesson_id", lessonId)
     .order("created_at");
-  return withUrls(data ?? []);
+  return withUrls(active(data));
+}
+
+/** Videos removed from a lesson whose original is kept, for Restore video. */
+export async function listArchivedForLesson(lessonId: string): Promise<Recording[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("recordings")
+    .select("*")
+    .eq("lesson_id", lessonId)
+    .order("created_at");
+  return (data ?? []).filter((r) => !!r.archived_at);
 }
 
 export async function listRecordingsForStudent(studentId: string, limit = 20): Promise<RecordingWithUrl[]> {
@@ -54,5 +70,5 @@ export async function listRecordingsForStudent(studentId: string, limit = 20): P
     .eq("status", "ready")
     .order("created_at", { ascending: false })
     .limit(limit);
-  return withUrls(data ?? []);
+  return withUrls(active(data));
 }

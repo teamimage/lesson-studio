@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { removeStudentFiles, requireAdmin } from "@/lib/admin";
 import { ADMIN_FIELDS, isAdminTable, type FieldSpec } from "@/lib/admin-fields";
 import { RECORDINGS_BUCKET, SCORES_BUCKET } from "@/lib/constants";
+import { deleteStream } from "@/lib/stream";
 
 function str(fd: FormData, key: string): string {
   return String(fd.get(key) ?? "").trim();
@@ -67,8 +68,9 @@ export async function adminDelete(fd: FormData) {
   if (table === "students") await removeStudentFiles(db, [id]);
   if (table === "lessons") await removeStudentFiles(db, [], id);
   if (table === "recordings") {
-    const { data } = await db.from("recordings").select("storage_path").eq("id", id).maybeSingle();
+    const { data } = await db.from("recordings").select("storage_path, stream_uid").eq("id", id).maybeSingle();
     if (data) await db.storage.from(RECORDINGS_BUCKET).remove([data.storage_path]);
+    if (data?.stream_uid) await deleteStream(data.stream_uid);
   }
   if (table === "scores") {
     const { data } = await db.from("scores").select("pages").eq("id", id).maybeSingle();
@@ -158,4 +160,35 @@ export async function adminDeleteAccount(fd: FormData) {
   const { error } = await db.rpc("admin_delete_user", { uid: userId });
   revalidatePath("/", "layout");
   redirect(error ? "/admin?error=1" : "/admin?deleted=1");
+}
+
+/**
+ * Storage screen: deletes lesson videos for good: the original file, any
+ * streaming copy, the row and its transcript. Takes recording ids
+ * ("recording_id") and, for files whose lesson is gone, storage paths
+ * ("path").
+ */
+export async function adminPurgeVideos(fd: FormData) {
+  const { db } = await requireAdmin();
+  const ids = fd.getAll("recording_id").map(String).filter(Boolean);
+  const loose = fd.getAll("path").map(String).filter(Boolean);
+  if (ids.length === 0 && loose.length === 0) redirect("/admin/storage?error=none");
+
+  const { data: recs } = ids.length
+    ? await db.from("recordings").select("id, storage_path, stream_uid").in("id", ids)
+    : { data: [] };
+  const paths = [...(recs ?? []).map((r) => r.storage_path), ...loose];
+  let failed = false;
+  // The storage API takes a limited number of paths per call.
+  for (let i = 0; i < paths.length; i += 100) {
+    const { error } = await db.storage.from(RECORDINGS_BUCKET).remove(paths.slice(i, i + 100));
+    if (error) failed = true;
+  }
+  await Promise.all((recs ?? []).flatMap((r) => (r.stream_uid ? [deleteStream(r.stream_uid)] : [])));
+  if (!failed && recs?.length) {
+    const { error } = await db.from("recordings").delete().in("id", recs.map((r) => r.id));
+    if (error) failed = true;
+  }
+  revalidatePath("/", "layout");
+  redirect(failed ? "/admin/storage?error=1" : `/admin/storage?deleted=${paths.length}`);
 }

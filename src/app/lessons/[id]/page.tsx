@@ -9,8 +9,8 @@ import { approveLesson, deleteLesson, unapproveLesson } from "@/app/lessons/acti
 import { requireTeacher } from "@/lib/auth";
 import { getLesson, getStudent } from "@/lib/data";
 import { formatDate, humanize } from "@/lib/format";
-import { listRecordingsForLesson } from "@/lib/recordings";
-import { RecordingList } from "@/components/recording-player";
+import { listArchivedForLesson, listRecordingsForLesson } from "@/lib/recordings";
+import { ArchivedRecordings, RecordingList } from "@/components/recording-player";
 import { RecordingUploader } from "@/components/recording-uploader";
 import { LessonTimeline } from "@/components/lesson-timeline";
 import { listScores, listStandEvents } from "@/lib/scores";
@@ -29,7 +29,7 @@ import {
 } from "@/lib/lesson-moments";
 
 type Params = Promise<{ id: string }>;
-type SP = Promise<{ approved?: string; upload?: string }>;
+type SP = Promise<{ approved?: string; upload?: string; video?: string }>;
 
 export default function LessonPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
@@ -42,10 +42,11 @@ export default function LessonPage({ params, searchParams }: { params: Params; s
 async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
   await requireTeacher();
   const { id } = await params;
-  const { approved, upload } = await searchParams;
-  const [lesson, recordings, standEvents, ai] = await Promise.all([
+  const { approved, upload, video } = await searchParams;
+  const [lesson, recordings, archived, standEvents, ai] = await Promise.all([
     getLesson(id),
     listRecordingsForLesson(id),
+    listArchivedForLesson(id),
     listStandEvents(id),
     getLessonAi(id),
   ]);
@@ -129,7 +130,14 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <section id="recordings" className="scroll-mt-4">
             <SectionTitle>Lesson video</SectionTitle>
             <div className="flex flex-col gap-3">
+              {video === "setup" && (
+                <Card tone="amber" className="text-sm">
+                  The video wasn&apos;t deleted. Run archived-videos.sql in the Supabase SQL Editor first, so the
+                  original can be kept, then try again.
+                </Card>
+              )}
               <RecordingList recordings={recordings} editable />
+              <ArchivedRecordings recordings={archived} />
               {!isDraft && (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                   <span className="text-sage">

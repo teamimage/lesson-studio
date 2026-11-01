@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
@@ -94,18 +95,59 @@ export async function finishRecording(id: string): Promise<{ ok: boolean }> {
   return { ok: true };
 }
 
+function revalidateRecording(rec: { lesson_id: string; student_id: string }) {
+  revalidatePath(`/lessons/${rec.lesson_id}`);
+  revalidatePath(`/students/${rec.student_id}`);
+  revalidatePath(`/family/${rec.student_id}`);
+  revalidatePath(`/teacher/${rec.student_id}/recordings`);
+  revalidatePath("/admin/storage");
+}
+
+/**
+ * "Delete video" on a lesson: removes the Cloudflare streaming copy and
+ * takes the video off the lesson, but keeps the original file and its
+ * transcript (archived). Restore video brings it back; Settings -> Admin ->
+ * Storage deletes it for good.
+ */
 export async function deleteRecording(fd: FormData) {
   await requireTeacher();
   const id = String(fd.get("recording_id") ?? "");
   const supabase = await createClient();
   const { data: rec } = await supabase.from("recordings").select("*").eq("id", id).maybeSingle();
   if (!rec) return;
-  await supabase.storage.from(RECORDINGS_BUCKET).remove([rec.storage_path]);
+  const { error } = await supabase
+    .from("recordings")
+    .update({
+      archived_at: new Date().toISOString(),
+      stream_uid: null,
+      stream_status: null,
+      stream_hls_url: null,
+      stream_error: null,
+    })
+    .eq("id", id);
+  // Without the archived_at column (archived-videos.sql not run yet) nothing
+  // is touched, so the video stays as it was.
+  if (error) redirect(`/lessons/${rec.lesson_id}?video=setup#recordings`);
   if (rec.stream_uid) await deleteStream(rec.stream_uid);
-  await supabase.from("recordings").delete().eq("id", id);
-  revalidatePath(`/lessons/${rec.lesson_id}`);
-  revalidatePath(`/students/${rec.student_id}`);
-  revalidatePath(`/family/${rec.student_id}`);
+  revalidateRecording(rec);
+}
+
+/** Restore video: puts an archived original back on its lesson and makes a new streaming copy. */
+export async function restoreRecording(fd: FormData) {
+  await requireTeacher();
+  const id = String(fd.get("recording_id") ?? "");
+  const supabase = await createClient();
+  const { data: rec } = await supabase
+    .from("recordings")
+    .update({ archived_at: null })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (!rec) return;
+  // Best effort, as on upload: if it fails, the lesson page offers Try again
+  // and the original plays meanwhile.
+  await syncStream(rec);
+  revalidateRecording(rec);
 }
 
 /**
