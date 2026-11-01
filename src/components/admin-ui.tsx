@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { adminDelete, adminUpdate } from "@/app/admin/actions";
 import { ADMIN_FIELDS, type AdminTable, type FieldSpec } from "@/lib/admin-fields";
 import { ConfirmButton } from "@/components/confirm-button";
+import { InstrumentBookFields } from "@/components/instrument-book-fields";
 import { Button, Field, Input, Notice, Select, Textarea, cx } from "@/components/ui";
 
 /** Edit form for one row, built from ADMIN_FIELDS. */
@@ -31,7 +32,7 @@ export function AdminEditForm({
       <input type="hidden" name="_back" value={back} />
       <div className={cx("grid gap-3", compact ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2")}>
         {specs.map(([key, spec]) => (
-          <FieldInput key={key} name={key} spec={spec} value={row[key]} />
+          <FieldInput key={key} name={key} spec={spec} value={row[key]} row={row} />
         ))}
       </div>
       <div>
@@ -43,8 +44,27 @@ export function AdminEditForm({
   );
 }
 
-function FieldInput({ name, spec, value }: { name: string; spec: FieldSpec; value: unknown }) {
+function FieldInput({
+  name,
+  spec,
+  value,
+  row,
+}: {
+  name: string;
+  spec: FieldSpec;
+  value: unknown;
+  row: Record<string, unknown>;
+}) {
   const v = value == null ? "" : String(value);
+  if (spec.kind === "instrument") {
+    return (
+      <InstrumentBookFields
+        instrument={v}
+        currentBook={typeof row.current_book === "string" ? row.current_book : null}
+      />
+    );
+  }
+  if (spec.kind === "book") return null;
   if (spec.kind === "bool") {
     return (
       <label className="flex min-h-11 items-center gap-3 text-[15px] sm:col-span-2">
