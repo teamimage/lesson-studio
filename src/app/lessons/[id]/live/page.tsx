@@ -1,3 +1,5 @@
+import { listScoreIndex } from "@/lib/scores";
+import { MusicPreviewLinks } from "@/components/music-preview-links";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
@@ -34,6 +36,7 @@ async function Body({ params }: { params: Params }) {
     supabase.from("stand_events").select("kind, score_id, page, at").eq("lesson_id", id).order("at"),
     supabase.from("recordings").select("*").eq("lesson_id", id),
   ]);
+  const music = await listScoreIndex(student.id);
   const videos = (recs ?? []).filter((r) => !r.archived_at).length;
   const standEvents = events ?? [];
   const firstStand = standEvents[0] ?? null;
@@ -113,6 +116,7 @@ async function Body({ params }: { params: Params }) {
           <LinkButton href={`/lessons/${id}/stand`} className="col-span-2 min-h-14 text-lg">
             Music stand
           </LinkButton>
+          <MusicPreviewLinks studentId={student.id} scores={music} className="col-span-2 px-1" />
           <LinkButton href={`/lessons/${id}?upload=1#recordings`} variant="secondary">
             Upload video
           </LinkButton>

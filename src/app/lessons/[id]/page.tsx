@@ -19,14 +19,16 @@ import { getLessonAi } from "@/lib/ai/usage";
 import { formatUsd } from "@/lib/ai/pricing";
 import { LessonReview } from "@/components/lesson-review";
 import { VideoPopupProvider } from "@/components/video-popup";
+import { LinkMusic } from "@/components/link-music";
 import {
   assignmentJumps,
   buildMoments,
   draftAssignmentTimes,
-  draftMoments,
-  parseTimelineText,
+  lessonAiMoments,
   withClipInfo,
 } from "@/lib/lesson-moments";
+import { findSection, momentsKey, parseMusicLinks, viewerHref } from "@/lib/music-links";
+import { pageRange } from "@/lib/score-analysis";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ approved?: string; upload?: string; video?: string }>;
@@ -53,7 +55,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   if (!lesson) notFound();
   const [student, scores] = await Promise.all([
     getStudent(lesson.student_id),
-    standEvents.length ? listScores(lesson.student_id, { includeArchived: true }) : Promise.resolve([]),
+    listScores(lesson.student_id, { includeArchived: true }),
   ]);
   if (!student) notFound();
   const isDraft = lesson.status === "draft";
@@ -62,8 +64,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   // its draft, or the "4:10 ..." lines older drafts put in the notes).
   const playable = recordings.filter((r) => r.url);
   const aiRecording = playable.some((r) => r.id === ai.state.recordingId) ? ai.state.recordingId! : null;
-  const fromDraft = draftMoments(ai.draft);
-  const aiMoments = fromDraft.length ? fromDraft : parseTimelineText(lesson.teacher_notes);
+  const aiMoments = lessonAiMoments(ai.draft, lesson.teacher_notes);
+  // Which sheet music each AI clip is about (matched by Claude, see link-music).
+  const musicLinks = parseMusicLinks(ai.draft);
+  const musicLinked = !!musicLinks && musicLinks.key === momentsKey(aiMoments);
+  const hasPieces = scores.some((s) => s.sections.length > 0);
+  const canLinkMusic = !!aiRecording && aiMoments.length > 0 && !!ai.transcript && hasPieces;
   const allMoments = buildMoments({
     recordings: playable.map((r) => ({
       id: r.id,
@@ -74,6 +80,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     scoreTitles: Object.fromEntries(scores.map((s) => [s.id, s.title])),
     scoreSections: Object.fromEntries(scores.map((s) => [s.id, s.sections])),
     ai: aiRecording ? { recordingId: aiRecording, moments: aiMoments } : null,
+    musicLinks: musicLinks?.links ?? [],
   });
   const { moments, jumps } = withClipInfo(
     allMoments,
@@ -101,6 +108,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
       }
     >
       <VideoPopupProvider
+        studentId={student.id}
+        scores={scores.map((s) => ({
+          id: s.id,
+          title: s.title,
+          pages: s.pages.map((p) => ({ url: p.url, w: p.w, h: p.h })),
+          sections: s.sections,
+        }))}
         recordings={playable.map((r) => ({
           id: r.id,
           url: r.url,
@@ -178,7 +192,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               {(ai.transcript || ai.costUsd > 0) && (
                 <details className="rounded-2xl border border-rule bg-sheet px-4 py-3 text-sm">
                   <summary className="cursor-pointer font-medium">
-                    Transcript{ai.costUsd > 0 ? ` · AI cost for this lesson ${formatUsd(ai.costUsd)}` : ""}
+                    Transcript
+                    {ai.costUsd > 0 ? ` · AI cost for this lesson ${formatUsd(ai.costUsd)}` : ""}
                   </summary>
                   {ai.transcript ? (
                     <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-muted">
@@ -199,13 +214,27 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             {lesson.lesson_pieces.length > 0 && (
               <Row label="Pieces">
                 <ul className="flex flex-col gap-1">
-                  {lesson.lesson_pieces.map((p) => (
-                    <li key={p.id} className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="font-medium">{p.title}</span>
-                      <span className="text-sm text-muted">{humanize(p.activity).toLowerCase()}</span>
-                      {p.notes && <span className="w-full text-sm text-muted">{p.notes}</span>}
-                    </li>
-                  ))}
+                  {lesson.lesson_pieces.map((p) => {
+                    const found = findSection(scores, p.title);
+                    return (
+                      <li key={p.id} className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="font-medium">{p.title}</span>
+                        {found && (
+                          <Link
+                            href={viewerHref(student.id, found.score.id, {
+                              from: found.section.start_page,
+                              to: found.section.end_page,
+                            })}
+                            className="text-sm text-accent-ink underline"
+                          >
+                            ♪ Music, {pageRange(found.section)}
+                          </Link>
+                        )}
+                        <span className="text-sm text-muted">{humanize(p.activity).toLowerCase()}</span>
+                        {p.notes && <span className="w-full text-sm text-muted">{p.notes}</span>}
+                      </li>
+                    );
+                  })}
                 </ul>
               </Row>
             )}
@@ -222,7 +251,19 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
           {moments.length > 0 && (
             <section id="review" className="scroll-mt-4">
-              <SectionTitle>Lesson review</SectionTitle>
+              <SectionTitle
+                action={
+                  canLinkMusic ? (
+                    <LinkMusic
+                      lessonId={id}
+                      linked={musicLinked}
+                      autoStart={!musicLinked && ai.state.status === "done"}
+                    />
+                  ) : undefined
+                }
+              >
+                Lesson review
+              </SectionTitle>
               <LessonReview moments={moments} multiVideo={videoNames} />
             </section>
           )}

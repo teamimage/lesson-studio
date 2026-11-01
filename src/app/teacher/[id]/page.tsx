@@ -1,3 +1,4 @@
+import { listScoreIndex } from "@/lib/scores";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -28,10 +29,11 @@ async function Body({ params }: { params: Params }) {
   const student = await getStudent(id);
   if (!student) notFound();
   const today = todayISO();
-  const [lessons, repertoire, parents] = await Promise.all([
+  const [lessons, repertoire, parents, music] = await Promise.all([
     listLessons(id, 5),
     listRepertoire(id),
     listParentsForStudent(id),
+    listScoreIndex(id),
   ]);
   const latest = lessons[0] ?? null;
   const plan = lessons.find((l) => l.status === "approved") ?? null;
@@ -126,7 +128,9 @@ async function Body({ params }: { params: Params }) {
                   <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-rule/60">
                     <div
                       className="h-full rounded-full bg-accent"
-                      style={{ width: `${Math.round((position.inReview / Math.max(1, position.total)) * 100)}%` }}
+                      style={{
+                        width: `${Math.round((position.inReview / Math.max(1, position.total)) * 100)}%`,
+                      }}
                     />
                   </div>
                   {position.nextPiece && (
@@ -183,7 +187,13 @@ async function Body({ params }: { params: Params }) {
             </Link>{" "}
             and it updates when you approve it.
           </p>
-          <RepertoireMap studentId={id} instrument={student.instrument} repertoire={repertoire} editable />
+          <RepertoireMap
+            studentId={id}
+            instrument={student.instrument}
+            repertoire={repertoire}
+            scores={music}
+            editable
+          />
         </section>
       </div>
     </Shell>

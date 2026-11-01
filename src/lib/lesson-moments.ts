@@ -9,6 +9,7 @@
 
 import { buildBlocks, buildSegments, formatClock, type StandEvent } from "@/lib/stand-timeline";
 import { sectionAt, sectionLabel, type ScoreSection } from "@/lib/score-analysis";
+import type { MusicRef, StoredLink } from "@/lib/music-links";
 
 export type MomentKind = "piece" | "mark" | "ai";
 
@@ -21,6 +22,8 @@ export type Jump = {
   endSeconds?: number | null;
   /** What the clip is for, shown above the popup player. */
   summary?: string[];
+  /** The sheet music the clip is about, shown next to the player. */
+  music?: MusicRef | null;
 };
 
 export type Moment = Jump & {
@@ -96,6 +99,7 @@ export function buildMoments({
   scoreTitles,
   scoreSections = {},
   ai,
+  musicLinks = [],
 }: {
   recordings: MomentRecording[];
   events: StandEvent[];
@@ -103,6 +107,8 @@ export function buildMoments({
   /** Pieces Claude found in each score, so a book's stretch splits by piece. */
   scoreSections?: Record<string, ScoreSection[]>;
   ai: { recordingId: string; moments: AiMoment[] } | null;
+  /** Which music each AI moment is about (from the AI, see music-links). */
+  musicLinks?: StoredLink[];
 }): Moment[] {
   const out: Moment[] = [];
   const placed = recordings.filter((r) => r.startedAt);
@@ -136,7 +142,20 @@ export function buildMoments({
           pages.push({ page: s.page, seconds: p.seconds });
       }
       const minutes = b.end ? Math.max(1, Math.round((b.end - b.start) / 60000)) : null;
+      const firstPage = b.segments[0]?.page ?? null;
+      const sec0 = pieceOf(b.scoreId, firstPage);
       out.push({
+        music: firstPage
+          ? {
+              scoreId: b.scoreId,
+              page: firstPage,
+              fromPage: sec0?.start_page ?? firstPage,
+              toPage: sec0?.end_page ?? Math.max(firstPage, ...b.segments.map((x) => x.page ?? 0)),
+              piece: sec0 ? sectionLabel(sec0) : (scoreTitles[b.scoreId] ?? "Music"),
+              bars: "",
+              box: null,
+            }
+          : null,
         id: `piece-${i}`,
         kind: "piece",
         recordingId: at.recordingId,
@@ -164,6 +183,18 @@ export function buildMoments({
         seconds: Math.max(0, at.seconds - 8),
         label: m.note?.trim() || "Marked bars",
         detail: [title, m.page ? `page ${m.page}` : null].filter(Boolean).join(", ") || undefined,
+        music:
+          m.score_id && m.page
+            ? {
+                scoreId: m.score_id,
+                page: m.page,
+                fromPage: sec?.start_page ?? m.page,
+                toPage: sec?.end_page ?? m.page,
+                piece: sec ? sectionLabel(sec) : (scoreTitles[m.score_id] ?? "Music"),
+                bars: "",
+                box: m.rect,
+              }
+            : null,
       });
     }
   }
@@ -176,6 +207,10 @@ export function buildMoments({
         recordingId: ai.recordingId,
         seconds: m.seconds,
         label: m.label,
+        music:
+          musicLinks.find((l) => Math.abs(l.seconds - m.seconds) < 1 && l.label === m.label)?.music ??
+          musicLinks.find((l) => Math.abs(l.seconds - m.seconds) < 1)?.music ??
+          null,
       }),
     );
   }
@@ -287,13 +322,30 @@ export function withClipInfo(
   for (const a of assignments) {
     const j = jumps[a.id];
     if (!j) continue;
+    // The music of the clip the assignment falls in (latest one starting at or before it).
+    let cover: Moment | null = null;
+    for (const m of outMoments)
+      if (
+        m.recordingId === j.recordingId &&
+        m.music &&
+        m.seconds <= j.seconds + 1 &&
+        (!cover || m.seconds >= cover.seconds)
+      )
+        cover = m;
     outJumps[a.id] = {
       ...j,
       endSeconds: clipEnd(moments, j.recordingId, j.seconds),
       summary: a.how ? [a.how] : [],
+      music: j.music ?? (cover && (cover.endSeconds == null || j.seconds < cover.endSeconds) ? cover.music : null),
     };
   }
   return { moments: outMoments, jumps: outJumps };
 }
 
 export { formatClock };
+
+/** The AI's moments for a lesson: from its draft, else the "4:10 ..." lines older drafts put in the notes. */
+export function lessonAiMoments(draft: unknown, teacherNotes: string | null | undefined): AiMoment[] {
+  const fromDraft = draftMoments(draft);
+  return fromDraft.length ? fromDraft : parseTimelineText(teacherNotes);
+}

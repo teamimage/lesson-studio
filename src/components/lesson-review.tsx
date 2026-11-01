@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cx } from "@/components/ui";
 import { JumpButton, useVideoPopup } from "@/components/video-popup";
 import { formatClock, type Moment, type MomentKind } from "@/lib/lesson-moments";
+import { musicTag } from "@/lib/music-links";
 
 const TABS: { key: "all" | MomentKind; label: string }[] = [
   { key: "all", label: "All" },
@@ -79,6 +80,14 @@ export function LessonReview({ moments, multiVideo }: { moments: Moment[]; multi
                   </span>
                 )}
               </span>
+              {m.music && (
+                <span
+                  className="shrink-0 rounded border border-rule bg-paper px-1.5 text-[11px] tabular-nums text-muted"
+                  title={m.music.piece}
+                >
+                  ♪ {musicTag(m.music)}
+                </span>
+              )}
             </button>
             {m.pages && (
               <div className="-mt-0.5 flex flex-wrap gap-1 pb-1.5 pl-[5.9rem] pr-3">
@@ -91,6 +100,7 @@ export function LessonReview({ moments, multiVideo }: { moments: Moment[]; multi
                       label: `${m.label}, page ${p.page}`,
                       endSeconds: m.pages![pi + 1]?.seconds ?? m.endSeconds,
                       summary: m.summary,
+                      music: m.music ? { ...m.music, page: p.page, box: null } : null,
                     }}
                     className="min-h-6 px-1.5 font-medium"
                   >

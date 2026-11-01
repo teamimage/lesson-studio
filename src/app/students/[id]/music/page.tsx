@@ -10,6 +10,8 @@ import { listScores } from "@/lib/scores";
 import { SCORE_KINDS } from "@/lib/constants";
 import { formatBytes } from "@/lib/format";
 import { pageRange, sectionLabel, STATUS_LABELS, type SectionStatus } from "@/lib/score-analysis";
+import { viewerHref } from "@/lib/music-links";
+import Link from "next/link";
 import type { StandScore } from "@/lib/stand-timeline";
 import { moveScore, openMusicStand, renameScore, setScoreArchived } from "@/app/students/music-actions";
 
@@ -28,7 +30,10 @@ async function Body({ params }: { params: Params }) {
   const { id } = await params;
   const student = await getStudent(id);
   if (!student) notFound();
-  const scores = await listScores(id, { includeArchived: true, withSourceLinks: true });
+  const scores = await listScores(id, {
+    includeArchived: true,
+    withSourceLinks: true,
+  });
   const active = scores.filter((s) => !s.archived);
   const archived = scores.filter((s) => s.archived);
 
@@ -65,6 +70,7 @@ async function Body({ params }: { params: Params }) {
                   key={s.id}
                   score={s}
                   studentName={student.name}
+                  studentId={id}
                   first={i === 0}
                   last={i === active.length - 1}
                 />
@@ -85,7 +91,7 @@ async function Body({ params }: { params: Params }) {
             <SectionTitle>Put away ({archived.length})</SectionTitle>
             <ul className="flex flex-col gap-2">
               {archived.map((s) => (
-                <ScoreRow key={s.id} score={s} studentName={student.name} first last />
+                <ScoreRow key={s.id} score={s} studentName={student.name} studentId={id} first last />
               ))}
             </ul>
           </section>
@@ -98,11 +104,13 @@ async function Body({ params }: { params: Params }) {
 function ScoreRow({
   score,
   studentName,
+  studentId,
   first,
   last,
 }: {
   score: StandScore;
   studentName: string;
+  studentId: string;
   first: boolean;
   last: boolean;
 }) {
@@ -110,12 +118,16 @@ function ScoreRow({
   const kind = SCORE_KINDS.find((k) => k.value === score.kind)?.label ?? score.kind;
   return (
     <li className="flex gap-3 rounded-2xl border border-rule bg-sheet p-3">
-      <div className="h-24 w-[72px] shrink-0 overflow-hidden rounded-lg border border-rule bg-white">
+      <Link
+        href={viewerHref(studentId, score.id)}
+        className="h-24 w-[72px] shrink-0 overflow-hidden rounded-lg border border-rule bg-white"
+        aria-label={`View ${score.title}`}
+      >
         {cover?.url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover.url} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
         )}
-      </div>
+      </Link>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <form action={renameScore} className="flex items-center gap-2">
           <input type="hidden" name="score_id" value={score.id} />
@@ -144,7 +156,12 @@ function ScoreRow({
             )}
           </div>
         )}
-        <MusicReading score={score} studentName={studentName} />
+        {score.pages.length > 0 && (
+          <Link href={viewerHref(studentId, score.id)} className="text-sm font-medium text-accent-ink underline">
+            View the music (doesn&apos;t open the stand)
+          </Link>
+        )}
+        <MusicReading score={score} studentName={studentName} studentId={studentId} />
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {!score.archived && !first && (
             <form action={moveScore}>
@@ -193,7 +210,15 @@ const STATUS_TONES: Record<SectionStatus, "accent" | "sage" | "plum" | "muted"> 
 };
 
 // What Claude found in the music: the book, how it fits the student, and its pieces.
-function MusicReading({ score, studentName }: { score: StandScore; studentName: string }) {
+function MusicReading({
+  score,
+  studentName,
+  studentId,
+}: {
+  score: StandScore;
+  studentName: string;
+  studentId: string;
+}) {
   if (score.pages.length === 0) return null;
   if (score.analysisStatus === "running") {
     return <p className="text-sm text-muted">Claude is reading the music to find the pieces…</p>;
@@ -244,7 +269,15 @@ function MusicReading({ score, studentName }: { score: StandScore; studentName: 
             key={`${s.start_page}-${i}`}
             className={cx("flex items-baseline gap-2 py-1.5", s.status === "current" && "font-semibold")}
           >
-            <span className="min-w-0 flex-1">{sectionLabel(s)}</span>
+            <Link
+              href={viewerHref(studentId, score.id, {
+                from: s.start_page,
+                to: s.end_page,
+              })}
+              className="min-w-0 flex-1 text-accent-ink hover:underline"
+            >
+              {sectionLabel(s)}
+            </Link>
             {STATUS_LABELS[s.status] && <Pill tone={STATUS_TONES[s.status]}>{STATUS_LABELS[s.status]}</Pill>}
             <span className="shrink-0 tabular-nums text-muted">{pageRange(s)}</span>
           </li>
