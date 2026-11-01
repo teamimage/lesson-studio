@@ -2,17 +2,24 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/types";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
+import { streamingEnabled } from "@/lib/stream";
 
 export type Recording = Tables<"recordings">;
-/** A recording with a short-lived signed playback URL (null until uploaded). */
-export type RecordingWithUrl = Recording & { url: string | null };
+/**
+ * A recording with a short-lived signed URL for the original (null until
+ * uploaded), and whether a fast streaming copy can be played instead (the
+ * player asks /api/recordings/[id]/stream for its address).
+ */
+export type RecordingWithUrl = Recording & { url: string | null; streamReady: boolean };
 
 // Long enough to watch a full lesson without the link expiring mid-video.
 const SIGNED_URL_SECONDS = 6 * 60 * 60;
 
 async function withUrls(rows: Recording[]): Promise<RecordingWithUrl[]> {
+  const streaming = streamingEnabled();
+  const streamReady = (r: Recording) => streaming && r.status === "ready" && r.stream_status === "ready";
   const ready = rows.filter((r) => r.status === "ready");
-  if (ready.length === 0) return rows.map((r) => ({ ...r, url: null }));
+  if (ready.length === 0) return rows.map((r) => ({ ...r, url: null, streamReady: false }));
   const supabase = await createClient();
   const { data } = await supabase.storage
     .from(RECORDINGS_BUCKET)
@@ -21,7 +28,11 @@ async function withUrls(rows: Recording[]): Promise<RecordingWithUrl[]> {
       SIGNED_URL_SECONDS,
     );
   const urls = new Map((data ?? []).map((d) => [d.path, d.signedUrl]));
-  return rows.map((r) => ({ ...r, url: r.status === "ready" ? (urls.get(r.storage_path) ?? null) : null }));
+  return rows.map((r) => ({
+    ...r,
+    url: r.status === "ready" ? (urls.get(r.storage_path) ?? null) : null,
+    streamReady: streamReady(r),
+  }));
 }
 
 export async function listRecordingsForLesson(lessonId: string): Promise<RecordingWithUrl[]> {

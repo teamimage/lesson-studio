@@ -76,6 +76,28 @@ server-only secrets. Never prefix these with `NEXT_PUBLIC_`:
 Every AI call is logged with its cost in the `ai_usage` table; totals are in
 Settings > AI costs. Prices live in `src/lib/ai/pricing.ts`.
 
+## Fast video streaming (optional)
+
+Lesson videos are stored as uploaded (often 2 to 4 GB) in the private
+`lesson-recordings` bucket. That original stays the master copy: the AI
+transcript and the "Original" link use it. When Cloudflare Stream is set up,
+each finished upload is also sent to Cloudflare (by a 24-hour signed link),
+which makes a compressed, adaptive HLS copy that starts playing in a second
+or two. Players use that copy when it's ready and the original until then,
+or if the stream fails to load.
+
+- Server-only env vars: `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_STREAM_TOKEN`
+  (an API token with the Stream: Edit permission). Without them nothing
+  changes.
+- Columns `stream_uid`, `stream_status`, `stream_hls_url`, `stream_error` on
+  `recordings` (migration `20261101200000_streaming_copies.sql`).
+- Streaming copies require signed URLs. `GET /api/recordings/[id]/stream`
+  hands a 6-hour playback token to whoever can read the recording row;
+  `POST` starts or checks the copy (teachers only). The lesson page shows
+  "Preparing a fast streaming copy" while Cloudflare works, and starts copies
+  for videos uploaded before streaming was turned on.
+- Deleting a recording deletes its Cloudflare copy too.
+
 ## Supabase auth settings
 
 In Supabase > Authentication > URL Configuration, set **Site URL** to

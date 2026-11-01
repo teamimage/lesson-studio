@@ -13,6 +13,7 @@ import {
   type StandScore,
 } from "@/lib/stand-timeline";
 import { cx } from "@/components/ui";
+import { LessonVideo } from "@/components/lesson-video";
 
 /**
  * A lesson video next to the music that was open on the stand at each moment:
@@ -115,12 +116,15 @@ export function LessonTimeline({
 
       {rec ? (
         <div className="grid gap-3 md:grid-cols-[3fr_2fr]">
-          <video
+          <LessonVideo
+            key={rec.id}
             ref={videoRef}
+            recordingId={rec.id}
+            src={rec.url!}
+            streamReady={rec.streamReady}
             controls
             playsInline
             preload="metadata"
-            src={`${rec.url}#t=0.1`}
             className="aspect-video w-full rounded-2xl bg-black"
             onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
             onLoadedMetadata={(e) => Number.isFinite(e.currentTarget.duration) && setDuration(e.currentTarget.duration)}

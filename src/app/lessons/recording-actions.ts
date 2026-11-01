@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
+import { syncStream } from "@/lib/recording-stream";
+import { deleteStream } from "@/lib/stream";
 
 export type StartRecordingInput = {
   lessonId: string;
@@ -81,6 +83,9 @@ export async function finishRecording(id: string): Promise<{ ok: boolean }> {
   const { data: exists } = await supabase.storage.from(RECORDINGS_BUCKET).exists(rec.storage_path);
   if (!exists) return { ok: false };
   await supabase.from("recordings").update({ status: "ready" }).eq("id", id);
+  // Start the fast streaming copy right away. Best effort: if it fails, the
+  // lesson page shows why and offers Try again; the original still plays.
+  await syncStream({ ...rec, status: "ready" });
   revalidatePath(`/lessons/${rec.lesson_id}`);
   revalidatePath(`/students/${rec.student_id}`);
   revalidatePath(`/family/${rec.student_id}`);
@@ -108,6 +113,7 @@ export async function deleteRecording(fd: FormData) {
   const { data: rec } = await supabase.from("recordings").select("*").eq("id", id).maybeSingle();
   if (!rec) return;
   await supabase.storage.from(RECORDINGS_BUCKET).remove([rec.storage_path]);
+  if (rec.stream_uid) await deleteStream(rec.stream_uid);
   await supabase.from("recordings").delete().eq("id", id);
   revalidatePath(`/lessons/${rec.lesson_id}`);
   revalidatePath(`/students/${rec.student_id}`);
