@@ -2,8 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
+import { LocalDateTime } from "@/components/local-time";
 import { AssignmentList } from "@/components/assignment-list";
-import { Button, Card, LinkButton, Notice, Pill, Row, SectionTitle } from "@/components/ui";
+import { Button, Card, LinkButton, Pill, Row, SectionTitle } from "@/components/ui";
 import { approveLesson, deleteLesson, unapproveLesson } from "@/app/lessons/actions";
 import { requireTeacher } from "@/lib/auth";
 import { getLesson, getStudent } from "@/lib/data";
@@ -106,17 +107,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         }))}
       >
         <div className="flex flex-col gap-5">
-          {approved && (
-            <Notice tone="sage">
-              Approved. {student.name}&apos;s family can now see this plan in{" "}
-              <Link href={`/family/${student.id}`} className="font-semibold underline">
-                Home practice
-              </Link>
-              .
-            </Notice>
-          )}
-
-          {isDraft ? (
+          {isDraft && (
             <Card tone="amber" className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
                 <Pill tone="amber">Draft</Pill>
@@ -133,22 +124,32 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 </LinkButton>
               </form>
             </Card>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <Pill tone="sage">Approved {lesson.approved_at ? formatDate(lesson.approved_at.slice(0, 10)) : ""}</Pill>
-              <LinkButton href={`/lessons/${id}/sheet`} variant="secondary" className="min-h-9 px-3 text-sm">
-                Print lesson sheet
-              </LinkButton>
-              <LinkButton href={`/family/${student.id}`} variant="ghost" className="min-h-9 px-3 text-sm">
-                Parent view
-              </LinkButton>
-            </div>
           )}
 
           <section id="recordings" className="scroll-mt-4">
             <SectionTitle>Lesson video</SectionTitle>
             <div className="flex flex-col gap-3">
               <RecordingList recordings={recordings} editable />
+              {!isDraft && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                  <span className="text-sage">
+                    ✓ Approved
+                    {lesson.approved_at && (
+                      <>
+                        {" "}
+                        <LocalDateTime iso={lesson.approved_at} />
+                      </>
+                    )}
+                    {approved && " · the family can see it now"}
+                  </span>
+                  <Link href={`/lessons/${id}/sheet`} className="text-accent-ink underline">
+                    Print lesson sheet
+                  </Link>
+                  <Link href={`/family/${student.id}`} className="text-accent-ink underline">
+                    Parent view
+                  </Link>
+                </div>
+              )}
               <RecordingUploader lessonId={id} autoOpen={!!upload} />
               <ProcessVideo
                 // Remount when the server state moves (e.g. processing started on upload).
