@@ -44,8 +44,13 @@ export function RecordingList({ recordings, editable = false }: { recordings: Re
                 .join(" · ")}
             </span>
             {r.url && (
-              <a href={r.url} target="_blank" rel="noreferrer" className="ml-auto text-accent-ink underline">
-                {r.streamReady ? "Original" : "Open"}
+              <a
+                href={`/recordings/${r.id}/full`}
+                target="_blank"
+                rel="noreferrer"
+                className="ml-auto text-accent-ink underline"
+              >
+                Full quality
               </a>
             )}
           </div>

@@ -80,7 +80,7 @@ Settings > AI costs. Prices live in `src/lib/ai/pricing.ts`.
 
 Lesson videos are stored as uploaded (often 2 to 4 GB) in the private
 `lesson-recordings` bucket. That original stays the master copy: the AI
-transcript and the "Original" link use it. When Cloudflare Stream is set up,
+transcript and the "Full quality" link (/recordings/[id]/full, its own window) use it. When Cloudflare Stream is set up,
 each finished upload is also sent to Cloudflare (by a 24-hour signed link),
 which makes a compressed, adaptive HLS copy that starts playing in a second
 or two. Players use that copy when it's ready and the original until then,
