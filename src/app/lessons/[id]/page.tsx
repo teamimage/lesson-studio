@@ -145,31 +145,6 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             </div>
           )}
 
-          <Card className="divide-y divide-rule">
-            {lesson.lesson_pieces.length > 0 && (
-              <Row label="Pieces">
-                <ul className="flex flex-col gap-1">
-                  {lesson.lesson_pieces.map((p) => (
-                    <li key={p.id} className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="font-medium">{p.title}</span>
-                      <span className="text-sm text-muted">{humanize(p.activity).toLowerCase()}</span>
-                      {p.notes && <span className="w-full text-sm text-muted">{p.notes}</span>}
-                    </li>
-                  ))}
-                </ul>
-              </Row>
-            )}
-            {lesson.summary && <Row label="Today we">{lesson.summary}</Row>}
-            {lesson.focus_points && <Row label="Focus">{lesson.focus_points}</Row>}
-            {lesson.parent_message && <Row label="To parent">{lesson.parent_message}</Row>}
-            {(lesson.duration_minutes || lesson.next_lesson_date) && (
-              <Row label="Details">
-                {lesson.duration_minutes ? `${lesson.duration_minutes} minutes. ` : ""}
-                {lesson.next_lesson_date ? `Next lesson ${formatDate(lesson.next_lesson_date, "weekday")}.` : ""}
-              </Row>
-            )}
-          </Card>
-
           <section id="recordings" className="scroll-mt-4">
             <SectionTitle>Lesson video</SectionTitle>
             <div className="flex flex-col gap-3">
@@ -209,6 +184,31 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               )}
             </div>
           </section>
+
+          <Card className="divide-y divide-rule">
+            {lesson.lesson_pieces.length > 0 && (
+              <Row label="Pieces">
+                <ul className="flex flex-col gap-1">
+                  {lesson.lesson_pieces.map((p) => (
+                    <li key={p.id} className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="font-medium">{p.title}</span>
+                      <span className="text-sm text-muted">{humanize(p.activity).toLowerCase()}</span>
+                      {p.notes && <span className="w-full text-sm text-muted">{p.notes}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </Row>
+            )}
+            {lesson.summary && <Row label="Today we">{lesson.summary}</Row>}
+            {lesson.focus_points && <Row label="Focus">{lesson.focus_points}</Row>}
+            {lesson.parent_message && <Row label="To parent">{lesson.parent_message}</Row>}
+            {(lesson.duration_minutes || lesson.next_lesson_date) && (
+              <Row label="Details">
+                {lesson.duration_minutes ? `${lesson.duration_minutes} minutes. ` : ""}
+                {lesson.next_lesson_date ? `Next lesson ${formatDate(lesson.next_lesson_date, "weekday")}.` : ""}
+              </Row>
+            )}
+          </Card>
 
           {moments.length > 0 && (
             <section id="review" className="scroll-mt-4">
