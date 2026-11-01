@@ -129,6 +129,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                   {" · "}
                   {formatBytes(r.size_bytes)} · lesson {formatDate(r.lessons?.lesson_date, "short")}
                   {r.status !== "ready" ? " · upload not finished" : ""}
+                  {r.archived_at ? " · deleted from the lesson (original kept)" : ""}
                 </span>
               </div>
               <AdminEditForm table="recordings" row={r} back={back} compact />
@@ -138,7 +139,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                   id={r.id}
                   back={back}
                   label="Delete video"
-                  confirm={`Delete the video ${r.file_name}? The file is removed for good.`}
+                  confirm={`Delete the video ${r.file_name} for good? The original file, streaming copy and transcript are removed.`}
                 />
               </div>
             </Card>

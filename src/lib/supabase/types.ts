@@ -378,6 +378,7 @@ export type Database = {
       };
       recordings: {
         Row: {
+          archived_at: string | null;
           created_at: string;
           duration_seconds: number | null;
           file_name: string;
@@ -398,6 +399,7 @@ export type Database = {
           teacher_id: string;
         };
         Insert: {
+          archived_at?: string | null;
           created_at?: string;
           duration_seconds?: number | null;
           file_name: string;
@@ -418,6 +420,7 @@ export type Database = {
           teacher_id: string;
         };
         Update: {
+          archived_at?: string | null;
           created_at?: string;
           duration_seconds?: number | null;
           file_name?: string;
@@ -753,6 +756,14 @@ export type Database = {
     };
     Functions: {
       admin_delete_user: { Args: { uid: string }; Returns: undefined };
+      admin_storage_usage: {
+        Args: never;
+        Returns: { bucket_id: string; files: number; bytes: number }[];
+      };
+      admin_unlinked_videos: {
+        Args: never;
+        Returns: { name: string; bytes: number; created_at: string }[];
+      };
       admin_list_users: {
         Args: never;
         Returns: { id: string; email: string; created_at: string; last_sign_in_at: string | null }[];

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { deleteStream } from "@/lib/stream";
 import { revalidatePath } from "next/cache";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -180,6 +181,11 @@ export async function deleteLesson(fd: FormData) {
   const id = clean(fd.get("lesson_id"));
   const studentId = clean(fd.get("student_id"));
   const supabase = await createClient();
+  // Streaming copies are billed by Cloudflare, so remove them with the
+  // lesson. The original files stay in storage and show under Settings ->
+  // Admin -> Storage as videos with no lesson, to delete for good there.
+  const { data: recs } = await supabase.from("recordings").select("stream_uid").eq("lesson_id", id);
+  await Promise.all((recs ?? []).flatMap((r) => (r.stream_uid ? [deleteStream(r.stream_uid)] : [])));
   await supabase.from("lessons").delete().eq("id", id);
   revalidateLesson(id, studentId);
   redirect(studentId ? `/students/${studentId}` : "/");

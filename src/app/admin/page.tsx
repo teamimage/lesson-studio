@@ -41,6 +41,20 @@ async function Body({ searchParams }: { searchParams: SP }) {
         lessons, practice logs and videos. Changes here take effect right away for that account.
       </p>
 
+      <Link href="/admin/storage" className="block">
+        <Card className="flex items-center gap-3 transition hover:border-accent/50">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold">Storage</div>
+            <div className="text-sm text-muted">
+              Space used, videos deleted from lessons, and old videos to delete for good.
+            </div>
+          </div>
+          <span className="text-accent-ink" aria-hidden>
+            ›
+          </span>
+        </Card>
+      </Link>
+
       <section>
         <SectionTitle>Teachers</SectionTitle>
         <div className="flex flex-col gap-3">

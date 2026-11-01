@@ -30,10 +30,11 @@ async function Body({ params }: { params: Params }) {
   if (!student) notFound();
 
   const supabase = await createClient();
-  const [{ data: events }, { count: videos }] = await Promise.all([
+  const [{ data: events }, { data: recs }] = await Promise.all([
     supabase.from("stand_events").select("kind, score_id, page, at").eq("lesson_id", id).order("at"),
-    supabase.from("recordings").select("id", { count: "exact", head: true }).eq("lesson_id", id),
+    supabase.from("recordings").select("*").eq("lesson_id", id),
   ]);
+  const videos = (recs ?? []).filter((r) => !r.archived_at).length;
   const standEvents = events ?? [];
   const firstStand = standEvents[0] ?? null;
   const lastStand = standEvents[standEvents.length - 1] ?? null;
