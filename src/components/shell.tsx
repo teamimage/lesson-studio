@@ -49,7 +49,7 @@ export function Shell({
             )}
             <div className="ml-auto flex items-center gap-2">{actions}</div>
           </div>
-          <nav aria-label="Sections" className="-mx-1 flex gap-1 overflow-x-auto pb-1.5 pt-0.5">
+          <nav aria-label="Sections" className="-mx-1 flex gap-1 overflow-x-auto pb-1.5 pt-0.5 sm:justify-center">
             <TabLink href="/teacher" active={tab === "desk"} label="Desk" icon="▦" />
             <TabLink href="/" active={tab === "studio"} label="Studio" icon="♪" />
             <TabLink href="/family" active={tab === "family"} label="Home practice" icon="⌂" />
@@ -64,7 +64,7 @@ export function Shell({
           wide ? "max-w-5xl" : "max-w-2xl",
         )}
       >
-        <div className="mb-4">
+        <div className="mb-4 text-center">
           {eyebrow && (
             <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-accent-ink">
               {eyebrow}
