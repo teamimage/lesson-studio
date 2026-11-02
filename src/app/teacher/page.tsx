@@ -6,6 +6,9 @@ import { Avatar } from "@/components/avatar";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { studentPhotoSrc } from "@/lib/constants";
 import { DeskLink, PracticeGrid, Stat } from "@/components/desk";
+import { DeskPanels } from "@/components/desk-panels";
+import { LessonSheet } from "@/components/lesson-sheet";
+import { PreLessonBrief } from "@/components/pre-lesson-brief";
 import { Shell } from "@/components/shell";
 import { StudentPicker } from "@/components/student-picker";
 import { Button, Card, EmptyState, LinkButton, Pill, SectionTitle } from "@/components/ui";
@@ -14,6 +17,7 @@ import { requireTeacher } from "@/lib/auth";
 import {
   type Student,
   getPracticeWeek,
+  getTeacherForStudent,
   listDraftLessons,
   listLessons,
   listRepertoire,
@@ -78,13 +82,14 @@ async function Desk({ searchParams }: { searchParams: SearchParams }) {
 async function StudentPanel({ student }: { student: Student }) {
   const id = student.id;
   const today = todayISO();
-  const [lessons, week, month, repertoire, recordings, music] = await Promise.all([
+  const [lessons, week, month, repertoire, recordings, music, teacher] = await Promise.all([
     listLessons(id, 20),
     getPracticeWeek(id),
     listPracticeRange(id, 28),
     listRepertoire(id),
     listRecordingsForStudent(id, 50),
     listScoreIndex(id),
+    getTeacherForStudent(student),
   ]);
 
   const latest = lessons[0] ?? null;
@@ -157,29 +162,34 @@ async function StudentPanel({ student }: { student: Student }) {
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <LinkButton href={`/students/${id}/lessons/new`} className="text-sm">
-            Record lesson
-          </LinkButton>
-          <LinkButton href={`/students/${id}/brief`} variant="secondary" className="text-sm">
-            Pre-lesson brief
-          </LinkButton>
-          {plan ? (
-            <LinkButton href={`/lessons/${plan.id}/sheet`} variant="secondary" className="text-sm">
-              Printable sheet
+        <DeskPanels
+          studentId={id}
+          studentName={student.name}
+          sheetLessonId={plan?.id ?? null}
+          recordButton={
+            <LinkButton href={`/students/${id}/lessons/new`} className="text-sm">
+              Record lesson
             </LinkButton>
-          ) : (
-            <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-dashed border-rule text-sm text-muted">
-              No sheet yet
-            </span>
-          )}
-          <form action={openMusicStand}>
-            <input type="hidden" name="student_id" value={id} />
-            <Button variant="secondary" className="w-full text-sm">
-              Open music stand
-            </Button>
-          </form>
-        </div>
+          }
+          musicStandButton={
+            <form action={openMusicStand}>
+              <input type="hidden" name="student_id" value={id} />
+              <Button variant="secondary" className="w-full text-sm">
+                Open music stand
+              </Button>
+            </form>
+          }
+          brief={
+            <PreLessonBrief
+              student={student}
+              lessons={lessons.slice(0, 6)}
+              week={week}
+              repertoire={repertoire}
+              showRecordButton={false}
+            />
+          }
+          sheet={plan ? <LessonSheet lesson={plan} student={student} teacher={teacher} /> : null}
+        />
         <div className="text-sm">
           <span className="text-muted">Last lesson:</span>{" "}
           {latest ? (
