@@ -309,7 +309,7 @@ export function LessonForm({
         <Textarea value={basics.teacher_notes} onChange={(e) => set("teacher_notes", e.target.value)} rows={2} />
       </Section>
 
-      <div className="sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] -mx-4 flex gap-2 border-t border-rule bg-paper/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))] -mx-4 flex gap-2 border-t border-rule bg-paper/95 px-4 pt-3 backdrop-blur">
         {isApproved ? (
           <Button type="submit" disabled={pending} className="flex-1">
             {pending ? "Saving…" : "Save changes"}
