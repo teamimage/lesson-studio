@@ -7,8 +7,11 @@ import { todayISO } from "@/lib/format";
 // rather than a date, because the server's date is UTC and lessons are not.
 const SAME_LESSON_HOURS = 12;
 
-/** Today's lesson for a student (reused if one was started recently), or a new draft. */
-export async function findOrCreateTodayLesson(studentId: string, teacherId: string): Promise<string | null> {
+/**
+ * The lesson running for a student right now (one started in the last 12 h),
+ * or null. Never creates one: only Start lesson does that.
+ */
+export async function findTodayLesson(studentId: string): Promise<string | null> {
   const supabase = await createClient();
   const since = new Date(Date.now() - SAME_LESSON_HOURS * 3600_000).toISOString();
   const { data: recent } = await supabase
@@ -19,7 +22,14 @@ export async function findOrCreateTodayLesson(studentId: string, teacherId: stri
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (recent) return recent.id;
+  return recent?.id ?? null;
+}
+
+/** Start lesson: today's lesson for a student (reused if one was started recently), or a new draft. */
+export async function findOrCreateTodayLesson(studentId: string, teacherId: string): Promise<string | null> {
+  const recent = await findTodayLesson(studentId);
+  if (recent) return recent;
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("lessons")
     .insert({ student_id: studentId, teacher_id: teacherId, lesson_date: todayISO(), status: "draft" })
