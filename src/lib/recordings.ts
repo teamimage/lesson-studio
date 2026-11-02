@@ -12,14 +12,22 @@ export type Recording = Tables<"recordings">;
  */
 export type RecordingWithUrl = Recording & { url: string | null; streamReady: boolean };
 
+/**
+ * Teacher pages get a link to the original for every uploaded video. The
+ * family side ("stream") only gets the original while the fast streaming copy
+ * isn't ready yet; after that, the streaming copy is all it can play.
+ */
+export type OriginalAccess = "always" | "until-stream";
+
 // Long enough to watch a full lesson without the link expiring mid-video.
 const SIGNED_URL_SECONDS = 6 * 60 * 60;
 
-async function withUrls(rows: Recording[]): Promise<RecordingWithUrl[]> {
+async function withUrls(rows: Recording[], original: OriginalAccess = "always"): Promise<RecordingWithUrl[]> {
   const streaming = streamingEnabled();
   const streamReady = (r: Recording) => streaming && r.status === "ready" && r.stream_status === "ready";
-  const ready = rows.filter((r) => r.status === "ready");
-  if (ready.length === 0) return rows.map((r) => ({ ...r, url: null, streamReady: false }));
+  const needsOriginal = (r: Recording) => r.status === "ready" && (original === "always" || !streamReady(r));
+  const ready = rows.filter(needsOriginal);
+  if (ready.length === 0) return rows.map((r) => ({ ...r, url: null, streamReady: streamReady(r) }));
   const supabase = await createClient();
   const { data } = await supabase.storage
     .from(RECORDINGS_BUCKET)
@@ -30,7 +38,7 @@ async function withUrls(rows: Recording[]): Promise<RecordingWithUrl[]> {
   const urls = new Map((data ?? []).map((d) => [d.path, d.signedUrl]));
   return rows.map((r) => ({
     ...r,
-    url: r.status === "ready" ? (urls.get(r.storage_path) ?? null) : null,
+    url: needsOriginal(r) ? (urls.get(r.storage_path) ?? null) : null,
     streamReady: streamReady(r),
   }));
 }
@@ -40,14 +48,17 @@ async function withUrls(rows: Recording[]): Promise<RecordingWithUrl[]> {
 // archived_at column exists.
 const active = (rows: Recording[] | null) => (rows ?? []).filter((r) => !r.archived_at);
 
-export async function listRecordingsForLesson(lessonId: string): Promise<RecordingWithUrl[]> {
+export async function listRecordingsForLesson(
+  lessonId: string,
+  original: OriginalAccess = "always",
+): Promise<RecordingWithUrl[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("recordings")
     .select("*")
     .eq("lesson_id", lessonId)
     .order("created_at");
-  return withUrls(active(data));
+  return withUrls(active(data), original);
 }
 
 /** Videos removed from a lesson whose original is kept, for Restore video. */
@@ -72,3 +83,6 @@ export async function listRecordingsForStudent(studentId: string, limit = 20): P
     .limit(limit);
   return withUrls(active(data));
 }
+
+/** True when a video can be played: streaming copy ready or original linked. */
+export const isPlayable = (r: RecordingWithUrl) => !!r.url || r.streamReady;

@@ -9,19 +9,19 @@ import { streamingEnabled } from "@/lib/stream";
 
 /**
  * Lesson videos with playback. Each video is named by its original file
- * name (e.g. IMG_1962.MOV). Teachers (editable) can delete (archive);
- * parents just watch. Rows still uploading show as pending. When fast
+ * name (e.g. IMG_1962.MOV). Teachers (editable) can delete (archive) and
+ * open the original with Full quality; parents just watch the streaming copy. Rows still uploading show as pending. When fast
  * streaming is set up, teachers also see the streaming copy being prepared.
  */
 export function RecordingList({ recordings, editable = false }: { recordings: RecordingWithUrl[]; editable?: boolean }) {
-  const shown = editable ? recordings : recordings.filter((r) => r.url);
+  const shown = editable ? recordings : recordings.filter((r) => r.url || r.streamReady);
   if (shown.length === 0) return null;
   const streaming = streamingEnabled();
   return (
     <ul className="flex flex-col gap-3">
       {shown.map((r) => (
         <li key={r.id} className="overflow-hidden rounded-2xl border border-rule bg-sheet">
-          {r.url ? (
+          {r.url || r.streamReady ? (
             <LessonVideo
               recordingId={r.id}
               src={r.url}
@@ -45,7 +45,7 @@ export function RecordingList({ recordings, editable = false }: { recordings: Re
                 .filter(Boolean)
                 .join(" · ")}
             </span>
-            {r.url && (
+            {editable && r.url && (
               <a
                 href={`/recordings/${r.id}/full`}
                 target="_blank"

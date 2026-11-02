@@ -12,9 +12,8 @@ type SP = Promise<{ t?: string }>;
 
 /**
  * The original, full-quality lesson video in its own window. The lesson page
- * plays the fast streaming copy; its "Full quality" link opens this. Anyone
- * who can see the recording row (its teacher, or a parent of an approved
- * lesson) can open it.
+ * plays the fast streaming copy; its "Full quality" link opens this. Only the
+ * recording's teacher can open it: family screens play the streaming copy.
  */
 export default function FullQualityPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
@@ -27,17 +26,17 @@ export default function FullQualityPage({ params, searchParams }: { params: Para
 }
 
 async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
-  await getViewer();
+  const viewer = await getViewer();
   const { id } = await params;
   // ?t=seconds starts the video there (the popup player passes where it was).
   const start = Math.max(0, Math.floor(Number((await searchParams).t) || 0)) || 0.1;
   const supabase = await createClient();
   const { data: rec } = await supabase
     .from("recordings")
-    .select("storage_path, file_name, label, status")
+    .select("storage_path, file_name, label, status, teacher_id")
     .eq("id", id)
     .maybeSingle();
-  if (!rec || rec.status !== "ready") notFound();
+  if (!rec || rec.status !== "ready" || !viewer.teacher || viewer.teacher.id !== rec.teacher_id) notFound();
   const { data: link } = await supabase.storage.from(RECORDINGS_BUCKET).createSignedUrl(rec.storage_path, 6 * 60 * 60);
   if (!link?.signedUrl) notFound();
 
