@@ -21,3 +21,13 @@ export function LocalDateTime({ iso, className }: { iso: string; className?: str
   );
   return <span className={className}>{label}</span>;
 }
+
+/** Just the time of day ("4:05 PM") in the viewer's time zone. */
+export function LocalTime({ iso, className }: { iso: string; className?: string }) {
+  const label = useSyncExternalStore(
+    noop,
+    () => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+    () => "",
+  );
+  return <span className={className}>{label}</span>;
+}

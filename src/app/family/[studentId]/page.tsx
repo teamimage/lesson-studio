@@ -10,6 +10,9 @@ import { addDays, capitalize, formatDate, relativeDay, todayISO } from "@/lib/fo
 import { savePractice } from "../actions";
 import { isPlayable, listRecordingsForLesson } from "@/lib/recordings";
 import { RecordingList } from "@/components/recording-player";
+import { PracticeRecorder } from "@/components/practice-recorder";
+import { PracticeSessionList } from "@/components/practice-session-list";
+import { listPracticeSessions } from "@/lib/practice/data";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ date?: string; saved?: string; error?: string }>;
@@ -33,12 +36,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const today = todayISO();
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) && sp.date <= today ? sp.date : today;
 
-  const [plan, week, log, history, teacher] = await Promise.all([
+  const [plan, week, log, history, teacher, sessions] = await Promise.all([
     getCurrentPlan(studentId),
     getPracticeWeek(studentId),
     getPracticeLog(studentId, date),
     listPracticeLogs(studentId, 30),
     getTeacherForStudent(student),
+    listPracticeSessions(studentId, 10),
   ]);
   // Families watch the fast streaming copy; the original is only offered
   // while that copy is still being made.
@@ -64,6 +68,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
       <div className="flex flex-col gap-6">
         {sp.saved && <Notice tone="sage">Saved. Nice work.</Notice>}
         {sp.error && <Notice tone="danger">Couldn&apos;t save that. Try again.</Notice>}
+
+        <PracticeRecorder studentId={studentId} firstName={firstName} hasPlan={!!plan} />
 
         {!plan ? (
           <Card className="text-sm text-muted">
@@ -166,6 +172,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               </form>
             </section>
           </>
+        )}
+
+        {sessions.length > 0 && (
+          <section>
+            <SectionTitle>Practice reviews</SectionTitle>
+            <PracticeSessionList sessions={sessions} teacherView={isTeacher} />
+          </section>
         )}
 
         <section>

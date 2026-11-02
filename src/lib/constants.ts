@@ -54,6 +54,8 @@ export const PIECE_ACTIVITIES: { value: Enums<"piece_activity">; label: string }
 
 /** Private storage bucket for lesson videos (see the lesson_recordings migration). */
 export const RECORDINGS_BUCKET = "lesson-recordings";
+// Temporary home-practice recordings; deleted once the AI has listened.
+export const PRACTICE_BUCKET = "practice-recordings";
 
 /** Private storage bucket for score page images (see the music_stand migration). */
 export const SCORES_BUCKET = "lesson-scores";

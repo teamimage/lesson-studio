@@ -139,7 +139,7 @@ async function AiCosts({ teacherId }: { teacherId: string }) {
         </div>
         {usage.lessons.length === 0 ? (
           <p className="text-sm text-muted">
-            Nothing yet. Costs show up here after a lesson video is processed or sheet music is read.
+            Nothing yet. Costs show up here after a lesson video is processed, sheet music is read or a practice session is reviewed.
           </p>
         ) : (
           <>
@@ -155,7 +155,7 @@ async function AiCosts({ teacherId }: { teacherId: string }) {
               </ul>
             </div>
             <div>
-              <div className="mb-1 text-sm font-semibold">By lesson and music</div>
+              <div className="mb-1 text-sm font-semibold">By lesson, music and practice</div>
               <ul className="divide-y divide-rule text-sm">
                 {usage.lessons.slice(0, 30).map((l) => (
                   <li
@@ -163,7 +163,11 @@ async function AiCosts({ teacherId }: { teacherId: string }) {
                     className="flex items-baseline justify-between gap-3 py-1.5"
                   >
                     <span className="min-w-0">
-                      {l.music ? (
+                      {l.practice ? (
+                        <span className="font-medium">
+                          Practice reviews{l.studentName ? `: ${l.studentName}` : " (deleted sessions)"}
+                        </span>
+                      ) : l.music ? (
                         l.scoreTitle ? (
                           <span className="font-medium">
                             Sheet music: {l.scoreTitle}

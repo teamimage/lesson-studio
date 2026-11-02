@@ -17,6 +17,8 @@ import { openMusicStand } from "@/app/students/music-actions";
 import { startLesson } from "@/app/lessons/live-actions";
 import { listScoreIndex } from "@/lib/scores";
 import { MusicPreviewLinks } from "@/components/music-preview-links";
+import { PracticeSessionList } from "@/components/practice-session-list";
+import { listPracticeSessions } from "@/lib/practice/data";
 
 type Params = Promise<{ id: string }>;
 
@@ -33,12 +35,13 @@ async function Body({ params }: { params: Params }) {
   const { id } = await params;
   const student = await getStudent(id);
   if (!student) notFound();
-  const [lessons, week, repertoire, parents, music] = await Promise.all([
+  const [lessons, week, repertoire, parents, music, sessions] = await Promise.all([
     listLessons(id),
     getPracticeWeek(id),
     listRepertoire(id),
     listParentsForStudent(id),
     listScoreIndex(id),
+    listPracticeSessions(id, 5),
   ]);
 
   return (
@@ -156,6 +159,13 @@ async function Body({ params }: { params: Params }) {
             </Link>
           </Card>
         </section>
+
+        {sessions.length > 0 && (
+          <section>
+            <SectionTitle>Practice reviews</SectionTitle>
+            <PracticeSessionList sessions={sessions} teacherView />
+          </section>
+        )}
 
         {(student.goals || student.notes || student.lesson_day) && (
           <Card className="flex flex-col gap-2 text-[15px]">
