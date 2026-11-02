@@ -14,6 +14,7 @@ import {
   type StandScore,
 } from "@/lib/stand-timeline";
 import { pageRange, sectionAt, sectionLabel } from "@/lib/score-analysis";
+import { openMusicStand } from "@/app/students/music-actions";
 
 type Row = TablesInsert<"stand_events"> & { id: string; at: string };
 type Current = { scoreId: string; page: number } | null;
@@ -81,7 +82,8 @@ export function MusicStand({
   scores,
   priorEvents,
 }: {
-  lessonId: string;
+  /** Null when no lesson is running: the stand just shows music and logs nothing. */
+  lessonId: string | null;
   studentId: string;
   teacherId: string;
   studentName: string;
@@ -119,7 +121,7 @@ export function MusicStand({
   // ------------------------------------------------------------ event log
   // Every event is kept in a local queue (also in localStorage) and sent in
   // the background, so a dropped Wi-Fi connection loses nothing.
-  const storageKey = `stand-queue-${lessonId}`;
+  const storageKey = `stand-queue-${lessonId ?? "none"}`;
   const queue = useRef<Row[]>([]);
   const rows = useRef(new Map<string, Row>());
   const flushing = useRef(false);
@@ -150,6 +152,7 @@ export function MusicStand({
   }, [supabase, persist]);
 
   useEffect(() => {
+    if (!lessonId) return;
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) ?? "[]") as Row[];
       if (Array.isArray(saved) && saved.length) {
@@ -166,7 +169,7 @@ export function MusicStand({
       clearInterval(timer);
       window.removeEventListener("online", onOnline);
     };
-  }, [storageKey, flush, persist]);
+  }, [lessonId, storageKey, flush, persist]);
 
   const log = useCallback(
     (kind: StandEventKind, extra: Partial<Row> = {}): Row => {
@@ -175,7 +178,7 @@ export function MusicStand({
         id: crypto.randomUUID(),
         teacher_id: teacherId,
         student_id: studentId,
-        lesson_id: lessonId,
+        lesson_id: lessonId ?? "",
         kind,
         at,
         score_id: null,
@@ -184,6 +187,8 @@ export function MusicStand({
         note: null,
         ...extra,
       };
+      // No lesson running: nothing is recorded, the stand only shows music.
+      if (!lessonId) return row;
       rows.current.set(row.id, row);
       queue.current.push(row);
       persist();
@@ -196,7 +201,7 @@ export function MusicStand({
 
   // The first time the stand opens for a lesson, note it (as "no piece open"),
   // so the lesson card on the teacher's phone sees the stand is running.
-  const openedLogged = useRef(priorEvents.length > 0);
+  const openedLogged = useRef(priorEvents.length > 0 || !lessonId);
   useEffect(() => {
     if (openedLogged.current) return;
     openedLogged.current = true;
@@ -408,8 +413,11 @@ export function MusicStand({
   return (
     <div className="fixed inset-0 flex flex-col bg-[#ece6dc] text-ink dark:bg-[#1c1916]">
       <header className={cx(full && "hidden", "flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-rule bg-sheet px-2 py-1.5 pt-[max(0.375rem,env(safe-area-inset-top))]")}>
-        <Link href={`/lessons/${lessonId}/live`} className="flex min-h-10 shrink-0 items-center px-2 text-sm text-accent-ink">
-          ‹ Lesson
+        <Link
+          href={lessonId ? `/lessons/${lessonId}/live` : `/students/${studentId}`}
+          className="flex min-h-10 shrink-0 items-center px-2 text-sm text-accent-ink"
+        >
+          {lessonId ? "‹ Lesson" : `‹ ${studentName}`}
         </Link>
         <button
           onClick={() => setPickerOpen(true)}
@@ -430,25 +438,46 @@ export function MusicStand({
         <span className="ml-auto shrink-0 text-sm tabular-nums text-muted">
           {startedAt ? formatClock((now - startedAt) / 1000) : studentName}
         </span>
-        <ToolButton active={markMode} disabled={!page} onClick={() => setMarkMode((m) => !m)}>
-          ▭ Mark
-        </ToolButton>
-        <ToolButton onClick={sync}>◉ Sync</ToolButton>
+        {lessonId && (
+          <>
+            <ToolButton active={markMode} disabled={!page} onClick={() => setMarkMode((m) => !m)}>
+              ▭ Mark
+            </ToolButton>
+            <ToolButton onClick={sync}>◉ Sync</ToolButton>
+          </>
+        )}
         <ToolButton active={fitWidth} disabled={!page} onClick={() => setFitWidth((f) => !f)}>
           ↔ Fit
         </ToolButton>
         <ToolButton onClick={toggleFull}>⤢ Full screen</ToolButton>
-        <span
-          title={pending ? `${pending} change(s) waiting to save` : "Saved"}
-          className={cx(
-            "mx-1 h-2.5 w-2.5 shrink-0 rounded-full",
-            offline ? "bg-danger" : pending ? "bg-amber" : "bg-sage",
-          )}
-        />
-        <button onClick={end} className="min-h-10 shrink-0 rounded-lg bg-accent px-3 text-sm font-semibold text-white">
-          End
-        </button>
+        {lessonId && (
+          <>
+            <span
+              title={pending ? `${pending} change(s) waiting to save` : "Saved"}
+              className={cx(
+                "mx-1 h-2.5 w-2.5 shrink-0 rounded-full",
+                offline ? "bg-danger" : pending ? "bg-amber" : "bg-sage",
+              )}
+            />
+            <button onClick={end} className="min-h-10 shrink-0 rounded-lg bg-accent px-3 text-sm font-semibold text-white">
+              End
+            </button>
+          </>
+        )}
       </header>
+
+      {!full && !lessonId && (
+        <form action={openMusicStand} className="flex shrink-0 items-center gap-2 bg-amber-soft px-3 py-1.5 text-sm">
+          <input type="hidden" name="student_id" value={studentId} />
+          <span className="flex-1">
+            No lesson running, so page turns aren&apos;t saved. Press <b>Start lesson</b> on {studentName}&apos;s page,
+            then tap Join lesson here.
+          </span>
+          <button type="submit" className="min-h-9 shrink-0 rounded-lg bg-accent px-3 font-semibold text-white">
+            Join lesson
+          </button>
+        </form>
+      )}
 
       {full && (
         <button
@@ -459,7 +488,7 @@ export function MusicStand({
           {score && current ? `${current.page}/${score.pages.length} ` : ""}⤡
         </button>
       )}
-      {!full && !synced && !syncHintHidden && (
+      {!full && lessonId && !synced && !syncHintHidden && (
         <div className="flex shrink-0 items-center gap-2 bg-amber-soft px-3 py-1.5 text-sm">
           <span className="flex-1">
             Camera rolling? Tap <b>◉ Sync</b> once where the camera can hear it. It lines the video up with the music.

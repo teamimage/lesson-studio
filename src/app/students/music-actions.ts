@@ -6,7 +6,7 @@ import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SCORES_BUCKET } from "@/lib/constants";
 import { titleFromFileName } from "@/lib/score-analysis";
-import { findOrCreateTodayLesson } from "@/lib/lesson-today";
+import { findTodayLesson } from "@/lib/lesson-today";
 import { parsePages, type ScorePage } from "@/lib/stand-timeline";
 
 export type StartScoreResult = { id: string; prefix: string } | { error: string };
@@ -163,12 +163,14 @@ export async function deleteScore(fd: FormData) {
   revalidatePath(`/students/${score.student_id}/music`);
 }
 
-/** Opens the music stand on today's lesson for a student, starting a draft lesson if needed. */
+/**
+ * Opens the music stand. If a lesson is running for the student (Start lesson
+ * in the last 12 h) the stand joins it; otherwise it opens on its own and
+ * records nothing. It never starts a lesson.
+ */
 export async function openMusicStand(fd: FormData) {
-  const { teacher } = await requireTeacher();
+  await requireTeacher();
   const studentId = String(fd.get("student_id") ?? "");
-  const lessonId = await findOrCreateTodayLesson(studentId, teacher.id);
-  if (!lessonId) redirect(`/students/${studentId}?error=lesson`);
-  revalidatePath(`/students/${studentId}`);
-  redirect(`/lessons/${lessonId}/stand`);
+  const lessonId = await findTodayLesson(studentId);
+  redirect(lessonId ? `/lessons/${lessonId}/stand` : `/students/${studentId}/stand`);
 }

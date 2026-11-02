@@ -48,13 +48,14 @@ async function Body({ params }: { params: Params }) {
         <RefreshWhileReading active={scores.some((s) => s.analysisStatus === "running")} />
         <Card tone="accent" className="flex flex-col gap-3">
           <p className="text-[16px]">
-            Put {student.name}&apos;s music here, then open the music stand on the iPad (or a phone or laptop) during the
-            lesson. It notes which piece and page is open, so the lesson video can be split by piece.
+            Put {student.name}&apos;s music here, then open the music stand on the iPad (or a phone or laptop). Once
+            you press Start lesson, the stand notes which piece and page is open, so the lesson video can be split by
+            piece. Opening the stand never starts a lesson by itself.
           </p>
           <form action={openMusicStand}>
             <input type="hidden" name="student_id" value={id} />
             <Button className="w-full" disabled={active.length === 0}>
-              Open the music stand for today&apos;s lesson
+              Open the music stand
             </Button>
           </form>
         </Card>
