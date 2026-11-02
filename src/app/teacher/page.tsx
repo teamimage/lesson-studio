@@ -1,5 +1,5 @@
 import { listScoreIndex } from "@/lib/scores";
-import { MusicPreviewLinks } from "@/components/music-preview-links";
+import { viewerHref } from "@/lib/music-links";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
@@ -98,6 +98,16 @@ async function StudentPanel({ student }: { student: Student }) {
   const stale = staleReview(repertoire, today);
   const reviewCount = repertoire.filter((r) => r.status === "review" || r.status === "performed").length;
   const monthDays = month.filter((l) => practiced(l)).length;
+  // Suzuki students: the book under their name opens that book's sheet music
+  // (read-only viewer). Prefer the upload whose title names the same book.
+  const withPages = music.filter((s) => s.pageCount > 0);
+  const bookNo = student.current_book?.match(/book\s*(\d+)/i)?.[1];
+  const bookScore =
+    student.method && /suzuki/i.test(student.method) && student.current_book
+      ? (bookNo ? withPages.find((s) => new RegExp(`book\\s*${bookNo}\\b`, "i").test(s.title)) : undefined) ??
+        withPages.find((s) => s.title.toLowerCase().includes(student.current_book!.toLowerCase())) ??
+        (withPages.length === 1 ? withPages[0] : undefined)
+      : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -118,13 +128,21 @@ async function StudentPanel({ student }: { student: Student }) {
               {!student.active && <Pill>inactive</Pill>}
             </div>
             <div className="text-sm text-muted">
-              {[
-                student.age ? `age ${student.age}` : "",
-                student.method ? humanize(student.method) : "",
-                student.current_book ?? "",
-              ]
+              {[student.age ? `age ${student.age}` : "", student.method ? humanize(student.method) : ""]
                 .filter(Boolean)
                 .join(" · ")}
+              {student.current_book && (
+                <>
+                  {student.age || student.method ? " · " : ""}
+                  {bookScore ? (
+                    <Link href={viewerHref(id, bookScore.id)} className="font-semibold text-accent-ink no-underline">
+                      {student.current_book}
+                    </Link>
+                  ) : (
+                    student.current_book
+                  )}
+                </>
+              )}
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {upcoming ? (
@@ -162,7 +180,16 @@ async function StudentPanel({ student }: { student: Student }) {
             </Button>
           </form>
         </div>
-        <MusicPreviewLinks studentId={id} scores={music} />
+        <div className="text-sm">
+          <span className="text-muted">Last lesson:</span>{" "}
+          {latest ? (
+            <Link href={`/lessons/${latest.id}`} className="font-medium text-ink no-underline">
+              {formatDate(latest.lesson_date, "weekday")}
+            </Link>
+          ) : (
+            <span className="text-muted">none yet</span>
+          )}
+        </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <DeskLink
             href={`/teacher/${id}`}
