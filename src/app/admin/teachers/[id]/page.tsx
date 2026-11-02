@@ -16,7 +16,7 @@ type SP = Promise<{ saved?: string; deleted?: string; error?: string }>;
 
 export default function AdminTeacherPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
-    <Suspense fallback={<Shell title="Teacher" back={{ href: "/admin", label: "All teachers" }} wide>{null}</Shell>}>
+    <Suspense fallback={<Shell title="Teacher" back={{ href: "/admin", label: "All teachers" }}>{null}</Shell>}>
       <Body params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -44,7 +44,6 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
       title={teacher.name || "No name yet"}
       eyebrow={`Teacher · ${email}`}
       back={{ href: "/admin", label: "All teachers" }}
-      wide
     >
       <div className="flex flex-col gap-8">
         <AdminNotices sp={sp} />

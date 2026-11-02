@@ -2,6 +2,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cx } from "./ui";
 
+// One content width for every section (Studio, Desk, Home practice, Settings,
+// Admin), matching the Desk page David liked.
+const PAGE_WIDTH = "max-w-5xl";
+
 type Tab = "studio" | "desk" | "family" | "settings";
 
 // Page frame: header with the back link (or app name) top left, page actions
@@ -14,7 +18,6 @@ export function Shell({
   actions,
   tab,
   children,
-  wide,
 }: {
   title: ReactNode;
   eyebrow?: ReactNode;
@@ -22,16 +25,12 @@ export function Shell({
   actions?: ReactNode;
   tab?: Tab;
   children: ReactNode;
-  wide?: boolean;
 }) {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="no-print sticky top-0 z-10 border-b border-rule/80 bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-paper/75">
         <div
-          className={cx(
-            "mx-auto flex w-full flex-col px-4 pt-1",
-            wide ? "max-w-5xl" : "max-w-2xl",
-          )}
+          className={cx("mx-auto flex w-full flex-col px-4 pt-1", PAGE_WIDTH)}
         >
           <div className="flex items-center gap-3">
             {back ? (
@@ -61,7 +60,7 @@ export function Shell({
       <main
         className={cx(
           "mx-auto w-full flex-1 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-3",
-          wide ? "max-w-5xl" : "max-w-2xl",
+          PAGE_WIDTH,
         )}
       >
         <div className="mb-4">
