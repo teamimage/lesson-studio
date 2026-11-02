@@ -50,8 +50,8 @@ export function Shell({
             <div className="ml-auto flex items-center gap-2">{actions}</div>
           </div>
           <nav aria-label="Sections" className="-mx-1 flex gap-1 overflow-x-auto pb-1.5 pt-0.5">
-            <TabLink href="/" active={tab === "studio"} label="Studio" icon="♪" />
             <TabLink href="/teacher" active={tab === "desk"} label="Desk" icon="▦" />
+            <TabLink href="/" active={tab === "studio"} label="Studio" icon="♪" />
             <TabLink href="/family" active={tab === "family"} label="Home practice" icon="⌂" />
             <TabLink href="/settings" active={tab === "settings"} label="Settings" icon="⚙" />
           </nav>
