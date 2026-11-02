@@ -12,7 +12,7 @@ type SP = Promise<{ saved?: string; deleted?: string; error?: string }>;
 
 export default function AdminPage({ searchParams }: { searchParams: SP }) {
   return (
-    <Shell title="Admin" eyebrow="All accounts" back={{ href: "/settings", label: "Settings" }} wide>
+    <Shell title="Admin" eyebrow="All accounts" back={{ href: "/settings", label: "Settings" }}>
       <Suspense>
         <Body searchParams={searchParams} />
       </Suspense>

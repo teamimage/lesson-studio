@@ -21,7 +21,7 @@ type Params = Promise<{ id: string }>;
 // "View student" from the teacher desk: profile, parents and repertoire.
 export default function DeskStudentPage({ params }: { params: Params }) {
   return (
-    <Suspense fallback={<Shell title=" " tab="desk" back={{ href: "/teacher", label: "Teacher desk" }} wide>{null}</Shell>}>
+    <Suspense fallback={<Shell title=" " tab="desk" back={{ href: "/teacher", label: "Teacher desk" }}>{null}</Shell>}>
       <Body params={params} />
     </Suspense>
   );
@@ -67,7 +67,6 @@ async function Body({ params }: { params: Params }) {
       eyebrow={student.current_book ?? undefined}
       back={{ href: `/teacher?student=${id}`, label: "Teacher desk" }}
       tab="desk"
-      wide
       actions={
         <LinkButton href={`/students/${id}/edit`} variant="secondary" className="min-h-9 px-3 text-sm">
           Edit student
