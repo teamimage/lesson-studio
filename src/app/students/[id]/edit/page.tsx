@@ -29,6 +29,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     <Shell title={student.name} eyebrow="Edit student" back={{ href: `/students/${id}`, label: student.name }} tab="studio">
       <div className="flex flex-col gap-8">
         {error === "save" && <Notice tone="danger">Something went wrong saving. Try again.</Notice>}
+        {error === "photo" && <Notice tone="danger">The details were saved, but the photo didn&apos;t upload. Try it again.</Notice>}
         {error === "parent" && <Notice tone="danger">A parent needs an email address.</Notice>}
         <StudentForm student={student} action={updateStudent} submitLabel="Save changes" />
 

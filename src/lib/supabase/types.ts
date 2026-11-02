@@ -718,6 +718,8 @@ export type Database = {
           method: string;
           name: string;
           notes: string | null;
+          photo_path: string | null;
+          photo_updated_at: string | null;
           teacher_id: string;
         };
         Insert: {
@@ -733,6 +735,8 @@ export type Database = {
           method?: string;
           name: string;
           notes?: string | null;
+          photo_path?: string | null;
+          photo_updated_at?: string | null;
           teacher_id: string;
         };
         Update: {
@@ -748,6 +752,8 @@ export type Database = {
           method?: string;
           name?: string;
           notes?: string | null;
+          photo_path?: string | null;
+          photo_updated_at?: string | null;
           teacher_id?: string;
         };
         Relationships: [

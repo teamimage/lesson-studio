@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { applyPhotoFromForm } from "@/lib/student-photos";
 
 function str(fd: FormData, key: string): string | null {
   const v = String(fd.get(key) ?? "").trim();
@@ -36,6 +37,9 @@ export async function createStudent(fd: FormData) {
     .single();
   if (error || !data) redirect("/students/new?error=save");
 
+  // A failed photo upload doesn't stop the new student; it can be added later.
+  await applyPhotoFromForm(supabase, teacher.id, data.id, fd);
+
   // Optional parent on the same form.
   const parentEmail = str(fd, "parent_email");
   if (parentEmail) {
@@ -47,15 +51,30 @@ export async function createStudent(fd: FormData) {
 }
 
 export async function updateStudent(fd: FormData) {
-  await requireTeacher();
+  const { teacher } = await requireTeacher();
   const id = String(fd.get("id") ?? "");
   if (!id) redirect("/");
   const supabase = await createClient();
   const { error } = await supabase.from("students").update(studentFields(fd)).eq("id", id);
   if (error) redirect(`/students/${id}/edit?error=save`);
+  if (!(await applyPhotoFromForm(supabase, teacher.id, id, fd))) redirect(`/students/${id}/edit?error=photo`);
   revalidatePath("/");
   revalidatePath(`/students/${id}`);
   redirect(`/students/${id}`);
+}
+
+/** Take, choose or remove a student's photo from the enlarged photo view. */
+export async function updateStudentPhoto(fd: FormData): Promise<{ ok: boolean }> {
+  const { teacher } = await requireTeacher();
+  const id = String(fd.get("student_id") ?? "");
+  if (!id) return { ok: false };
+  const supabase = await createClient();
+  const { data: student } = await supabase.from("students").select("id, teacher_id").eq("id", id).maybeSingle();
+  if (!student || student.teacher_id !== teacher.id) return { ok: false };
+  const ok = await applyPhotoFromForm(supabase, teacher.id, id, fd);
+  revalidatePath("/");
+  revalidatePath(`/students/${id}`);
+  return { ok };
 }
 
 export async function addParent(fd: FormData) {

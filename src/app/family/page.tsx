@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
+import { InstrumentTag } from "@/components/instrument-tag";
+import { studentPhotoSrc } from "@/lib/constants";
 import { Shell } from "@/components/shell";
 import { WeekStrip } from "@/components/week-strip";
 import { Card, EmptyState, Pill } from "@/components/ui";
 import { getViewer } from "@/lib/auth";
 import { getCurrentPlan, getPracticeWeek, listStudents } from "@/lib/data";
-import { capitalize, formatDate, todayISO } from "@/lib/format";
+import { formatDate, todayISO } from "@/lib/format";
 
 // The family side: one card per child with today's plan.
 export default function FamilyPage() {
@@ -50,13 +52,13 @@ async function Body() {
           <Link key={student.id} href={`/family/${student.id}`} className="block">
             <Card tone="plum" className="flex flex-col gap-3">
               <div className="flex items-center gap-3">
-                <Avatar name={student.name} instrument={student.instrument} />
+                <Avatar name={student.name} instrument={student.instrument} photoSrc={studentPhotoSrc(student)} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[17px] font-semibold leading-tight">{student.name}</div>
-                  <div className="text-sm text-muted">
-                    {capitalize(student.instrument)}
-                    {student.current_book ? ` · ${student.current_book}` : ""}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-[17px] font-semibold leading-tight">{student.name}</span>
+                    <InstrumentTag instrument={student.instrument} />
                   </div>
+                  {student.current_book && <div className="text-sm text-muted">{student.current_book}</div>}
                 </div>
                 {doneToday ? <Pill tone="sage">✓ practiced today</Pill> : <Pill tone="plum">today&apos;s plan →</Pill>}
               </div>

@@ -3,6 +3,9 @@ import { MusicPreviewLinks } from "@/components/music-preview-links";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
+import { Avatar } from "@/components/avatar";
+import { InstrumentTag } from "@/components/instrument-tag";
+import { studentPhotoSrc } from "@/lib/constants";
 import { Button, Card, LinkButton } from "@/components/ui";
 import { AutoRefresh, ClockTime, LessonTimer } from "@/components/lesson-clock";
 import { requireTeacher } from "@/lib/auth";
@@ -53,7 +56,15 @@ async function Body({ params }: { params: Params }) {
 
   return (
     <Shell
-      title={`${firstName}'s lesson`}
+      title={
+        <span className="flex items-center gap-3">
+          <Avatar name={student.name} instrument={student.instrument} photoSrc={studentPhotoSrc(student)} />
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            {`${firstName}'s lesson`}
+            <InstrumentTag instrument={student.instrument} />
+          </span>
+        </span>
+      }
       eyebrow={formatDate(lesson.lesson_date, "long")}
       back={{ href: `/students/${student.id}`, label: student.name }}
       tab="studio"

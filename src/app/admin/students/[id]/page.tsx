@@ -2,6 +2,9 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
+import { Avatar } from "@/components/avatar";
+import { InstrumentTag } from "@/components/instrument-tag";
+import { studentPhotoSrc } from "@/lib/constants";
 import { AdminDeleteButton, AdminEditForm, AdminNotices, Fold } from "@/components/admin-ui";
 import { Button, Card, Field, Input, Pill, SectionTitle } from "@/components/ui";
 import { requireAdmin } from "@/lib/admin";
@@ -47,7 +50,15 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
   return (
     <Shell
-      title={student.name}
+      title={
+        <span className="flex items-center gap-3">
+          <Avatar name={student.name} instrument={student.instrument} photoSrc={studentPhotoSrc(student)} />
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            {student.name}
+            <InstrumentTag instrument={student.instrument} />
+          </span>
+        </span>
+      }
       eyebrow={`Student of ${teacherLabel}`}
       back={{ href: `/admin/teachers/${student.teacher_id}`, label: teacherLabel }}
       wide
