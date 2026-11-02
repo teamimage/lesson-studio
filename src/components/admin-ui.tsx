@@ -67,7 +67,7 @@ function FieldInput({
   if (spec.kind === "book") return null;
   if (spec.kind === "bool") {
     return (
-      <label className="flex min-h-11 items-center gap-3 text-[15px] sm:col-span-2">
+      <label className="flex min-h-11 items-center gap-3 text-[16px] sm:col-span-2">
         <input type="hidden" name={name} value="off" />
         <input
           type="checkbox"

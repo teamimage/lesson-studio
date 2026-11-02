@@ -70,7 +70,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
       <section>
         <SectionTitle>Account</SectionTitle>
         <Card className="flex flex-col gap-3">
-          <div className="text-[15px]">
+          <div className="text-[16px]">
             Signed in as <span className="font-medium">{viewer.email}</span>
             <div className="text-sm text-muted">
               {viewer.teacher ? "Teacher" : ""}
@@ -129,11 +129,11 @@ async function AiCosts({ teacherId }: { teacherId: string }) {
       <Card className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">This month</div>
+            <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">This month</div>
             <div className="font-display text-2xl">{formatUsd(usage.thisMonthUsd)}</div>
           </div>
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">All time</div>
+            <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">All time</div>
             <div className="font-display text-2xl">{formatUsd(usage.allTimeUsd)}</div>
           </div>
         </div>

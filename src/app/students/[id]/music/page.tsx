@@ -47,7 +47,7 @@ async function Body({ params }: { params: Params }) {
       <div className="flex flex-col gap-6">
         <RefreshWhileReading active={scores.some((s) => s.analysisStatus === "running")} />
         <Card tone="accent" className="flex flex-col gap-3">
-          <p className="text-[15px]">
+          <p className="text-[16px]">
             Put {student.name}&apos;s music here, then open the music stand on the iPad (or a phone or laptop) during the
             lesson. It notes which piece and page is open, so the lesson video can be split by piece.
           </p>

@@ -78,7 +78,7 @@ async function Body({ params }: { params: Params }) {
         <div className="flex min-w-0 flex-col gap-6">
           <section>
             <SectionTitle>About</SectionTitle>
-            <Card className="flex flex-col divide-y divide-rule p-0 text-[15px]">
+            <Card className="flex flex-col divide-y divide-rule p-0 text-[16px]">
               <Info label="Instrument">
                 {capitalize(student.instrument)}
                 {student.age ? `, age ${student.age}` : ""}
@@ -162,13 +162,13 @@ async function Body({ params }: { params: Params }) {
                 </div>
               )}
               <div>
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-ink">Working on</div>
+                <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">Working on</div>
                 {working.length === 0 ? (
                   <p className="text-sm text-muted">Nothing in progress.</p>
                 ) : (
                   <ul className="flex flex-col gap-1">
                     {working.map((r) => (
-                      <li key={r.id} className="flex items-center justify-between gap-2 text-[15px]">
+                      <li key={r.id} className="flex items-center justify-between gap-2 text-[16px]">
                         <span className="truncate">{r.title}</span>
                         <Pill tone={r.status === "polishing" ? "amber" : r.status === "preview" ? "plum" : "accent"}>
                           {humanize(r.status)}
@@ -180,12 +180,12 @@ async function Body({ params }: { params: Params }) {
               </div>
               {stale.length > 0 && (
                 <div>
-                  <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
+                  <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
                     Review pieces not played lately
                   </div>
                   <ul className="flex flex-col gap-1">
                     {stale.slice(0, 5).map((r) => (
-                      <li key={r.id} className="flex items-center justify-between gap-2 text-[15px]">
+                      <li key={r.id} className="flex items-center justify-between gap-2 text-[16px]">
                         <span className="truncate">{r.title}</span>
                         <span className="shrink-0 text-xs text-muted">
                           {r.daysSince === null ? "never logged" : `${r.daysSince} days`}

@@ -57,14 +57,14 @@ function SessionCard({ s, teacherView, open }: { s: PracticeSessionView; teacher
               {minutes(s.duration_seconds)} session · {minutes(s.playing_seconds)} playing
               {r && practiced.length + skipped.length > 0 ? ` · ${practiced.length} of ${practiced.length + skipped.length} items` : ""}
             </div>
-            {r?.summary && <div className="mt-1 text-[15px]">{r.summary}</div>}
+            {r?.summary && <div className="mt-1 text-[16px]">{r.summary}</div>}
           </div>
           <span className="mt-1 text-muted transition group-open:rotate-90" aria-hidden>
             ›
           </span>
         </summary>
 
-        <div className="flex flex-col gap-3 border-t border-rule px-4 py-3 text-[15px]">
+        <div className="flex flex-col gap-3 border-t border-rule px-4 py-3 text-[16px]">
           {s.status === "error" && <div className="text-sm text-danger">{s.error || "The review didn't finish."}</div>}
           {working && <div className="text-sm text-muted">Listening back to the practice. This takes a minute or two.</div>}
 
@@ -104,13 +104,13 @@ function SessionCard({ s, teacherView, open }: { s: PracticeSessionView; teacher
               )}
               {r.flow && (
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-plum">How it flowed</div>
+                  <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-plum">How it flowed</div>
                   <div>{r.flow}</div>
                 </div>
               )}
               {r.tips.length > 0 && (
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-plum">For next time</div>
+                  <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-plum">For next time</div>
                   <ul className="list-disc pl-5">
                     {r.tips.map((t, i) => (
                       <li key={i}>{t}</li>

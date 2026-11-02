@@ -539,7 +539,7 @@ export function MusicStand({
               onChange={(e) => setToast({ ...toast, note: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && saveNote()}
               placeholder="e.g. Slow bow, stop before the string crossing"
-              className="min-h-11 min-w-0 flex-1 rounded-xl border border-rule bg-paper px-3 text-[16px]"
+              className="min-h-11 min-w-0 flex-1 rounded-xl border border-rule bg-paper px-3 text-[17px]"
             />
             <button onClick={saveNote} className="min-h-11 rounded-xl bg-accent px-4 font-semibold text-white">
               {toast.note.trim() ? "Save" : "Skip"}

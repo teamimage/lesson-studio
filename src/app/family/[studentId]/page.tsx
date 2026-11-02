@@ -158,7 +158,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                       placeholder="20"
                     />
                   </Field>
-                  <label className="flex items-end gap-3 pb-2.5 text-[15px]">
+                  <label className="flex items-end gap-3 pb-2.5 text-[16px]">
                     <input type="checkbox" name="listened" defaultChecked={log?.listened ?? false} className="h-6 w-6 accent-[var(--plum)]" />
                     Listened to the recording
                   </label>

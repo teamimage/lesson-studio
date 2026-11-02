@@ -36,7 +36,7 @@ export function EmailLinkHandler({ children }: { children: React.ReactNode }) {
 
   const failed = linkError ?? sessionError;
   if (access_token && !failed) {
-    return <p className="text-[15px]">Signing you in…</p>;
+    return <p className="text-[16px]">Signing you in…</p>;
   }
   return (
     <>

@@ -66,11 +66,11 @@ export function Shell({
       >
         <div className="mb-4">
           {eyebrow && (
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-accent-ink">
+            <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-accent-ink">
               {eyebrow}
             </div>
           )}
-          <h1 className="text-[26px] font-medium leading-tight">{title}</h1>
+          <h1 className="text-[27px] font-medium leading-tight">{title}</h1>
         </div>
         {children}
       </main>
@@ -94,7 +94,7 @@ function TabLink({
       href={href}
       aria-current={active ? "page" : undefined}
       className={cx(
-        "flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium",
+        "flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[14px] font-medium",
         active ? "bg-accent-soft text-accent-ink" : "text-muted hover:text-ink",
       )}
     >

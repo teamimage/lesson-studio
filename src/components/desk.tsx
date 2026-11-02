@@ -10,7 +10,7 @@ import { cx } from "./ui";
 export function Stat({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="rounded-2xl border border-rule bg-sheet px-3 py-2.5">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-ink">{label}</div>
+      <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">{label}</div>
       <div className="mt-0.5 text-lg font-semibold leading-tight">{value}</div>
       <div className="text-xs text-muted">{detail}</div>
     </div>
@@ -20,7 +20,7 @@ export function Stat({ label, value, detail }: { label: string; value: string; d
 export function Info({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[96px_1fr] gap-3 px-4 py-2.5">
-      <div className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-ink">{label}</div>
+      <div className="pt-0.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">{label}</div>
       <div className="min-w-0 whitespace-pre-line">{children}</div>
     </div>
   );
@@ -50,7 +50,7 @@ export function PracticeGrid({ logs, today }: { logs: PracticeLog[]; today: stri
   const weeks = Array.from({ length: 4 }, (_, w) => Array.from({ length: 7 }, (_, d) => addDays(start, w * 7 + d)));
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] gap-1.5 text-center text-[11px] text-muted">
+      <div className="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] gap-1.5 text-center text-[12px] text-muted">
         <span />
         {weeks[0].map((d) => (
           <span key={d}>{parseISODate(d).toLocaleDateString("en-US", { weekday: "narrow" })}</span>
@@ -58,7 +58,7 @@ export function PracticeGrid({ logs, today }: { logs: PracticeLog[]; today: stri
       </div>
       {weeks.map((days) => (
         <div key={days[0]} className="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] items-center gap-1.5">
-          <span className="text-[11px] text-muted">{formatDate(days[0])}</span>
+          <span className="text-[12px] text-muted">{formatDate(days[0])}</span>
           {days.map((d) => {
             const log = logs.find((l) => l.practice_date === d);
             const did = practiced(log);
@@ -68,7 +68,7 @@ export function PracticeGrid({ logs, today }: { logs: PracticeLog[]; today: stri
                 key={d}
                 title={`${formatDate(d, "weekday")}${log?.minutes ? ` · ${log.minutes} min` : ""}${log?.listened ? " · listened" : ""}`}
                 className={cx(
-                  "relative flex h-8 items-center justify-center rounded-lg text-[11px] font-semibold",
+                  "relative flex h-8 items-center justify-center rounded-lg text-[12px] font-semibold",
                   did ? (short ? "bg-sage/40 text-ink" : "bg-sage text-white") : "bg-rule/50 text-muted",
                   d === today && "ring-2 ring-accent",
                 )}

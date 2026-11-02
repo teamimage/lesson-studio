@@ -48,7 +48,7 @@ export function StudentForm({
         <Textarea name="notes" defaultValue={student?.notes ?? ""} rows={2} />
       </Field>
       {student && (
-        <label className="flex items-center gap-3 text-[15px]">
+        <label className="flex items-center gap-3 text-[16px]">
           <input type="hidden" name="active" value="off" />
           <input
             type="checkbox"

@@ -85,7 +85,7 @@ async function Body({ params }: { params: Params }) {
           <div className="pb-1 text-sm text-muted">{ended ? "Ended" : "In progress"}</div>
         </Card>
 
-        <Card className="flex flex-col gap-3 text-[15px]">
+        <Card className="flex flex-col gap-3 text-[16px]">
           <Status
             ok={!!firstStand && !standEnded}
             label="Music stand"
