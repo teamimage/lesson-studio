@@ -1,29 +1,13 @@
 import "server-only";
 import { anthropicClient, DraftError, lessonModel, usageRows } from "./draft-lesson";
 import type { ClaudeUsage } from "./pricing";
+import { POINT_TOPICS, type PracticeAnalysis } from "@/lib/practice/review-types";
 
 // Claude reads a home practice session (the sound timeline the phone wrote
 // down while recording, plus any talking AssemblyAI transcribed) and works
 // out which of the teacher's assignments were practised.
 
-export type PracticeItem = {
-  assignment_id: string;
-  practiced: boolean;
-  confidence: "high" | "medium" | "low";
-  minutes: number;
-  note: string;
-};
-export type PracticeAnalysis = {
-  counted: boolean;
-  not_counted_reason: string;
-  summary: string;
-  items: PracticeItem[];
-  other: { label: string; minutes: number }[];
-  timeline: { start: string; end: string; label: string }[];
-  flow: string;
-  tips: string[];
-  teacher_note: string;
-};
+export type { PracticeAnalysis, PracticeItem } from "@/lib/practice/review-types";
 
 export type PracticeContext = {
   studentName: string;
@@ -35,16 +19,41 @@ export type PracticeContext = {
   focus: string | null;
   assignments: { id: string; kind: string; title: string; how: string | null }[];
   pieces: { title: string; notes: string | null }[];
+  /** Current repertoire not already on the assignment list. */
+  currentPieces: string[];
   durationSeconds: number;
   playingSeconds: number;
   activity: string;
   transcript: string;
 };
 
+const POINT = {
+  type: "object",
+  additionalProperties: false,
+  required: ["text", "topic", "piece"],
+  properties: {
+    text: { type: "string" },
+    topic: { type: "string", enum: [...POINT_TOPICS] },
+    piece: { type: "string" },
+  },
+} as const;
+
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["counted", "not_counted_reason", "summary", "items", "other", "timeline", "flow", "tips", "teacher_note"],
+  required: [
+    "counted",
+    "not_counted_reason",
+    "summary",
+    "items",
+    "repertoire",
+    "other",
+    "timeline",
+    "encouragement",
+    "going_well",
+    "work_on",
+    "teacher_note",
+  ],
   properties: {
     counted: { type: "boolean" },
     not_counted_reason: { type: "string" },
@@ -82,8 +91,18 @@ const SCHEMA = {
         properties: { start: { type: "string" }, end: { type: "string" }, label: { type: "string" } },
       },
     },
-    flow: { type: "string" },
-    tips: { type: "array", items: { type: "string" } },
+    repertoire: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "practiced", "note"],
+        properties: { title: { type: "string" }, practiced: { type: "boolean" }, note: { type: "string" } },
+      },
+    },
+    encouragement: { type: "string" },
+    going_well: { type: "array", items: POINT },
+    work_on: { type: "array", items: POINT },
     teacher_note: { type: "string" },
   },
 } as const;
@@ -96,17 +115,20 @@ Work out what was practised and when:
 - Scales and arpeggios show as steady stepwise runs or broken-chord patterns up and down, often repeated. Name the key when you can.
 - Pieces: match the note sequences to the melodies of the assigned pieces and the student's Suzuki books, which you know (for example Twinkle variations, Lightly Row, Minuet 1, Gavotte by Gossec, Hunters' Chorus). Repeated short fragments of a piece usually mean focused work on one passage, which is good practice.
 - Speech naming a piece is strong evidence.
-- Only mark an assignment practiced when the timeline or transcript supports it. confidence is high when the melody or the spoken name clearly matches, medium when it is likely, low when it is a guess. minutes is your estimate of time spent on it (0 if not practised). note is a few words on what you noticed ("whole piece twice, then bars with the shift"). Include every assignment you are given, by its id. Listening and game assignments usually can't be heard; mark them not practiced with a note that they can be ticked by hand.
+- Only mark an assignment practiced when the timeline or transcript supports it. confidence is high when the melody or the spoken name clearly matches, medium when it is likely, low when it is a guess. minutes is your estimate of time spent on it (0 if not practised). note is at most six words on what you noticed ("whole piece twice, then the shift"). Include every assignment you are given, by its id. Listening and game assignments usually can't be heard; mark them not practiced with a note that they can be ticked by hand.
+- repertoire: one entry for each "current piece" you are given (they are the student's pieces that aren't on the assignment list), by its exact title, with practiced true only when the timeline or transcript supports it, and a note of at most six words.
 - other: anything played that is not on the list (older review pieces, improvising), with minutes.
 - timeline: the session in order, as stretches start-end in m:ss with a short label ("Warm-up: D major scale", "Gavotte, whole piece", "Talking / break"). Usually 3 to 15 entries.
 
 counted: false only when the session clearly wasn't practice: almost nothing musical, or only random noodling, a few notes now and then, or long silence with sound only at the very start and end. A short but real practice counts. Put a one-sentence, non-judgemental reason in not_counted_reason (empty when counted).
 
-Write for the parent and child in a warm, encouraging, plain voice. Never scold, shame or sound suspicious; the app is a helper, not a monitor.
-- summary: one or two sentences on what the session covered.
-- flow: one to three gentle sentences about the shape of the practice: long breaks, a lot of time on one thing and none on another, playing through without stopping to fix spots, or noodling between pieces. Frame it as a friendly idea for next time. If the practice flowed well, say so.
-- tips: up to three short, concrete suggestions for the next practice, tied to the teacher's assignments and instructions (for example "Start with the Gavotte shift slowly, three times right"). Empty if nothing useful to add.
-- teacher_note: one or two factual sentences for the teacher only (what was and wasn't covered, anything that may need attention, such as notes that look consistently sharp or flat on a passage). Empty if nothing to add.`;
+Write for the parent and child in a warm, encouraging, plain voice. Never scold, shame or sound suspicious; the app is a helper, not a monitor. Keep everything short: these are a checklist and bullet points, not explanations.
+- summary: one short sentence on what the session covered.
+- encouragement: one short, specific, encouraging line for the child ("Lovely steady bow on the long notes in Gavotte!"). Empty only when the session wasn't counted.
+- going_well: 3 or 4 bullets, each under 10 words, on what is going well, as specific as the evidence allows ("Played Gavotte all the way through", "Steady D major scale, two octaves"). Fewer only for a very short session.
+- work_on: 3 or 4 bullets, each under 10 words, on what to work on next, concrete and tied to the assignments and the teacher's focus: intonation on a named note or passage, rushing in a named spot, tempo, tone, a section that keeps stopping, or the practice routine itself (long breaks, skipping an assignment, noodling between pieces). Examples: "Intonation on the F# in Gavotte", "Try not to rush bar 12", "Start with the hard spot, slowly". Only claim intonation or rhythm problems the note data supports (cents far from 0 on the same note again and again, or the same passage played much faster each time); otherwise keep to what you can tell.
+  Each bullet has a topic (intonation, rhythm, tempo, tone, notes, technique, memory, focus, routine or other) and piece: the piece, scale or exercise it is about, or empty.
+- teacher_note: one or two factual sentences for the teacher only (what was and wasn't covered, anything that may need attention). Empty if nothing to add.`;
 
 function contextText(c: PracticeContext): string {
   const lines = [
@@ -126,6 +148,7 @@ function contextText(c: PracticeContext): string {
   }
   if (c.pieces.length)
     lines.push(`Pieces worked on in that lesson:\n${c.pieces.map((p) => (p.notes ? `${p.title}: ${p.notes}` : p.title)).join("\n")}`);
+  if (c.currentPieces.length) lines.push(`Current pieces not on the assignment list:\n${c.currentPieces.join("\n")}`);
   if (c.bookPieces.length) lines.push(`Pieces in the student's books, in order:\n${c.bookPieces.join("\n")}`);
   return lines.join("\n\n");
 }
