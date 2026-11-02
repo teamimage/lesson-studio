@@ -128,7 +128,7 @@ async function Dashboard() {
                     <div className="min-w-0 flex-1">
                       <Link href={`/students/${student.id}`} className="block">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="text-[17px] font-semibold leading-tight">{student.name}</span>
+                          <span className="text-[18px] font-semibold leading-tight">{student.name}</span>
                           <InstrumentTag instrument={student.instrument} />
                         </div>
                         {student.current_book && <div className="text-sm text-muted">{student.current_book}</div>}

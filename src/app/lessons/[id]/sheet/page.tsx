@@ -38,7 +38,7 @@ async function Body({ params }: { params: Params }) {
   const firstName = student.name.split(" ")[0];
 
   return (
-    <div className="min-h-screen bg-paper print:bg-white">
+    <div className="default-text-sizes min-h-screen bg-paper print:bg-white">
       <div className="no-print mx-auto flex max-w-[8.5in] items-center justify-between gap-3 px-4 py-3">
         <Link href={backHref} className="text-sm font-medium text-accent-ink">
           ‹ Back

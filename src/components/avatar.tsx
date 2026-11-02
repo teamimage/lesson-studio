@@ -217,7 +217,7 @@ function PhotoLightbox({
               type="button"
               disabled={busy}
               onClick={() => cameraRef.current?.click()}
-              className="min-h-11 rounded-full bg-white px-5 text-[15px] font-semibold text-[#2b2521] disabled:opacity-60"
+              className="min-h-11 rounded-full bg-white px-5 text-[16px] font-semibold text-[#2b2521] disabled:opacity-60"
             >
               Take photo
             </button>
@@ -225,7 +225,7 @@ function PhotoLightbox({
               type="button"
               disabled={busy}
               onClick={() => libraryRef.current?.click()}
-              className="min-h-11 rounded-full bg-white/15 px-5 text-[15px] font-semibold text-white hover:bg-white/25 disabled:opacity-60"
+              className="min-h-11 rounded-full bg-white/15 px-5 text-[16px] font-semibold text-white hover:bg-white/25 disabled:opacity-60"
             >
               Choose photo
             </button>
@@ -234,7 +234,7 @@ function PhotoLightbox({
                 type="button"
                 disabled={busy}
                 onClick={onRemove}
-                className="min-h-11 rounded-full px-4 text-[15px] font-medium text-white/80 underline disabled:opacity-60"
+                className="min-h-11 rounded-full px-4 text-[16px] font-medium text-white/80 underline disabled:opacity-60"
               >
                 Remove
               </button>

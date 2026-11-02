@@ -229,7 +229,7 @@ export function LessonTimeline({
       )}
 
       <div>
-        <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
+        <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
           What was on the stand
         </div>
         <ol className="flex flex-col divide-y divide-rule rounded-2xl border border-rule bg-sheet">
@@ -270,7 +270,7 @@ export function LessonTimeline({
 
       {marks.length > 0 && (
         <div>
-          <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-ink">Marked bars</div>
+          <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">Marked bars</div>
           <ul className="grid gap-3 sm:grid-cols-2">
             {marks.map((m) => {
               const s = byId.get(m.score_id!);

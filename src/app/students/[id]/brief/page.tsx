@@ -47,7 +47,7 @@ async function Body({ params }: { params: Params }) {
       }
     >
       <div className="flex flex-col gap-5">
-        <Card tone="accent" className="text-[15px] leading-relaxed">
+        <Card tone="accent" className="text-[16px] leading-relaxed">
           <div className="font-semibold">
             {capitalize(student.instrument)}
             {student.current_book ? ` · ${student.current_book}` : ""}
@@ -139,7 +139,7 @@ async function Body({ params }: { params: Params }) {
 
         <section>
           <SectionTitle>Consider today</SectionTitle>
-          <Card tone="sage" className="flex flex-col gap-2 text-[15px] leading-relaxed">
+          <Card tone="sage" className="flex flex-col gap-2 text-[16px] leading-relaxed">
             {last?.suggestions && <p className="whitespace-pre-line">{last.suggestions}</p>}
             {stale.length > 0 && (
               <p>

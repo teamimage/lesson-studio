@@ -63,12 +63,49 @@
   --font-display: var(--font-display), Georgia, serif;
 }
 
+/* Text sizes: every Tailwind size is 1px larger than the default
+   (David, 2026-11-02). The printable lesson sheet keeps the defaults
+   via .default-text-sizes below. */
+@theme {
+  --text-xs: 0.8125rem; /* 13px */
+  --text-sm: 0.9375rem; /* 15px */
+  --text-base: 1.0625rem; /* 17px */
+  --text-lg: 1.1875rem; /* 19px */
+  --text-xl: 1.3125rem; /* 21px */
+  --text-2xl: 1.5625rem; /* 25px */
+  --text-3xl: 1.9375rem; /* 31px */
+  --text-4xl: 2.3125rem; /* 37px */
+  --text-5xl: 3.0625rem; /* 49px */
+  --text-6xl: 3.8125rem; /* 61px */
+  --text-7xl: 4.5625rem; /* 73px */
+  --text-8xl: 6.0625rem; /* 97px */
+  --text-9xl: 8.0625rem; /* 129px */
+}
+
+.default-text-sizes {
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+  --text-6xl: 3.75rem;
+  --text-7xl: 4.5rem;
+  --text-8xl: 6rem;
+  --text-9xl: 8rem;
+  font-size: 1rem;
+}
+
 html {
   background: var(--paper);
 }
 
 body {
   background: var(--paper);
+  font-size: 1.0625rem; /* 17px: 1px above the browser default */
   color: var(--ink);
   font-family: var(--font-body), system-ui, -apple-system, sans-serif;
   -webkit-tap-highlight-color: transparent;

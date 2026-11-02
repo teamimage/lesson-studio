@@ -32,7 +32,7 @@ async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
     if (sent) {
       return (
         <div className="flex flex-col gap-4">
-          <p className="text-[15px] leading-relaxed">
+          <p className="text-[16px] leading-relaxed">
             We emailed a link to <strong>{sent}</strong>. Tap it, and you&apos;ll be signed in and taken to Settings to
             choose your password.
           </p>
@@ -44,7 +44,7 @@ async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
     }
     return (
       <form action={sendPasswordReset} className="flex flex-col gap-3">
-        <p className="text-[15px] leading-relaxed">
+        <p className="text-[16px] leading-relaxed">
           Enter your email and we&apos;ll send a link to set a password. This also works if you never had one.
         </p>
         <label htmlFor="email" className="text-sm font-semibold">
@@ -71,7 +71,7 @@ async function LoginForm({ searchParams }: { searchParams: SearchParams }) {
   if (email) {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-[15px] leading-relaxed">
+        <p className="text-[16px] leading-relaxed">
           We emailed a sign-in link to <strong>{email}</strong>. Open the email and tap the link. It works on any
           device.
         </p>

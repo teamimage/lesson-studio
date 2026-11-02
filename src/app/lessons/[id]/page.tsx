@@ -196,7 +196,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                     {ai.costUsd > 0 ? ` · AI cost for this lesson ${formatUsd(ai.costUsd)}` : ""}
                   </summary>
                   {ai.transcript ? (
-                    <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-sans text-[13px] leading-relaxed text-muted">
+                    <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-sans text-[14px] leading-relaxed text-muted">
                       {ai.transcript}
                     </pre>
                   ) : (
@@ -292,7 +292,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
           {(lesson.suggestions || lesson.teacher_notes) && (
             <Card tone="plum" className="divide-y divide-plum/15">
-              <div className="pb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-plum">Teacher only</div>
+              <div className="pb-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-plum">Teacher only</div>
               {lesson.suggestions && <Row label="Next time">{lesson.suggestions}</Row>}
               {lesson.teacher_notes && <Row label="Notes">{lesson.teacher_notes}</Row>}
             </Card>

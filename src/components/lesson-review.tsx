@@ -65,7 +65,7 @@ export function LessonReview({ moments, multiVideo }: { moments: Moment[]; multi
               </span>
               <span
                 className={cx(
-                  "w-10 shrink-0 rounded px-1 text-center text-[10px] font-semibold uppercase tracking-wide",
+                  "w-10 shrink-0 rounded px-1 text-center text-[11px] font-semibold uppercase tracking-wide",
                   TAG[m.kind].className,
                 )}
               >
@@ -82,7 +82,7 @@ export function LessonReview({ moments, multiVideo }: { moments: Moment[]; multi
               </span>
               {m.music && (
                 <span
-                  className="shrink-0 rounded border border-rule bg-paper px-1.5 text-[11px] tabular-nums text-muted"
+                  className="shrink-0 rounded border border-rule bg-paper px-1.5 text-[12px] tabular-nums text-muted"
                   title={m.music.piece}
                 >
                   ♪ {musicTag(m.music)}

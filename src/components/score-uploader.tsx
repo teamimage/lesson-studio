@@ -235,7 +235,7 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
           busy && "pointer-events-none opacity-60",
         )}
       >
-        <span className="text-[15px] font-semibold text-accent-ink">
+        <span className="text-[16px] font-semibold text-accent-ink">
           {files.length ? `${files.length === 1 ? files[0].name : `${files.length} files chosen`}` : "Take photos or choose a PDF"}
         </span>
         <span className="text-sm text-muted">

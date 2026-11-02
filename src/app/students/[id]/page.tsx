@@ -168,7 +168,7 @@ async function Body({ params }: { params: Params }) {
         )}
 
         {(student.goals || student.notes || student.lesson_day) && (
-          <Card className="flex flex-col gap-2 text-[15px]">
+          <Card className="flex flex-col gap-2 text-[16px]">
             {student.lesson_day && (
               <div>
                 <span className="text-muted">Lessons: </span>
@@ -215,7 +215,7 @@ async function Body({ params }: { params: Params }) {
           {parents.length === 0 ? (
             <p className="text-sm text-muted">No parent linked yet. Add one so they can see the home plan.</p>
           ) : (
-            <ul className="text-[15px]">
+            <ul className="text-[16px]">
               {parents.map((p) => (
                 <li key={p.id}>
                   {p.name} <span className="text-muted">· {p.email}</span>

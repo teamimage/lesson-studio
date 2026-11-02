@@ -193,7 +193,7 @@ export function RecordingUploader({ lessonId, autoOpen = false }: { lessonId: st
           busy && "pointer-events-none opacity-60",
         )}
       >
-        <span className="text-[15px] font-semibold text-accent-ink">
+        <span className="text-[16px] font-semibold text-accent-ink">
           {busy ? "Uploading…" : "Choose lesson video"}
         </span>
         <span className="text-sm text-muted">From this phone or computer. You can pick more than one file.</span>

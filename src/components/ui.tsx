@@ -55,7 +55,7 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
   return (
     <div
       className={cx(
-        "text-[11px] font-semibold uppercase tracking-[0.12em] text-accent-ink",
+        "text-[12px] font-semibold uppercase tracking-[0.12em] text-accent-ink",
         className,
       )}
     >
@@ -96,7 +96,7 @@ export function Pill({
 }
 
 const buttonBase =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-[15px] font-semibold transition active:scale-[0.99] disabled:opacity-50";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-[16px] font-semibold transition active:scale-[0.99] disabled:opacity-50";
 const buttonVariants = {
   primary: "bg-accent text-white hover:bg-accent-ink",
   secondary: "border border-rule bg-sheet text-ink hover:border-accent/50",
@@ -154,7 +154,7 @@ export function Field({
 }
 
 export const inputClass =
-  "min-h-11 w-full rounded-xl border border-rule bg-sheet px-3 py-2 text-[16px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
+  "min-h-11 w-full rounded-xl border border-rule bg-sheet px-3 py-2 text-[17px] text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";
 export const textareaClass = cx(inputClass, "min-h-24 leading-relaxed");
 
 export function Input(props: ComponentProps<"input">) {
@@ -193,8 +193,8 @@ export function EmptyState({
 export const ROW_LAYOUT: "stacked" | "side" = "stacked";
 
 const ROW_LAYOUT_CLASSES = {
-  stacked: "flex flex-col gap-1 py-2 text-[15px] leading-relaxed",
-  side: "grid grid-cols-[96px_1fr] gap-x-3 gap-y-1 py-2 text-[15px] leading-relaxed sm:grid-cols-[120px_1fr]",
+  stacked: "flex flex-col gap-1 py-2 text-[16px] leading-relaxed",
+  side: "grid grid-cols-[96px_1fr] gap-x-3 gap-y-1 py-2 text-[16px] leading-relaxed sm:grid-cols-[120px_1fr]",
 } as const;
 
 export function Row({
@@ -208,7 +208,7 @@ export function Row({
 }) {
   return (
     <div className={ROW_LAYOUT_CLASSES[layout]}>
-      <div className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
+      <div className="pt-0.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
         {label}
       </div>
       <div className="min-w-0 whitespace-pre-line">{children}</div>

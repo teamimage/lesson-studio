@@ -401,7 +401,7 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
               tick off what was practised and keep a short review. The recording itself is deleted afterwards.
             </p>
           )}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[16px]">
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"

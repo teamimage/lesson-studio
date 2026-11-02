@@ -50,8 +50,8 @@ export function StudentPicker({ students, selectedId }: { students: PickerStuden
           className="h-9 w-9 text-lg"
         />
         <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-ink">Student</span>
-          <span className="block truncate text-[16px] font-semibold leading-tight">{selected?.name ?? "Choose a student"}</span>
+          <span className="block text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">Student</span>
+          <span className="block truncate text-[17px] font-semibold leading-tight">{selected?.name ?? "Choose a student"}</span>
         </span>
         <span className={cx("text-muted transition", open && "rotate-180")} aria-hidden>
           ▾
@@ -75,7 +75,7 @@ export function StudentPicker({ students, selectedId }: { students: PickerStuden
                     aria-selected={on}
                     onClick={() => setOpen(false)}
                     className={cx(
-                      "flex min-h-11 items-center gap-3 px-4 py-2 text-[15px]",
+                      "flex min-h-11 items-center gap-3 px-4 py-2 text-[16px]",
                       on ? "bg-accent-soft font-semibold text-accent-ink" : "hover:bg-accent-soft/60",
                       !s.active && !on && "text-muted",
                     )}
@@ -87,7 +87,7 @@ export function StudentPicker({ students, selectedId }: { students: PickerStuden
                     </span>
                     {!s.active && <span className="text-xs text-muted">inactive</span>}
                     {s.drafts > 0 && (
-                      <span className="rounded-full bg-amber-soft px-1.5 text-[11px] font-bold text-amber" title="drafts to approve">
+                      <span className="rounded-full bg-amber-soft px-1.5 text-[12px] font-bold text-amber" title="drafts to approve">
                         {s.drafts}
                       </span>
                     )}
