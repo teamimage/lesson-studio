@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Source_Sans_3 } from "next/font/google";
+import { Lora, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 
-const display = Fraunces({
+// Headings: Lora, a warm old-style serif whose capital J sits on the
+// baseline (David disliked Fraunces' descending J in "James").
+const display = Lora({
   variable: "--font-display",
   subsets: ["latin"],
-  axes: ["opsz", "SOFT"],
 });
 
 const body = Source_Sans_3({
