@@ -13,6 +13,8 @@ import { requireTeacher } from "@/lib/auth";
 import { getStudent, listLessons, listParentsForStudent, listRepertoire, staleReview } from "@/lib/data";
 import { capitalize, formatDate, humanize, todayISO } from "@/lib/format";
 import { bookPosition, nextLesson } from "@/lib/teacher-data";
+import { PracticeSessionList } from "@/components/practice-session-list";
+import { listPracticeSessions } from "@/lib/practice/data";
 
 type Params = Promise<{ id: string }>;
 
@@ -31,11 +33,12 @@ async function Body({ params }: { params: Params }) {
   const student = await getStudent(id);
   if (!student) notFound();
   const today = todayISO();
-  const [lessons, repertoire, parents, music] = await Promise.all([
+  const [lessons, repertoire, parents, music, sessions] = await Promise.all([
     listLessons(id, 5),
     listRepertoire(id),
     listParentsForStudent(id),
     listScoreIndex(id),
+    listPracticeSessions(id, 3),
   ]);
   const latest = lessons[0] ?? null;
   const plan = lessons.find((l) => l.status === "approved") ?? null;
@@ -112,6 +115,13 @@ async function Body({ params }: { params: Params }) {
               {plan?.focus_points && <Info label="Last focus">{plan.focus_points}</Info>}
             </Card>
           </section>
+
+          {sessions.length > 0 && (
+            <section>
+              <SectionTitle>Recent practice</SectionTitle>
+              <PracticeSessionList sessions={sessions} teacherView />
+            </section>
+          )}
 
           <section>
             <SectionTitle>More for {student.name}</SectionTitle>

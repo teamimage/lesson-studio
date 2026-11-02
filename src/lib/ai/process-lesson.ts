@@ -343,7 +343,7 @@ async function draftContext(db: Db, row: Transcript) {
 }
 
 // The student's book and the ones before it, plus the next one.
-function bookPieces(instrument: string, currentBook: string | null): string[] {
+export function bookPieces(instrument: string, currentBook: string | null): string[] {
   const books = booksFor(instrument);
   const idx = currentBook ? books.findIndex((b) => b.book === currentBook) : -1;
   const upto = idx >= 0 ? idx + 2 : Math.min(books.length, 2);

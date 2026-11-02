@@ -31,6 +31,8 @@ export type LessonTotal = {
   key: string;
   /** Reading sheet music (not tied to a lesson); scoreTitle null once deleted. */
   music: boolean;
+  /** Reviewing home practice sessions, one total per student. */
+  practice: boolean;
   scoreTitle: string | null;
   lessonDate: string | null;
   studentName: string | null;
@@ -52,7 +54,7 @@ export async function getUsageSummary(teacherId: string): Promise<UsageSummary> 
   const { data } = await db
     .from("ai_usage")
     .select(
-      "lesson_id, score_id, kind, cost_usd, audio_seconds, created_at, lessons(lesson_date, students(name)), scores(title, students(name))",
+      "lesson_id, score_id, practice_session_id, kind, cost_usd, audio_seconds, created_at, lessons(lesson_date, students(name)), scores(title, students(name)), practice_sessions(students(name))",
     )
     .eq("teacher_id", teacherId)
     .order("created_at", { ascending: false })
@@ -72,16 +74,27 @@ export async function getUsageSummary(teacherId: string): Promise<UsageSummary> 
     months.set(month, m);
 
     const music = r.kind === "music";
-    const key = music ? `music-${r.score_id ?? "deleted"}` : (r.lesson_id ?? "deleted");
+    const practice = !!r.practice_session_id || r.kind === "practice";
+    const practiceStudent = r.practice_sessions?.students?.name ?? null;
+    const key = practice
+      ? `practice-${practiceStudent ?? "deleted"}`
+      : music
+        ? `music-${r.score_id ?? "deleted"}`
+        : (r.lesson_id ?? "deleted");
     const l =
       lessons.get(key) ??
       ({
-        lessonId: music ? null : r.lesson_id,
+        lessonId: music || practice ? null : r.lesson_id,
         key,
         music,
+        practice,
         scoreTitle: music ? (r.scores?.title ?? null) : null,
         lessonDate: music ? null : (r.lessons?.lesson_date ?? null),
-        studentName: music ? (r.scores?.students?.name ?? null) : (r.lessons?.students?.name ?? null),
+        studentName: practice
+          ? practiceStudent
+          : music
+            ? (r.scores?.students?.name ?? null)
+            : (r.lessons?.students?.name ?? null),
         costUsd: 0,
         transcriptionUsd: 0,
         claudeUsd: 0,

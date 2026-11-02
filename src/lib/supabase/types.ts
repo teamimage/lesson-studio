@@ -30,6 +30,7 @@ export type Database = {
           lesson_id: string | null;
           model: string;
           output_tokens: number;
+          practice_session_id: string | null;
           provider: string;
           recording_id: string | null;
           teacher_id: string;
@@ -47,6 +48,7 @@ export type Database = {
           lesson_id?: string | null;
           model: string;
           output_tokens?: number;
+          practice_session_id?: string | null;
           provider: string;
           recording_id?: string | null;
           teacher_id: string;
@@ -64,11 +66,19 @@ export type Database = {
           lesson_id?: string | null;
           model?: string;
           output_tokens?: number;
+          practice_session_id?: string | null;
           provider?: string;
           recording_id?: string | null;
           teacher_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "ai_usage_practice_session_id_fkey";
+            columns: ["practice_session_id"];
+            isOneToOne: false;
+            referencedRelation: "practice_sessions";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "ai_usage_score_id_fkey";
             columns: ["score_id"];
@@ -335,6 +345,95 @@ export type Database = {
             columns: ["teacher_id"];
             isOneToOne: false;
             referencedRelation: "teachers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      practice_sessions: {
+        Row: {
+          activity: Json | null;
+          analysis: Json | null;
+          applied: boolean;
+          counted: boolean | null;
+          created_at: string;
+          created_by: string | null;
+          duration_seconds: number;
+          ended_at: string | null;
+          error: string | null;
+          id: string;
+          lesson_id: string | null;
+          media: string;
+          mime_type: string | null;
+          playing_seconds: number;
+          practice_date: string;
+          provider_job_id: string | null;
+          size_bytes: number | null;
+          started_at: string;
+          status: string;
+          storage_path: string | null;
+          student_id: string;
+          teacher_id: string;
+          transcript: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          activity?: Json | null;
+          analysis?: Json | null;
+          applied?: boolean;
+          counted?: boolean | null;
+          created_at?: string;
+          created_by?: string | null;
+          duration_seconds?: number;
+          ended_at?: string | null;
+          error?: string | null;
+          id?: string;
+          lesson_id?: string | null;
+          media?: string;
+          mime_type?: string | null;
+          playing_seconds?: number;
+          practice_date?: string;
+          provider_job_id?: string | null;
+          size_bytes?: number | null;
+          started_at: string;
+          status?: string;
+          storage_path?: string | null;
+          student_id: string;
+          teacher_id: string;
+          transcript?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          activity?: Json | null;
+          analysis?: Json | null;
+          applied?: boolean;
+          counted?: boolean | null;
+          created_at?: string;
+          created_by?: string | null;
+          duration_seconds?: number;
+          ended_at?: string | null;
+          error?: string | null;
+          id?: string;
+          lesson_id?: string | null;
+          media?: string;
+          mime_type?: string | null;
+          playing_seconds?: number;
+          practice_date?: string;
+          provider_job_id?: string | null;
+          size_bytes?: number | null;
+          started_at?: string;
+          status?: string;
+          storage_path?: string | null;
+          student_id?: string;
+          teacher_id?: string;
+          transcript?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "practice_sessions_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "students";
             referencedColumns: ["id"];
           },
         ];
