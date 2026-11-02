@@ -13,6 +13,8 @@ import { RecordingList } from "@/components/recording-player";
 import { PracticeRecorder } from "@/components/practice-recorder";
 import { PracticeSessionList } from "@/components/practice-session-list";
 import { listPracticeSessions } from "@/lib/practice/data";
+import { listWeeks } from "@/lib/practice/week";
+import { WeeklyReviewList } from "@/components/weekly-review-list";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ date?: string; saved?: string; error?: string }>;
@@ -36,13 +38,14 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const today = todayISO();
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) && sp.date <= today ? sp.date : today;
 
-  const [plan, week, log, history, teacher, sessions] = await Promise.all([
+  const [plan, week, log, history, teacher, sessions, weeks] = await Promise.all([
     getCurrentPlan(studentId),
     getPracticeWeek(studentId),
     getPracticeLog(studentId, date),
     listPracticeLogs(studentId, 30),
     getTeacherForStudent(student),
     listPracticeSessions(studentId, 10),
+    listWeeks(studentId),
   ]);
   // Families watch the fast streaming copy; the original is only offered
   // while that copy is still being made.
@@ -180,6 +183,11 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             <PracticeSessionList sessions={sessions} teacherView={isTeacher} />
           </section>
         )}
+
+        <section>
+          <SectionTitle>Weekly reviews</SectionTitle>
+          <WeeklyReviewList studentId={studentId} weeks={weeks} writeMissing />
+        </section>
 
         <section>
           <SectionTitle>This week</SectionTitle>

@@ -71,10 +71,12 @@ export async function finishUpload(id: string): Promise<PracticeState> {
       not_counted_reason: "The recording was almost silent, so there wasn't any playing to count.",
       summary: "We didn't hear much playing in this one.",
       items: [],
+      repertoire: [],
       other: [],
       timeline: [],
-      flow: "If the phone was far away or the microphone was blocked, try setting it a little closer next time.",
-      tips: [],
+      encouragement: "",
+      going_well: [],
+      work_on: [{ text: "Set the phone a little closer next time", topic: "routine", piece: "" }],
       teacher_note: "",
     };
     const done = await patch(
@@ -232,14 +234,16 @@ export async function deleteRecording(db: Db, s: PracticeSession) {
 }
 
 async function contextFor(db: Db, s: PracticeSession) {
-  const [{ data: student }, { data: lesson }] = await Promise.all([
+  const [{ data: student }, { data: lesson }, { data: repertoire }] = await Promise.all([
     db.from("students").select("*").eq("id", s.student_id).single(),
     s.lesson_id
       ? db.from("lessons").select("*, lesson_pieces(*), assignments(*)").eq("id", s.lesson_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    db.from("repertoire").select("title, status").eq("student_id", s.student_id),
   ]);
   if (!student) throw new Error("That student wasn't found.");
   const activity = parseActivity(s.activity);
+  const assignments = (lesson?.assignments ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
   return {
     studentName: student.name,
     instrument: student.instrument,
@@ -248,11 +252,9 @@ async function contextFor(db: Db, s: PracticeSession) {
     bookPieces: bookPieces(student.instrument, student.current_book),
     lessonDate: lesson?.lesson_date ?? null,
     focus: lesson?.focus_points ?? null,
-    assignments: (lesson?.assignments ?? [])
-      .slice()
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((a) => ({ id: a.id, kind: a.kind, title: a.title, how: a.how })),
+    assignments: assignments.map((a) => ({ id: a.id, kind: a.kind, title: a.title, how: a.how })),
     pieces: (lesson?.lesson_pieces ?? []).map((p) => ({ title: p.title, notes: p.notes })),
+    currentPieces: currentPieces(repertoire ?? [], assignments.map((a) => a.title)),
     durationSeconds: s.duration_seconds,
     playingSeconds: s.playing_seconds,
     activity: activityText(activity),
@@ -280,4 +282,23 @@ async function logClaude(db: Db, s: PracticeSession, usage: ClaudeUsage[]) {
 
 function round(n: number) {
   return Math.round(n * 1_000_000) / 1_000_000;
+}
+
+/**
+ * The student's current pieces (learning, polishing or on review) that aren't
+ * already on the assignment list, so the review can check them off too.
+ */
+export function currentPieces(rep: { title: string; status: string }[], assignmentTitles: string[]): string[] {
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const assigned = assignmentTitles.map(norm);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of rep) {
+    if (!["learning", "polishing", "review"].includes(r.status)) continue;
+    const t = norm(r.title);
+    if (!t || seen.has(t) || assigned.some((a) => a.includes(t) || t.includes(a))) continue;
+    seen.add(t);
+    out.push(r.title);
+  }
+  return out.slice(0, 12);
 }

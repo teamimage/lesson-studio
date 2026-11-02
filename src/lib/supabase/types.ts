@@ -31,6 +31,7 @@ export type Database = {
           model: string;
           output_tokens: number;
           practice_session_id: string | null;
+          practice_week_id: string | null;
           provider: string;
           recording_id: string | null;
           teacher_id: string;
@@ -49,6 +50,7 @@ export type Database = {
           model: string;
           output_tokens?: number;
           practice_session_id?: string | null;
+          practice_week_id?: string | null;
           provider: string;
           recording_id?: string | null;
           teacher_id: string;
@@ -67,6 +69,7 @@ export type Database = {
           model?: string;
           output_tokens?: number;
           practice_session_id?: string | null;
+          practice_week_id?: string | null;
           provider?: string;
           recording_id?: string | null;
           teacher_id?: string;
@@ -77,6 +80,13 @@ export type Database = {
             columns: ["practice_session_id"];
             isOneToOne: false;
             referencedRelation: "practice_sessions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "ai_usage_practice_week_id_fkey";
+            columns: ["practice_week_id"];
+            isOneToOne: false;
+            referencedRelation: "practice_weeks";
             referencedColumns: ["id"];
           },
           {
@@ -345,6 +355,59 @@ export type Database = {
             columns: ["teacher_id"];
             isOneToOne: false;
             referencedRelation: "teachers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      practice_weeks: {
+        Row: {
+          created_at: string;
+          error: string | null;
+          generated_at: string | null;
+          id: string;
+          review: Json | null;
+          session_count: number;
+          status: "generating" | "done" | "error";
+          student_id: string;
+          teacher_id: string;
+          through_date: string | null;
+          updated_at: string;
+          week_start: string;
+        };
+        Insert: {
+          created_at?: string;
+          error?: string | null;
+          generated_at?: string | null;
+          id?: string;
+          review?: Json | null;
+          session_count?: number;
+          status?: "generating" | "done" | "error";
+          student_id: string;
+          teacher_id: string;
+          through_date?: string | null;
+          updated_at?: string;
+          week_start: string;
+        };
+        Update: {
+          created_at?: string;
+          error?: string | null;
+          generated_at?: string | null;
+          id?: string;
+          review?: Json | null;
+          session_count?: number;
+          status?: "generating" | "done" | "error";
+          student_id?: string;
+          teacher_id?: string;
+          through_date?: string | null;
+          updated_at?: string;
+          week_start?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "practice_weeks_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "students";
             referencedColumns: ["id"];
           },
         ];

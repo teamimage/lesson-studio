@@ -11,10 +11,11 @@ import { Shell } from "@/components/shell";
 import { Card, LinkButton, Pill, SectionTitle } from "@/components/ui";
 import { requireTeacher } from "@/lib/auth";
 import { getStudent, listLessons, listParentsForStudent, listRepertoire, staleReview } from "@/lib/data";
-import { capitalize, formatDate, humanize, todayISO } from "@/lib/format";
+import { addDays, capitalize, formatDate, humanize, todayISO } from "@/lib/format";
 import { bookPosition, nextLesson } from "@/lib/teacher-data";
 import { PracticeSessionList } from "@/components/practice-session-list";
 import { listPracticeSessions } from "@/lib/practice/data";
+import { weekStartOf } from "@/lib/practice/week";
 
 type Params = Promise<{ id: string }>;
 
@@ -118,8 +119,19 @@ async function Body({ params }: { params: Params }) {
 
           {sessions.length > 0 && (
             <section>
-              <SectionTitle>Recent practice</SectionTitle>
-              <PracticeSessionList sessions={sessions} teacherView />
+              <SectionTitle
+                action={
+                  <Link
+                    href={`/family/${id}/week/${weekStartOf(addDays(todayISO(), -7))}`}
+                    className="text-sm text-accent-ink underline"
+                  >
+                    Last week&apos;s review
+                  </Link>
+                }
+              >
+                Recent practice
+              </SectionTitle>
+              <PracticeSessionList sessions={sessions} teacherView compact />
             </section>
           )}
 
