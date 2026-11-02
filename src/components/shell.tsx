@@ -59,10 +59,10 @@ export function Shell({
       <main
         className={cx(
           "mx-auto w-full flex-1 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-3",
-          wide ? "max-w-5xl" : "max-w-2xl",
+          wide ? "max-w-5xl" : "max-w-[50rem]",
         )}
       >
-        <div className="mb-4 text-center">
+        <div className="mb-4">
           {eyebrow && (
             <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-accent-ink">
               {eyebrow}
