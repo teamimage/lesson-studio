@@ -30,7 +30,7 @@ type SearchParams = Promise<{ student?: string }>;
 // the next lesson. Profile, repertoire and videos open on their own pages.
 export default function TeacherDesk({ searchParams }: { searchParams: SearchParams }) {
   return (
-    <Shell title="Teacher desk" eyebrow="Teacher" tab="desk">
+    <Shell title="Teacher desk" eyebrow="Teacher" tab="desk" wide>
       <Suspense fallback={<Skeleton />}>
         <Desk searchParams={searchParams} />
       </Suspense>
