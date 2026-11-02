@@ -21,7 +21,7 @@ type SP = Promise<{ deleted?: string; error?: string }>;
 
 export default function StoragePage({ searchParams }: { searchParams: SP }) {
   return (
-    <Shell title="Storage" eyebrow="Admin" back={{ href: "/admin", label: "Admin" }}>
+    <Shell title="Storage" eyebrow="Admin" back={{ href: "/admin", label: "Admin" }} wide>
       <Suspense>
         <Body searchParams={searchParams} />
       </Suspense>
