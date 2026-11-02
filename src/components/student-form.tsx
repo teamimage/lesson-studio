@@ -1,5 +1,7 @@
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { InstrumentBookFields } from "@/components/instrument-book-fields";
+import { PhotoField } from "@/components/photo-field";
+import { studentPhotoSrc } from "@/lib/constants";
 import type { Student } from "@/lib/data";
 
 export function StudentForm({
@@ -16,6 +18,7 @@ export function StudentForm({
   return (
     <form action={action} className="flex flex-col gap-4">
       {student && <input type="hidden" name="id" value={student.id} />}
+      <PhotoField name={student?.name} instrument={student?.instrument} photoSrc={student ? studentPhotoSrc(student) : null} />
       <Field label="Name">
         <Input name="name" required defaultValue={student?.name ?? ""} autoComplete="off" placeholder="First name" />
       </Field>

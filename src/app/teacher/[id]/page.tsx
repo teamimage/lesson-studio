@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
+import { InstrumentTag } from "@/components/instrument-tag";
+import { studentPhotoSrc } from "@/lib/constants";
 import { Info } from "@/components/desk";
 import { RepertoireMap } from "@/components/repertoire-map";
 import { Shell } from "@/components/shell";
@@ -46,11 +48,20 @@ async function Body({ params }: { params: Params }) {
     <Shell
       title={
         <span className="flex items-center gap-3">
-          <Avatar name={student.name} instrument={student.instrument} />
-          {student.name}
+          <Avatar
+            name={student.name}
+            instrument={student.instrument}
+            photoSrc={studentPhotoSrc(student)}
+            size="lg"
+            editStudentId={student.id}
+          />
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            {student.name}
+            <InstrumentTag instrument={student.instrument} />
+          </span>
         </span>
       }
-      eyebrow={`${capitalize(student.instrument)}${student.current_book ? ` · ${student.current_book}` : ""}`}
+      eyebrow={student.current_book ?? undefined}
       back={{ href: `/teacher?student=${id}`, label: "Teacher desk" }}
       tab="desk"
       wide

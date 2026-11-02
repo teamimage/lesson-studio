@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { Avatar } from "@/components/avatar";
+import { InstrumentTag } from "@/components/instrument-tag";
+import { studentPhotoSrc } from "@/lib/constants";
 import { Card, EmptyState, LinkButton, Pill, SectionTitle } from "@/components/ui";
 import { getViewer } from "@/lib/auth";
 import {
@@ -122,14 +124,14 @@ async function Dashboard() {
               return (
                 <Card key={student.id} className="flex flex-col gap-3">
                   <div className="flex items-start gap-3">
-                    <Avatar name={student.name} instrument={student.instrument} />
+                    <Avatar name={student.name} instrument={student.instrument} photoSrc={studentPhotoSrc(student)} />
                     <div className="min-w-0 flex-1">
                       <Link href={`/students/${student.id}`} className="block">
-                        <div className="text-[17px] font-semibold leading-tight">{student.name}</div>
-                        <div className="text-sm text-muted">
-                          {capitalize(student.instrument)}
-                          {student.current_book ? ` · ${student.current_book}` : ""}
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="text-[17px] font-semibold leading-tight">{student.name}</span>
+                          <InstrumentTag instrument={student.instrument} />
                         </div>
+                        {student.current_book && <div className="text-sm text-muted">{student.current_book}</div>}
                       </Link>
                       {working && (
                         <div className="mt-1.5 text-sm">

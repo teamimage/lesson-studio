@@ -2,12 +2,13 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
+import { AvatarFace } from "@/components/avatar";
+import { InstrumentTag } from "@/components/instrument-tag";
 import { AdminDeleteButton, AdminEditForm, AdminNotices, Fold } from "@/components/admin-ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Button, Card, Field, Input, Pill, Select, SectionTitle } from "@/components/ui";
 import { requireAdmin } from "@/lib/admin";
-import { INSTRUMENTS, instrumentLabel } from "@/lib/constants";
-import { capitalize } from "@/lib/format";
+import { INSTRUMENTS, instrumentLabel, studentPhotoSrc } from "@/lib/constants";
 import { adminCreateStudent, adminDeleteAccount } from "../../actions";
 
 type Params = Promise<{ id: string }>;
@@ -54,12 +55,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             {(students ?? []).map((s) => (
               <Link key={s.id} href={`/admin/students/${s.id}`} className="block">
                 <Card className="flex items-center gap-3 py-3 transition hover:border-accent/50">
+                  <AvatarFace name={s.name} instrument={s.instrument} photoSrc={studentPhotoSrc(s)} className="h-10 w-10 text-xl" />
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold">{s.name}</div>
-                    <div className="text-sm text-muted">
-                      {capitalize(s.instrument)}
-                      {s.current_book ? ` · ${s.current_book}` : ""}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="font-semibold">{s.name}</span>
+                      <InstrumentTag instrument={s.instrument} />
                     </div>
+                    {s.current_book && <div className="text-sm text-muted">{s.current_book}</div>}
                   </div>
                   {!s.active && <Pill>Inactive</Pill>}
                   <span className="text-accent-ink" aria-hidden>

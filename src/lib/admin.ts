@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { RECORDINGS_BUCKET, SCORES_BUCKET } from "@/lib/constants";
+import { PHOTOS_BUCKET, RECORDINGS_BUCKET, SCORES_BUCKET } from "@/lib/constants";
 
 /** True when the signed-in user is listed in app_admins. */
 export async function isAdmin(): Promise<boolean> {
@@ -37,4 +37,8 @@ export async function removeStudentFiles(db: Db, studentIds: string[], lessonId?
     ...(s.source_path ? [s.source_path] : []),
   ]);
   if (pagePaths.length) await db.storage.from(SCORES_BUCKET).remove(pagePaths);
+
+  const { data: photos } = await db.from("students").select("photo_path").in("id", studentIds);
+  const photoPaths = (photos ?? []).map((p) => p.photo_path).filter((p): p is string => !!p);
+  if (photoPaths.length) await db.storage.from(PHOTOS_BUCKET).remove(photoPaths);
 }

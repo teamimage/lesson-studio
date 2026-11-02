@@ -3,6 +3,8 @@ import { MusicPreviewLinks } from "@/components/music-preview-links";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
+import { InstrumentTag } from "@/components/instrument-tag";
+import { studentPhotoSrc } from "@/lib/constants";
 import { DeskLink, PracticeGrid, Stat } from "@/components/desk";
 import { Shell } from "@/components/shell";
 import { StudentPicker } from "@/components/student-picker";
@@ -62,6 +64,7 @@ async function Desk({ searchParams }: { searchParams: SearchParams }) {
           name: s.name,
           instrument: s.instrument,
           active: s.active,
+          photoSrc: studentPhotoSrc(s),
           drafts: draftCount.get(s.id) ?? 0,
         }))}
       />
@@ -101,17 +104,27 @@ async function StudentPanel({ student }: { student: Student }) {
       {/* Header: who, when, and the main actions */}
       <Card className="flex flex-col gap-4">
         <div className="flex items-start gap-3">
-          <Avatar name={student.name} instrument={student.instrument} />
+          <Avatar
+            name={student.name}
+            instrument={student.instrument}
+            photoSrc={studentPhotoSrc(student)}
+            size="lg"
+            editStudentId={student.id}
+          />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-display text-2xl font-semibold leading-tight">{student.name}</h2>
+              <InstrumentTag instrument={student.instrument} />
               {!student.active && <Pill>inactive</Pill>}
             </div>
             <div className="text-sm text-muted">
-              {capitalize(student.instrument)}
-              {student.age ? ` · age ${student.age}` : ""}
-              {student.method ? ` · ${humanize(student.method)}` : ""}
-              {student.current_book ? ` · ${student.current_book}` : ""}
+              {[
+                student.age ? `age ${student.age}` : "",
+                student.method ? humanize(student.method) : "",
+                student.current_book ?? "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {upcoming ? (

@@ -65,3 +65,28 @@ export const SCORE_KINDS: { value: string; label: string }[] = [
   { value: "etude", label: "Etude" },
   { value: "other", label: "Other" },
 ];
+
+/** Private storage bucket for student face photos (see the student_photos migration). */
+export const PHOTOS_BUCKET = "student-photos";
+
+/** Address of a student's photo, or null when there is none. The version
+ *  query changes with each new photo so the browser drops its cached copy. */
+export function studentPhotoSrc(student: { id: string; photo_path?: string | null; photo_updated_at?: string | null }) {
+  if (!student.photo_path) return null;
+  return `/api/students/${student.id}/photo?v=${encodeURIComponent(student.photo_updated_at ?? "1")}`;
+}
+
+/** Small emoji for an instrument. */
+export function instrumentIcon(instrument: string) {
+  return instrument === "piano"
+    ? "🎹"
+    : ["cello", "violin", "viola", "bass"].includes(instrument)
+      ? "🎻"
+      : instrument === "guitar"
+        ? "🎸"
+        : instrument === "voice"
+          ? "🎤"
+          : instrument === "trumpet"
+            ? "🎺"
+            : "🎵";
+}
