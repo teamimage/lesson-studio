@@ -8,7 +8,7 @@ import { getViewer } from "@/lib/auth";
 import { getCurrentPlan, getPracticeLog, getPracticeWeek, getStudent, getTeacherForStudent, listPracticeLogs } from "@/lib/data";
 import { addDays, capitalize, formatDate, relativeDay, todayISO } from "@/lib/format";
 import { savePractice } from "../actions";
-import { listRecordingsForLesson } from "@/lib/recordings";
+import { isPlayable, listRecordingsForLesson } from "@/lib/recordings";
 import { RecordingList } from "@/components/recording-player";
 
 type Params = Promise<{ studentId: string }>;
@@ -40,7 +40,9 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     listPracticeLogs(studentId, 30),
     getTeacherForStudent(student),
   ]);
-  const recordings = plan ? (await listRecordingsForLesson(plan.id)).filter((r) => r.url) : [];
+  // Families watch the fast streaming copy; the original is only offered
+  // while that copy is still being made.
+  const recordings = plan ? (await listRecordingsForLesson(plan.id, "until-stream")).filter(isPlayable) : [];
   const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
   const firstName = student.name.split(" ")[0];
   const completed = new Set(log?.completed_assignment_ids ?? []);

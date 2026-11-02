@@ -5,8 +5,11 @@ import { CONTAINED_VIDEO_PROPS, useContainedVideo } from "@/lib/use-contained-vi
 
 type Props = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src" | "ref"> & {
   recordingId: string;
-  /** Signed link to the original file. Plays when there's no streaming copy. */
-  src: string;
+  /**
+   * Signed link to the original file. Plays when there's no streaming copy.
+   * Null on family screens once the streaming copy is ready.
+   */
+  src: string | null;
   /** True when a streaming copy is ready; its address is fetched on mount. */
   streamReady: boolean;
   ref?: Ref<HTMLVideoElement>;
@@ -32,9 +35,9 @@ export function LessonVideo({ recordingId, src, streamReady, ref, ...rest }: Pro
     const video = videoRef.current;
     if (!video) return;
     // #t=0.1 makes iPhone Safari show the first frame instead of a black box.
-    const original = `${src}#t=0.1`;
+    const original = src ? `${src}#t=0.1` : null;
     if (!streamReady) {
-      video.src = original;
+      if (original) video.src = original;
       return;
     }
 
@@ -44,7 +47,7 @@ export function LessonVideo({ recordingId, src, streamReady, ref, ...rest }: Pro
       if (cancelled) return;
       destroy?.();
       destroy = null;
-      if (video.src !== original) video.src = original;
+      if (original && video.src !== original) video.src = original;
     };
 
     (async () => {
