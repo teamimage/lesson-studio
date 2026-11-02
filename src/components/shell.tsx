@@ -27,13 +27,11 @@ export function Shell({
   return (
     <div className="flex min-h-screen flex-col">
       <header className="no-print sticky top-0 z-10 border-b border-rule/80 bg-paper/90 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-paper/75">
-        <div
-          className={cx(
-            "mx-auto flex w-full flex-col px-4 pt-1",
-            wide ? "max-w-5xl" : "max-w-2xl",
-          )}
-        >
-          <div className="flex items-center gap-3">
+        {/* The header is always Desk width and a fixed height, so the app
+            name, back link and tabs sit in exactly the same place on every
+            page; only the content below changes width. */}
+        <div className="mx-auto flex w-full max-w-5xl flex-col px-4 pt-1">
+          <div className="flex h-10 items-center gap-3">
             {back ? (
               <Link
                 href={back.href}

@@ -101,6 +101,9 @@
 
 html {
   background: var(--paper);
+  /* Reserve the scrollbar's space on every page, so short and long pages
+     centre on the same line (Windows scrollbars take up width). */
+  scrollbar-gutter: stable;
 }
 
 body {
