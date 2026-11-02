@@ -185,15 +185,29 @@ export function EmptyState({
   );
 }
 
+// Layout of labelled rows (PIECES, TODAY WE, FOCUS, IN THE LESSON…) on the
+// lesson page, pre-lesson brief and Home practice.
+//   "stacked": label on its own line, text below it at full card width (current).
+//   "side":    label in a narrow left column, text in a right column (the
+//              original layout, kept so it can be restored by changing this one word).
+export const ROW_LAYOUT: "stacked" | "side" = "stacked";
+
+const ROW_LAYOUT_CLASSES = {
+  stacked: "flex flex-col gap-1 py-2 text-[15px] leading-relaxed",
+  side: "grid grid-cols-[96px_1fr] gap-x-3 gap-y-1 py-2 text-[15px] leading-relaxed sm:grid-cols-[120px_1fr]",
+} as const;
+
 export function Row({
   label,
   children,
+  layout = ROW_LAYOUT,
 }: {
   label: ReactNode;
   children: ReactNode;
+  layout?: "stacked" | "side";
 }) {
   return (
-    <div className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1 py-2 text-[15px] leading-relaxed sm:grid-cols-[120px_1fr]">
+    <div className={ROW_LAYOUT_CLASSES[layout]}>
       <div className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
         {label}
       </div>
