@@ -8,7 +8,6 @@ import { Avatar } from "@/components/avatar";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { AddLesson } from "@/components/add-lesson";
 import { AssignmentList } from "@/components/assignment-list";
-import { ConsentNeeded } from "@/components/consent-needed";
 import { Fold } from "@/components/fold";
 import { PreLessonBrief } from "@/components/pre-lesson-brief";
 import { PracticeSessionList } from "@/components/practice-session-list";
@@ -246,15 +245,6 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <PreLessonBrief student={student} lessons={lessons.slice(0, 6)} week={week} repertoire={repertoire} showRecordButton={false} />
         </Fold>
 
-        {consent.state !== "signed" && (
-          <ConsentNeeded
-            studentId={id}
-            studentName={student.name}
-            state={consent.state}
-            next={`/v3/students/${id}`}
-            what="starting a recorded lesson"
-          />
-        )}
 
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex min-w-0 flex-col gap-4">
