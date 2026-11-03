@@ -15,6 +15,7 @@ import {
 } from "@/lib/stand-timeline";
 import { pageRange, sectionAt, sectionLabel } from "@/lib/score-analysis";
 import { openMusicStand } from "@/app/students/music-actions";
+import { endLessonFromStand } from "@/app/lessons/live-actions";
 
 type Row = TablesInsert<"stand_events"> & { id: string; at: string };
 type Current = { scoreId: string; page: number } | null;
@@ -399,11 +400,15 @@ export function MusicStand({
 
   async function end() {
     log("end");
+    // Save the lesson length now (same as End lesson on the lesson card);
+    // a failure here never blocks leaving the stand.
+    const saved = lessonId ? endLessonFromStand(lessonId).catch(() => undefined) : Promise.resolve();
     const deadline = Date.now() + 4000;
     while (queue.current.length && Date.now() < deadline) {
       await flush();
       if (queue.current.length) await new Promise((r) => setTimeout(r, 400));
     }
+    await Promise.race([saved, new Promise((r) => setTimeout(r, 4000))]);
     router.push(`/lessons/${lessonId}#timeline`);
   }
 
