@@ -6,6 +6,7 @@ import { LocalTime } from "@/components/local-time";
 import { PracticeReviewBody } from "@/components/practice-review";
 import { formatDate } from "@/lib/format";
 import type { DaySession, PracticeDay } from "@/lib/practice/data";
+import { useBackToClose } from "@/lib/use-back-to-close";
 
 // A practice chart square. When the day has practice on record, tapping it
 // opens a popup over the page with that day's sessions: a letter grade at
@@ -50,6 +51,7 @@ export function PracticeDayCell({
 }
 
 function DayPopup({ day, teacherView, onClose }: { day: PracticeDay; teacherView: boolean; onClose: () => void }) {
+  useBackToClose(true, onClose);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
