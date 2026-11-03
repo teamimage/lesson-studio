@@ -18,7 +18,7 @@ import { startLesson } from "@/app/lessons/live-actions";
 import { listScoreIndex } from "@/lib/scores";
 import { MusicPreviewLinks } from "@/components/music-preview-links";
 import { PracticeSessionList } from "@/components/practice-session-list";
-import { listPracticeSessions } from "@/lib/practice/data";
+import { listPracticeDays, listPracticeSessions } from "@/lib/practice/data";
 import { listPeriods } from "@/lib/practice/period";
 import { PeriodReviewList } from "@/components/period-review-list";
 
@@ -46,6 +46,7 @@ async function Body({ params }: { params: Params }) {
     listPracticeSessions(id, 5),
     listPeriods(id),
   ]);
+  const practiceDays = week.days.length ? await listPracticeDays(id, week.days[0], week.days[week.days.length - 1]) : {};
 
   return (
     <Shell
@@ -144,10 +145,13 @@ async function Body({ params }: { params: Params }) {
               </span>
             }
           >
-            Practice {practiceSpanLabel(week)}
+            Practice record
           </SectionTitle>
           <Card>
-            <WeekStrip week={week} />
+            <div className="mb-2 text-sm font-medium text-muted">
+              {practiceSpanLabel(week).replace(/^./, (c) => c.toUpperCase())}
+            </div>
+            <WeekStrip week={week} days={practiceDays} teacherView />
             {week.notes.length > 0 && (
               <ul className="mt-3 flex flex-col gap-1.5 text-sm">
                 {week.notes.map((n) => (
@@ -171,7 +175,7 @@ async function Body({ params }: { params: Params }) {
         )}
 
         <section>
-          <SectionTitle>Reviews, lesson to lesson</SectionTitle>
+          <SectionTitle>Weekly practice reviews</SectionTitle>
           <PeriodReviewList studentId={id} periods={periods} writeMissing />
         </section>
 

@@ -27,7 +27,7 @@ export function PeriodReviewList({
               {periodLabel(p)}
               <span className="font-normal text-muted">
                 {" "}
-                · {p.daysPracticed} of {p.dayCount} days
+                · {p.dayCount} {p.dayCount === 1 ? "day" : "days"} elapsed
                 {p.totalMinutes > 0 ? ` · ${p.totalMinutes} min` : ""}
                 {p.sessions > 0 ? ` · ${p.sessions} recorded` : ""}
               </span>

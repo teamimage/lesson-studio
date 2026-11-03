@@ -74,7 +74,7 @@ create policy "family uploads practice" on storage.objects for insert to authent
     bucket_id = 'practice-recordings'
     and exists (
       select 1 from public.students s
-      where s.id::text = (storage.foldername(name))[1]
+      where s.id::text = (storage.foldername(objects.name))[1]
         and (public.teaches_student(s.id) or public.parents_student(s.id))
     )
   );
@@ -84,7 +84,7 @@ create policy "family updates practice" on storage.objects for update to authent
     bucket_id = 'practice-recordings'
     and exists (
       select 1 from public.students s
-      where s.id::text = (storage.foldername(name))[1]
+      where s.id::text = (storage.foldername(objects.name))[1]
         and (public.teaches_student(s.id) or public.parents_student(s.id))
     )
   );
@@ -94,7 +94,7 @@ create policy "family reads practice" on storage.objects for select to authentic
     bucket_id = 'practice-recordings'
     and exists (
       select 1 from public.students s
-      where s.id::text = (storage.foldername(name))[1]
+      where s.id::text = (storage.foldername(objects.name))[1]
         and (public.teaches_student(s.id) or public.parents_student(s.id))
     )
   );
@@ -104,7 +104,7 @@ create policy "family deletes practice" on storage.objects for delete to authent
     bucket_id = 'practice-recordings'
     and exists (
       select 1 from public.students s
-      where s.id::text = (storage.foldername(name))[1]
+      where s.id::text = (storage.foldername(objects.name))[1]
         and (public.teaches_student(s.id) or public.parents_student(s.id))
     )
   );

@@ -39,7 +39,7 @@ import { isPlayable, listRecordingsForLesson } from "@/lib/recordings";
 import { RecordingList } from "@/components/recording-player";
 import { PracticeRecorder } from "@/components/practice-recorder";
 import { PracticeSessionList } from "@/components/practice-session-list";
-import { listPracticeSessions } from "@/lib/practice/data";
+import { listPracticeDays, listPracticeSessions } from "@/lib/practice/data";
 import { listPeriods } from "@/lib/practice/period";
 import { PeriodReviewList } from "@/components/period-review-list";
 import { JumpButton, VideoPopupProvider } from "@/components/video-popup";
@@ -100,6 +100,9 @@ async function Body({
       listPracticeSessions(studentId, 10),
       listPeriods(studentId),
     ]);
+  const practiceDays = week.days.length
+    ? await listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1])
+    : {};
   // Families watch the fast streaming copy; the original is only offered
   // while that copy is still being made.
   const [recordings, scores] = plan
@@ -333,7 +336,7 @@ async function Body({
           )}
 
           <section>
-            <SectionTitle>Reviews, lesson to lesson</SectionTitle>
+            <SectionTitle>Weekly practice reviews</SectionTitle>
             <PeriodReviewList
               studentId={studentId}
               periods={periods}
@@ -342,9 +345,12 @@ async function Body({
           </section>
 
           <section>
-            <SectionTitle>{capitalize(practiceSpanLabel(week))}</SectionTitle>
+            <SectionTitle>Practice record</SectionTitle>
             <Card>
-              <WeekStrip week={week} large />
+              <div className="mb-2 text-sm font-medium text-muted">
+                {capitalize(practiceSpanLabel(week))}
+              </div>
+              <WeekStrip week={week} large days={practiceDays} teacherView={isTeacher} />
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <Pill
                   tone={
@@ -381,7 +387,11 @@ async function Body({
                     </div>
                     <div className="min-w-0 flex-1 text-sm">
                       <span>
-                        {l.minutes ? `${l.minutes} min` : "practiced"}
+                        {l.minutes
+                          ? `${l.minutes} min`
+                          : l.completed_assignment_ids.length > 0
+                            ? "practiced"
+                            : "saved, nothing ticked"}
                         {l.completed_assignment_ids.length > 0
                           ? ` · ${l.completed_assignment_ids.length} items`
                           : ""}
