@@ -64,6 +64,9 @@ export async function listScores(
       source: r.source_path
         ? { name: r.source_name || "Original file", size: r.source_size, url: sourceUrls.get(r.id) ?? null }
         : null,
+      rights: r.rights_confirmed_at
+        ? { at: r.rights_confirmed_at, email: r.rights_confirmed_email, version: r.rights_version }
+        : null,
     };
   });
 }

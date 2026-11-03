@@ -158,6 +158,15 @@ function ScoreRow({
           </div>
         )}
         {score.pages.length > 0 && (
+          <p className="text-sm text-muted">
+            {score.rights
+              ? `✓ Ownership confirmed${score.rights.email ? ` by ${score.rights.email}` : ""} on ${new Date(
+                  score.rights.at,
+                ).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+              : "Added before the ownership sign-off. Replace file to confirm it."}
+          </p>
+        )}
+        {score.pages.length > 0 && (
           <Link href={viewerHref(studentId, score.id)} className="text-sm font-medium text-accent-ink underline">
             View the music (doesn&apos;t open the stand)
           </Link>
