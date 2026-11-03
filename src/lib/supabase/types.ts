@@ -359,6 +359,48 @@ export type Database = {
           },
         ];
       };
+      music_rights_confirmations: {
+        Row: {
+          id: string;
+          teacher_id: string;
+          student_id: string | null;
+          score_id: string | null;
+          confirmed_by: string;
+          confirmed_email: string;
+          confirmed_at: string;
+          statement_version: string;
+          statement: string;
+          action: string;
+          file_names: string[];
+        };
+        Insert: {
+          id?: string;
+          teacher_id: string;
+          student_id?: string | null;
+          score_id?: string | null;
+          confirmed_by?: string;
+          confirmed_email?: string;
+          confirmed_at?: string;
+          statement_version: string;
+          statement: string;
+          action?: string;
+          file_names?: string[];
+        };
+        Update: {
+          id?: string;
+          teacher_id?: string;
+          student_id?: string | null;
+          score_id?: string | null;
+          confirmed_by?: string;
+          confirmed_email?: string;
+          confirmed_at?: string;
+          statement_version?: string;
+          statement?: string;
+          action?: string;
+          file_names?: string[];
+        };
+        Relationships: [];
+      };
       practice_weeks: {
         Row: {
           created_at: string;
@@ -690,6 +732,10 @@ export type Database = {
           source_path: string | null;
           source_size: number | null;
           title_auto: boolean;
+          rights_confirmation_id: string | null;
+          rights_confirmed_at: string | null;
+          rights_confirmed_email: string | null;
+          rights_version: string | null;
           archived: boolean;
           created_at: string;
           id: string;
@@ -710,6 +756,10 @@ export type Database = {
           source_path?: string | null;
           source_size?: number | null;
           title_auto?: boolean;
+          rights_confirmation_id?: string | null;
+          rights_confirmed_at?: string | null;
+          rights_confirmed_email?: string | null;
+          rights_version?: string | null;
           archived?: boolean;
           created_at?: string;
           id?: string;
@@ -730,6 +780,10 @@ export type Database = {
           source_path?: string | null;
           source_size?: number | null;
           title_auto?: boolean;
+          rights_confirmation_id?: string | null;
+          rights_confirmed_at?: string | null;
+          rights_confirmed_email?: string | null;
+          rights_version?: string | null;
           archived?: boolean;
           created_at?: string;
           id?: string;

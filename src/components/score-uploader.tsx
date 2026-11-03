@@ -14,6 +14,7 @@ import {
 } from "@/app/students/music-actions";
 import type { ScorePage } from "@/lib/stand-timeline";
 import { Button, cx } from "@/components/ui";
+import { MUSIC_RIGHTS_NOTE, MUSIC_RIGHTS_STATEMENT, MUSIC_RIGHTS_VERSION } from "@/lib/music-rights";
 
 // Long edge of a stored page image. Sharp on an iPad, small enough to load fast.
 const MAX_EDGE = 2000;
@@ -142,7 +143,7 @@ export async function readMusic(scoreId: string): Promise<{ status: string; erro
  */
 async function uploadMusic(
   files: File[],
-  start: (fileName: string) => Promise<StartScoreResult>,
+  start: (fileName: string, fileNames: string[]) => Promise<StartScoreResult>,
   setStatus: (s: string) => void,
   afterSave: () => void,
 ): Promise<{ id: string; pages: number }> {
@@ -160,7 +161,10 @@ async function uploadMusic(
   if (prepared.length === 0) throw new Error("No pages found in those files.");
 
   const fileName = files[0].name;
-  const started = await start(fileName);
+  const started = await start(
+    fileName,
+    files.map((f) => f.name),
+  );
   if ("error" in started) throw new Error(started.error);
 
   // The PDF as uploaded is kept as the original (only for a single PDF).
@@ -183,7 +187,7 @@ async function uploadMusic(
     if (upErr) throw new Error("Upload stopped. Check the connection and try again.");
     pages.push({ path, w: p.w, h: p.h });
   }
-  const res = await finishScore(started.id, pages, source, fileName);
+  const res = await finishScore(started.id, pages, source, fileName, started.rightsId);
   if (!res.ok) throw new Error("Uploaded, but couldn't be saved. Try again.");
   afterSave();
 
@@ -202,20 +206,25 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [owned, setOwned] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (files.length === 0) return setError("Choose photos or a PDF of the music.");
+    if (!owned) return setError("Tick the box to confirm you own this copy of the music.");
     setBusy(true);
     setError(null);
     try {
       const out = await uploadMusic(
         files,
-        (fileName) => startScore({ studentId, fileName }),
+        (fileName, fileNames) =>
+          startScore({ studentId, fileName, fileNames, rights: { confirmed: owned, version: MUSIC_RIGHTS_VERSION } }),
         setStatus,
         () => router.refresh(),
       );
       setFiles([]);
+      // Each upload gets its own sign-off.
+      setOwned(false);
       if (fileRef.current) fileRef.current.value = "";
       setStatus(`Added ${out.pages} page${out.pages === 1 ? "" : "s"}. The pieces Claude found are listed above.`);
     } catch (err) {
@@ -251,9 +260,23 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
           onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
         />
       </label>
+      <label className={cx("flex items-start gap-3 text-[15px] leading-snug", busy && "opacity-60")}>
+        <input
+          type="checkbox"
+          className="mt-1 h-5 w-5 shrink-0 accent-[var(--accent)]"
+          checked={owned}
+          disabled={busy}
+          onChange={(e) => {
+            setOwned(e.target.checked);
+            if (e.target.checked) setError(null);
+          }}
+        />
+        <span>{MUSIC_RIGHTS_STATEMENT}</span>
+      </label>
+      <p className="text-sm text-muted">{MUSIC_RIGHTS_NOTE}</p>
       {error && <p className="text-sm text-danger">{error}</p>}
       {status && <p className="text-sm text-muted">{status}</p>}
-      <Button disabled={busy || files.length === 0}>{busy ? "Working…" : "Add to music"}</Button>
+      <Button disabled={busy || files.length === 0 || !owned}>{busy ? "Working…" : "Add to music"}</Button>
     </form>
   );
 }
@@ -271,12 +294,23 @@ export function ReplaceScoreFile({ scoreId, title }: { scoreId: string; title: s
     if (fileRef.current) fileRef.current.value = "";
     if (files.length === 0) return;
     const what = files.length === 1 ? files[0].name : `${files.length} files`;
-    if (!confirm(`Replace the whole file for "${title}" with ${what}? The old file, its pages and the pieces found in it are removed.`))
+    if (
+      !confirm(
+        `Replace the whole file for "${title}" with ${what}? The old file, its pages and the pieces found in it are removed.\n\n` +
+          `Pressing OK also confirms: ${MUSIC_RIGHTS_STATEMENT}`,
+      )
+    )
       return;
     setBusy(true);
     setError(null);
     try {
-      await uploadMusic(files, () => startReplaceScore(scoreId), setStatus, () => router.refresh());
+      await uploadMusic(
+        files,
+        (_fileName, fileNames) =>
+          startReplaceScore(scoreId, fileNames, { confirmed: true, version: MUSIC_RIGHTS_VERSION }),
+        setStatus,
+        () => router.refresh(),
+      );
       setStatus(null);
     } catch (err) {
       setStatus(null);

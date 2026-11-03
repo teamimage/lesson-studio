@@ -20,6 +20,8 @@ export type StandScore = {
   analysisError: string | null;
   /** The file as uploaded (PDFs), with a download link when asked for. */
   source: { name: string; size: number | null; url: string | null } | null;
+  /** The uploader's copyright sign-off for the file held now (null for music added before it existed). */
+  rights?: { at: string; email: string | null; version: string | null } | null;
 };
 export type Rect = { x: number; y: number; w: number; h: number };
 export type StandEventKind = "open" | "close" | "sync" | "mark" | "end";
