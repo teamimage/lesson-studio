@@ -6,6 +6,7 @@ import type { Json, Tables } from "@/lib/supabase/types";
 import { getTranscription, MissingKeyError, submitTranscription } from "./assemblyai";
 import { DraftError, draftLesson, timeLesson, type LessonDraft } from "./draft-lesson";
 import { claudeCost, TRANSCRIPTION_MODEL, transcriptionCost, type ClaudeUsage } from "./pricing";
+import { lessonConsentBlock } from "@/lib/recording-consent-data";
 
 // Lesson video → transcript → drafted lesson record.
 //
@@ -71,6 +72,9 @@ function messageOf(e: unknown): string {
 }
 
 export async function start(teacherId: string, lessonId: string, recordingId: string): Promise<ProcessState> {
+  // Nothing goes to the AI services without a signed parent consent.
+  const blocked = await lessonConsentBlock(lessonId);
+  if (blocked) return { status: "error", error: blocked };
   const db = await createClient();
   const { data: rec } = await db.from("recordings").select("*").eq("id", recordingId).maybeSingle();
   if (!rec || rec.lesson_id !== lessonId || rec.status !== "ready")
@@ -198,6 +202,8 @@ async function refreshTranscript(db: Db, row: Transcript): Promise<Transcript> {
 }
 
 export async function redraft(teacherId: string, lessonId: string): Promise<ProcessState> {
+  const blocked = await lessonConsentBlock(lessonId);
+  if (blocked) return { status: "error", error: blocked };
   const db = await createClient();
   const found = await latestTranscript(db, lessonId);
   if (!found?.transcript) return { status: "error", error: "There's no transcript to draft from yet." };
@@ -220,6 +226,8 @@ export async function redraft(teacherId: string, lessonId: string): Promise<Proc
  * draft.timing; the music links then go stale and are matched again.
  */
 export async function retime(teacherId: string, lessonId: string): Promise<ProcessState> {
+  const blocked = await lessonConsentBlock(lessonId);
+  if (blocked) return { status: "error", error: blocked };
   const db = await createClient();
   const found = await latestTranscript(db, lessonId);
   if (!found?.transcript) return { status: "error", error: "There's no transcript to time from yet." };

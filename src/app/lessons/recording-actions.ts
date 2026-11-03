@@ -8,6 +8,8 @@ import { RECORDINGS_BUCKET } from "@/lib/constants";
 import { syncStream } from "@/lib/recording-stream";
 import { deleteStream } from "@/lib/stream";
 import { latestTranscript, start as startProcessing } from "@/lib/ai/process-lesson";
+import { getConsentStatus } from "@/lib/recording-consent-data";
+import { CONSENT_SETUP_MESSAGE, consentNeededMessage } from "@/lib/recording-consent";
 
 export type StartRecordingInput = {
   lessonId: string;
@@ -40,6 +42,9 @@ export async function startRecording(input: StartRecordingInput): Promise<StartR
     .eq("id", input.lessonId)
     .maybeSingle();
   if (!lesson) return { error: "That lesson wasn't found." };
+  const consent = await getConsentStatus(lesson.student_id);
+  if (consent.state === "setup") return { error: CONSENT_SETUP_MESSAGE };
+  if (consent.state !== "signed") return { error: consentNeededMessage("this student") };
 
   const fileName = String(input.fileName || "recording").slice(0, 200);
   const sizeBytes = Math.max(0, Math.floor(Number(input.sizeBytes) || 0));

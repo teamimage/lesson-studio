@@ -5,7 +5,7 @@ import { Avatar } from "@/components/avatar";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { studentPhotoSrc } from "@/lib/constants";
 import { Shell } from "@/components/shell";
-import { Button, Card, EmptyState, LinkButton, Pill, SectionTitle } from "@/components/ui";
+import { Button, Card, EmptyState, LinkButton, Notice, Pill, SectionTitle } from "@/components/ui";
 import { requireTeacher } from "@/lib/auth";
 import { getPracticeWeek, getStudent, practiceSpanLabel, listLessons, listParentsForStudent, listRepertoire } from "@/lib/data";
 import { formatDate } from "@/lib/format";
@@ -21,23 +21,29 @@ import { PracticeSessionList } from "@/components/practice-session-list";
 import { listPracticeDays, listPracticeSessions } from "@/lib/practice/data";
 import { listPeriods } from "@/lib/practice/period";
 import { PeriodReviewList } from "@/components/period-review-list";
+import { ConsentNeeded } from "@/components/consent-needed";
+import { LocalDateTime } from "@/components/local-time";
+import { getConsentStatus } from "@/lib/recording-consent-data";
+import { consentPath } from "@/lib/recording-consent";
 
 type Params = Promise<{ id: string }>;
+type SP = Promise<{ consent?: string }>;
 
-export default function StudentPage({ params }: { params: Params }) {
+export default function StudentPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
     <Suspense fallback={<Shell title=" " tab="studio">{null}</Shell>}>
-      <Body params={params} />
+      <Body params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function Body({ params }: { params: Params }) {
+async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
   await requireTeacher();
   const { id } = await params;
+  const sp = await searchParams;
   const student = await getStudent(id);
   if (!student) notFound();
-  const [lessons, week, repertoire, parents, music, sessions, periods] = await Promise.all([
+  const [lessons, week, repertoire, parents, music, sessions, periods, consent] = await Promise.all([
     listLessons(id),
     getPracticeWeek(id),
     listRepertoire(id),
@@ -45,6 +51,7 @@ async function Body({ params }: { params: Params }) {
     listScoreIndex(id),
     listPracticeSessions(id, 5),
     listPeriods(id),
+    getConsentStatus(id),
   ]);
   const practiceDays = week.days.length ? await listPracticeDays(id, week.days[0], week.days[week.days.length - 1]) : {};
 
@@ -78,11 +85,26 @@ async function Body({ params }: { params: Params }) {
       }
     >
       <div className="flex flex-col gap-6">
+        {sp.consent === "signed" && consent.state === "signed" && (
+          <Notice tone="sage">Recording consent signed. {student.name.split(" ")[0]} can be recorded now.</Notice>
+        )}
         <div className="grid grid-cols-2 gap-2">
-          <form action={startLesson} className="col-span-2">
-            <input type="hidden" name="student_id" value={id} />
-            <Button className="min-h-14 w-full text-lg">Start lesson</Button>
-          </form>
+          {consent.state === "signed" ? (
+            <form action={startLesson} className="col-span-2">
+              <input type="hidden" name="student_id" value={id} />
+              <Button className="min-h-14 w-full text-lg">Start lesson</Button>
+            </form>
+          ) : (
+            <div className="col-span-2">
+              <ConsentNeeded
+                studentId={id}
+                studentName={student.name}
+                state={consent.state}
+                next={`/students/${id}`}
+                what="starting a recorded lesson"
+              />
+            </div>
+          )}
           <LinkButton href={`/students/${id}/brief`} variant="secondary">
             Pre-lesson brief
           </LinkButton>
@@ -224,6 +246,19 @@ async function Body({ params }: { params: Params }) {
           >
             Parents
           </SectionTitle>
+          <p className="mb-2 text-sm">
+            {consent.state === "signed" ? (
+              <>
+                ✓ Recording consent signed by {consent.consent.signerName} on{" "}
+                <LocalDateTime iso={consent.consent.signedAt} />.{" "}
+              </>
+            ) : (
+              <span className="text-danger">No recording consent on file. </span>
+            )}
+            <Link href={consentPath(id)} className="text-accent-ink underline">
+              {consent.state === "signed" ? "View or withdraw" : "Collect consent"}
+            </Link>
+          </p>
           {parents.length === 0 ? (
             <p className="text-sm text-muted">No parent linked yet. Add one so they can see the home plan.</p>
           ) : (
