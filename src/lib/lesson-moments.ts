@@ -67,27 +67,45 @@ export function parseTimelineText(text: string | null | undefined): AiMoment[] {
   return out;
 }
 
+/** The first "m:ss" in an AI time ("12:40", "[12:40]", "12:40–13:25"). */
+function aiClock(v: unknown): number | null {
+  if (typeof v !== "string") return null;
+  const m = v.match(/(?:\d+:)?\d{1,3}:\d{2}/);
+  return m ? parseClock(m[0]) : null;
+}
+
+/**
+ * Where the AI's times live: "Redo clip times" stores them under
+ * draft.timing (so an approved lesson's record is left alone); otherwise
+ * they are on the draft itself.
+ */
+function timingOf(draft: unknown): { moments?: unknown; assignments?: unknown } | null {
+  const d = draft as { timing?: unknown; moments?: unknown; assignments?: unknown } | null;
+  if (d?.timing && typeof d.timing === "object") return d.timing as { moments?: unknown; assignments?: unknown };
+  return d ?? null;
+}
+
 /** Moments the AI draft stored, if any (drafts from before this have none). */
 export function draftMoments(draft: unknown): AiMoment[] {
-  const list = (draft as { moments?: unknown } | null)?.moments;
+  const list = timingOf(draft)?.moments;
   if (!Array.isArray(list)) return [];
   return list.flatMap((m) => {
     const { time, label } = (m ?? {}) as { time?: unknown; label?: unknown };
-    const seconds = typeof time === "string" ? parseClock(time) : null;
+    const seconds = aiClock(time);
     return seconds !== null && typeof label === "string" && label.trim() ? [{ seconds, label: label.trim() }] : [];
   });
 }
 
 /** The AI's video time for each drafted assignment, by normalized title. */
 export function draftAssignmentTimes(draft: unknown): { title: string; seconds: number }[] {
-  const list = (draft as { assignments?: unknown } | null)?.assignments;
+  const list = timingOf(draft)?.assignments;
   if (!Array.isArray(list)) return [];
   return list.flatMap((a) => {
     const { title, video_time } = (a ?? {}) as {
       title?: unknown;
       video_time?: unknown;
     };
-    const seconds = typeof video_time === "string" ? parseClock(video_time) : null;
+    const seconds = aiClock(video_time);
     return typeof title === "string" && seconds !== null ? [{ title, seconds }] : [];
   });
 }

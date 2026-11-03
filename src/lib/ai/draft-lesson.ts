@@ -96,9 +96,12 @@ const SCHEMA = {
   },
 } as const;
 
+// How Claude picks a video time, shared by the draft and by "Redo clip times".
+const TIME_RULES = `Times (moments and video_time): copy the stamp of the transcript line where that part begins, exactly as written; never estimate a time between two lines. A part begins where the teacher announces it or sets it up ("let's go on to measure 9", "now G major"), not where the playing after it starts. If several lines could be the start, use the earliest.`;
+
 const SYSTEM = `You help a private music teacher turn a recorded lesson into the written lesson record. The teacher reads and edits your draft before anything reaches the family.
 
-The input is a machine transcript of a lesson video. Speakers are labelled A, B, C in order of first appearance; work out from context who is the teacher, the student and any parent. Long stretches of playing produce no words or garbled words; skip them. Timestamps are minutes:seconds from the start of the video.
+The input is a machine transcript of a lesson video. Speakers are labelled A, B, C in order of first appearance; work out from context who is the teacher, the student and any parent. Long stretches of playing produce no words or garbled words; skip them. Timestamps are minutes:seconds from the start of the video. A line like "[12:40–13:25] (no talking: probably playing)" marks a stretch with no speech, usually the student playing.
 
 Most students follow the Suzuki method, where a parent supervises daily home practice. Write for that parent: warm, concrete, plain words, no jargon they would not know.
 
@@ -106,11 +109,13 @@ Fill the fields like this:
 - summary: "Today we..." in 2-4 sentences. What was worked on, in lesson order.
 - focus_points: the one to three teaching points that matter most this week, each on its own line.
 - pieces: every piece played or discussed. Use the exact title from the student's book list when it matches. activity is started (first time), worked_on, polished, reviewed (older piece), or performed. notes: a short phrase on what was worked on.
-- assignments: the home practice the teacher asked for, or that clearly follows from the lesson. Keep them short: they show as one-line rows that open on a tap. title is at most six words and names the piece, passage or exercise ("Perpetual Motion: shifts"). how is one or two short sentences on how to practise it (tempo, repetitions, what to listen or watch for). Use kind piece, review, technique, listening, game, theory or other. every_day is true unless it is an occasional task. video_time is the timestamp (m:ss, as in the transcript) where the teacher demonstrated or worked on it, so the family can watch that spot; "" if there is none.
+- assignments: the home practice the teacher asked for, or that clearly follows from the lesson. Keep them short: they show as one-line rows that open on a tap. title is at most six words and names the piece, passage or exercise ("Perpetual Motion: shifts"). how is one or two short sentences on how to practise it (tempo, repetitions, what to listen or watch for). Use kind piece, review, technique, listening, game, theory or other. every_day is true unless it is an occasional task. video_time is the timestamp (m:ss, from the transcript) where the teacher starts to demonstrate or work on it, so the family can watch that spot; "" if there is none.
 - parent_message: one or two friendly sentences to the parent, for the printed sheet.
 - suggestions: teacher-only ideas for next lesson.
 - teacher_notes: teacher-only. Observations on posture, tone, attention and progress.
-- moments: the lesson's timeline, so the teacher can jump to each part of the video: every change of piece or activity and every important teaching point, in order. time is m:ss from the transcript; label is a few words ("Perpetual Motion, shifting"). Usually 6 to 20 entries.
+- moments: the lesson's timeline, so the teacher can jump to each part of the video: every change of piece or activity and every important teaching point, in order. label is a few words ("Perpetual Motion, shifting"). Usually 6 to 20 entries.
+
+${TIME_RULES}
 
 Only include what the transcript supports; leave a field empty rather than invent. Keep it short enough to fit a one-page sheet.`;
 
@@ -170,6 +175,74 @@ export async function draftLesson(ctx: DraftContext): Promise<{ draft: LessonDra
     throw new DraftError("Claude's draft couldn't be read. Try again.", usage);
   }
   return { draft, usage };
+}
+
+const TIMING_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["moments", "assignments"],
+  properties: {
+    moments: SCHEMA.properties.moments,
+    assignments: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "video_time"],
+        properties: { title: { type: "string" }, video_time: { type: "string" } },
+      },
+    },
+  },
+} as const;
+
+const TIMING_SYSTEM = `You help a private music teacher review a recorded lesson. The input is a machine transcript of the lesson video (speakers A, B, C... in order of first appearance; work out who is the teacher and who is the student) and the lesson record the teacher already approved. Timestamps are minutes:seconds from the start of the video. A line like "[12:40–13:25] (no talking: probably playing)" marks a stretch with no speech, usually the student playing.
+
+Return:
+- moments: the lesson's timeline, so the teacher can jump to each part of the video: every change of piece or activity and every important teaching point, in order. label is a few words ("Perpetual Motion, shifting"). Usually 6 to 20 entries.
+- assignments: for each practice assignment in the record, its title copied exactly, and video_time: where in the video the teacher starts to demonstrate or work on it; "" if nowhere.
+
+${TIME_RULES}`;
+
+export type LessonTiming = { moments: DraftMoment[]; assignments: { title: string; video_time: string }[] };
+
+/** Times only, for a lesson whose record is already written (often approved). */
+export async function timeLesson(input: {
+  transcript: string;
+  pieces: string[];
+  assignments: string[];
+}): Promise<{ timing: LessonTiming; usage: ClaudeUsage[] }> {
+  const anthropic = anthropicClient();
+  const stream = anthropic.beta.messages.stream({
+    model: lessonModel(),
+    max_tokens: 16000,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    output_config: { effort: "medium", format: { type: "json_schema", schema: TIMING_SCHEMA } },
+    system: TIMING_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: `Pieces in the lesson record:\n${input.pieces.join("\n") || "(none)"}\n\nPractice assignments in the lesson record:\n${input.assignments.join("\n") || "(none)"}\n\n<transcript>\n${input.transcript}\n</transcript>\n\nGive the timeline and the assignment times.`,
+      },
+    ],
+  });
+  const message = await stream.finalMessage();
+  const usage = usageRows(message);
+  if (message.stop_reason === "refusal") throw new DraftError("Claude declined to time this lesson.", usage);
+  if (message.stop_reason === "max_tokens") throw new DraftError("The answer came out too long. Try again.", usage);
+  const text = message.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
+  try {
+    const raw = JSON.parse(text) as LessonTiming;
+    return {
+      timing: {
+        moments: Array.isArray(raw.moments) ? raw.moments : [],
+        assignments: Array.isArray(raw.assignments) ? raw.assignments : [],
+      },
+      usage,
+    };
+  } catch {
+    throw new DraftError("Claude's answer couldn't be read. Try again.", usage);
+  }
 }
 
 export class DraftError extends Error {

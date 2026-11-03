@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTeacher } from "@/lib/auth";
-import { advance, redraft, start } from "@/lib/ai/process-lesson";
+import { advance, redraft, retime, start } from "@/lib/ai/process-lesson";
 
 // Drafting with Claude can take a minute or two for a long lesson.
 export const maxDuration = 300;
@@ -14,6 +14,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (body.action === "start" && body.recordingId) {
     return NextResponse.json(await start(teacher.id, id, body.recordingId));
   }
+  if (body.action === "retime") return NextResponse.json(await retime(teacher.id, id));
   if (body.action === "redraft") return NextResponse.json(await redraft(teacher.id, id));
   return NextResponse.json(await advance(teacher.id, id));
 }

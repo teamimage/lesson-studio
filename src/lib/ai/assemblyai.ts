@@ -35,7 +35,8 @@ export async function submitTranscription(audioUrl: string, keyterms: string[]):
   return body.id;
 }
 
-type Utterance = { speaker: string; start: number; end: number; text: string };
+type Word = { text: string; start: number; end: number };
+type Utterance = { speaker: string; start: number; end: number; text: string; words?: Word[] | null };
 export type TranscriptResult =
   | { status: "pending" }
   | { status: "error"; error: string }
@@ -63,16 +64,55 @@ export async function getTranscription(id: string): Promise<TranscriptResult> {
   };
 }
 
-// "[12:03] A: Let's try the shift again." One line per speaker turn.
-function formatUtterances(utterances: Utterance[] | null | undefined): string {
+// A teacher talking through a passage is one long speaker turn (often
+// several minutes), so one time stamp per turn is far too coarse to place
+// the lesson's moments. Each turn is cut into lines with their own stamps:
+// at a sentence end once a few seconds have passed, and at any word once a
+// line runs long. A long gap between words (the student playing, nobody
+// talking) gets its own line, so Claude can see where the playing was.
+const SENTENCE_LINE_MS = 6_000;
+const MAX_LINE_MS = 15_000;
+const GAP_MS = 6_000;
+
+function stamp(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// "[12:03] B: Let's try the shift again." Several lines per speaker turn.
+export function formatUtterances(utterances: Utterance[] | null | undefined): string {
   if (!utterances?.length) return "";
-  return utterances
-    .map((u) => {
-      const s = Math.floor(u.start / 1000);
-      const stamp = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-      return `[${stamp}] ${u.speaker}: ${u.text}`;
-    })
-    .join("\n");
+  const lines: string[] = [];
+  let lastEnd: number | null = null;
+  const gap = (from: number, to: number) => {
+    if (to - from >= GAP_MS) lines.push(`[${stamp(from)}–${stamp(to)}] (no talking: probably playing)`);
+  };
+  for (const u of utterances) {
+    const words = (u.words ?? []).filter((w) => w.text);
+    if (!words.length) {
+      if (lastEnd !== null) gap(lastEnd, u.start);
+      lines.push(`[${stamp(u.start)}] ${u.speaker}: ${u.text}`);
+      lastEnd = u.end;
+      continue;
+    }
+    let line: Word[] = [];
+    const flush = () => {
+      if (line.length) lines.push(`[${stamp(line[0].start)}] ${u.speaker}: ${line.map((w) => w.text).join(" ")}`);
+      line = [];
+    };
+    for (const w of words) {
+      if (lastEnd !== null && w.start - lastEnd >= GAP_MS) {
+        flush();
+        gap(lastEnd, w.start);
+      }
+      line.push(w);
+      lastEnd = w.end;
+      const span = w.end - line[0].start;
+      if ((/[.?!]$/.test(w.text) && span >= SENTENCE_LINE_MS) || span >= MAX_LINE_MS) flush();
+    }
+    flush();
+  }
+  return lines.join("\n");
 }
 
 // A short spoken instruction from the teacher (a minute or two at most):
