@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import type { Student } from "@/lib/data";
 import type { Tables } from "@/lib/supabase/types";
 import { capitalize, formatDate, parseISODate } from "@/lib/format";
-import { weekLabel, type CheckGridRow, type WeekData } from "@/lib/practice/week";
+import { type CheckGridRow, type PeriodData } from "@/lib/practice/period";
 
-// The weekly practice review as a printable page: the week's numbers, check
-// marks per day for every assigned item and current piece, and Claude's short
+// The lesson-to-lesson practice review as a printable page: the period's
+// numbers, check marks per day for every assigned item and current piece, and Claude's short
 // summary (encouraging line, going well, things to work on, trends).
 // Fixed colours so it prints the same in dark mode.
 
@@ -26,18 +26,18 @@ function H({ children }: { children: ReactNode }) {
 
 function change(now: number, before: number, unit: string): string | null {
   if (!before && !now) return null;
-  if (now === before) return `same as last week`;
+  if (now === before) return `same as last time`;
   return `${now > before ? "up" : "down"} from ${before}${unit}`;
 }
 
-export function WeekSheet({
-  week: w,
+export function PeriodSheet({
+  period: w,
   student,
   teacher,
   teacherView,
   writer,
 }: {
-  week: WeekData;
+  period: PeriodData;
   student: Student;
   teacher: Tables<"teachers"> | null;
   teacherView: boolean;
@@ -46,7 +46,13 @@ export function WeekSheet({
 }) {
   const firstName = student.name.split(" ")[0];
   const r = w.review;
-  const dayCount = w.isCurrent ? w.days.filter((d) => d <= w.through).length : 7;
+  const dayCount = w.stats.dayCount;
+  const prev = w.isCurrent ? null : w.prevStats;
+  const span = w.startsWithLesson
+    ? w.nextLesson
+      ? `${formatDate(w.start)} lesson to ${formatDate(w.nextLesson)} lesson`
+      : `Since the ${formatDate(w.start)} lesson`
+    : `${formatDate(w.start)} to the ${formatDate(w.nextLesson)} lesson`;
   const sessions = w.sessions.filter((s) => s.status === "done" && s.review);
 
   return (
@@ -54,16 +60,19 @@ export function WeekSheet({
       <article className="sheet mx-auto my-2 w-full max-w-[8.5in] bg-white px-6 py-7 text-[#1b1613] shadow-sm print:my-0 print:max-w-none print:shadow-none sm:px-10 sm:py-9">
         <header className="flex flex-wrap items-end justify-between gap-2 border-b-2 border-[#b4623c] pb-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8f4a2a]">Weekly practice review</div>
-            <h1 className="mt-0.5 text-[26px] font-semibold leading-tight">{firstName}&apos;s practice week</h1>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8f4a2a]">Practice review</div>
+            <h1 className="mt-0.5 text-[26px] font-semibold leading-tight">{firstName}&apos;s practice between lessons</h1>
             <div className="mt-1 text-sm text-[#5d524a]">
               {capitalize(student.instrument)}
               {student.current_book ? ` · ${student.current_book}` : ""}
             </div>
           </div>
           <div className="text-right text-sm text-[#5d524a]">
-            <div className="font-medium text-[#1b1613]">{weekLabel(w.start)}</div>
-            {w.isCurrent && <div>so far, through {formatDate(w.through, "weekday")}</div>}
+            <div className="font-medium text-[#1b1613]">{span}</div>
+            <div>
+              {dayCount} {dayCount === 1 ? "day" : "days"}
+              {w.isCurrent ? `, so far through ${formatDate(w.through, "weekday")}` : ""}
+            </div>
             {teacher?.name && <div>{teacher.name}</div>}
           </div>
         </header>
@@ -72,12 +81,12 @@ export function WeekSheet({
           <Stat
             value={`${w.stats.daysPracticed}/${dayCount}`}
             label="days practised"
-            sub={w.isCurrent ? null : change(w.stats.daysPracticed, w.prevStats.daysPracticed, "")}
+            sub={prev ? change(w.stats.daysPracticed, prev.daysPracticed, ` of ${prev.dayCount}`) : null}
           />
           <Stat
             value={`${w.stats.totalMinutes}`}
             label="minutes"
-            sub={w.isCurrent ? null : change(w.stats.totalMinutes, w.prevStats.totalMinutes, " min")}
+            sub={prev ? change(w.stats.totalMinutes, prev.totalMinutes, " min") : null}
           />
           <Stat value={`${w.stats.sessions}`} label="recorded sessions" sub={null} />
           <Stat value={`${w.stats.playingMinutes}`} label="minutes of playing heard" sub={null} />
@@ -123,19 +132,21 @@ export function WeekSheet({
                   <tr className="text-[11px] text-[#5d524a]">
                     <th className="py-1 pr-2 text-left font-medium" />
                     {w.days.map((d) => (
-                      <th key={d} className="w-7 py-1 text-center font-medium sm:w-9">
+                      <th key={d} className="w-7 py-1 text-center font-medium leading-tight sm:w-9">
                         {parseISODate(d).toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2)}
+                        <br />
+                        <span className="font-normal">{parseISODate(d).getDate()}</span>
                       </th>
                     ))}
                     <th className="w-8 py-1 text-center font-medium sm:w-10">Days</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {w.assigned.length > 0 && <GroupRow label="Assigned" />}
+                  {w.assigned.length > 0 && <GroupRow label="Assigned" span={w.days.length + 2} />}
                   {w.assigned.map((row) => (
                     <GridRow key={row.key} row={row} days={w.days} through={w.through} />
                   ))}
-                  {w.current.length > 0 && <GroupRow label="Current pieces (heard in a recording)" />}
+                  {w.current.length > 0 && <GroupRow label="Current pieces (heard in a recording)" span={w.days.length + 2} />}
                   {w.current.map((row) => (
                     <GridRow key={row.key} row={row} days={w.days} through={w.through} />
                   ))}
@@ -181,7 +192,7 @@ export function WeekSheet({
         )}
 
         {!w.hasActivity && (
-          <p className="mt-6 text-[15px] text-[#5d524a]">No practice logged or recorded this week{w.isCurrent ? " yet" : ""}.</p>
+          <p className="mt-6 text-[15px] text-[#5d524a]">No practice logged or recorded {w.isCurrent ? "since this lesson yet" : "between these lessons"}.</p>
         )}
 
         <footer className="mt-8 flex items-center justify-between border-t border-[#e6dbcc] pt-3 text-xs text-[#5d524a]">
@@ -225,10 +236,10 @@ function Points({ title, color, bg, items }: { title: string; color: string; bg:
   );
 }
 
-function GroupRow({ label }: { label: string }) {
+function GroupRow({ label, span }: { label: string; span: number }) {
   return (
     <tr>
-      <td colSpan={9} className="pt-2 pb-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#5d524a]">
+      <td colSpan={span} className="pt-2 pb-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#5d524a]">
         {label}
       </td>
     </tr>

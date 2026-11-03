@@ -5,7 +5,16 @@ import { Shell } from "@/components/shell";
 import { WeekStrip } from "@/components/week-strip";
 import { Button, Card, Field, Input, LinkButton, Notice, Pill, Row, SectionTitle, Textarea, cx } from "@/components/ui";
 import { getViewer } from "@/lib/auth";
-import { getCurrentPlan, getPracticeLog, getPracticeWeek, getStudent, getTeacherForStudent, listPracticeLogs } from "@/lib/data";
+import {
+  getCurrentPlan,
+  getPracticeLog,
+  getPracticeWeek,
+  getStudent,
+  getTeacherForStudent,
+  listPracticeLogs,
+  practiceSpanLabel,
+  practiceTone,
+} from "@/lib/data";
 import { addDays, capitalize, formatDate, relativeDay, todayISO } from "@/lib/format";
 import { savePractice } from "../actions";
 import { isPlayable, listRecordingsForLesson } from "@/lib/recordings";
@@ -13,13 +22,13 @@ import { RecordingList } from "@/components/recording-player";
 import { PracticeRecorder } from "@/components/practice-recorder";
 import { PracticeSessionList } from "@/components/practice-session-list";
 import { listPracticeSessions } from "@/lib/practice/data";
-import { listWeeks } from "@/lib/practice/week";
-import { WeeklyReviewList } from "@/components/weekly-review-list";
+import { listPeriods } from "@/lib/practice/period";
+import { PeriodReviewList } from "@/components/period-review-list";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ date?: string; saved?: string; error?: string }>;
 
-// The parent's page for one child: this week's plan from the approved
+// The parent's page for one child: the practice plan from the approved
 // lesson, and a one-tap practice log for a chosen day (today by default).
 export default function FamilyStudentPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
@@ -38,14 +47,14 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const today = todayISO();
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) && sp.date <= today ? sp.date : today;
 
-  const [plan, week, log, history, teacher, sessions, weeks] = await Promise.all([
+  const [plan, week, log, history, teacher, sessions, periods] = await Promise.all([
     getCurrentPlan(studentId),
     getPracticeWeek(studentId),
     getPracticeLog(studentId, date),
     listPracticeLogs(studentId, 30),
     getTeacherForStudent(student),
     listPracticeSessions(studentId, 10),
-    listWeeks(studentId),
+    listPeriods(studentId),
   ]);
   // Families watch the fast streaming copy; the original is only offered
   // while that copy is still being made.
@@ -82,7 +91,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <>
             <Card tone="plum" className="divide-y divide-plum/15">
               <div className="flex items-center justify-between pb-2">
-                <div className="font-semibold">This week&apos;s plan</div>
+                <div className="font-semibold">Practice plan</div>
                 <span className="text-sm text-muted">lesson {formatDate(plan.lesson_date, "weekday")}</span>
               </div>
               {plan.focus_points && <Row label="Focus">{plan.focus_points}</Row>}
@@ -185,19 +194,19 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         )}
 
         <section>
-          <SectionTitle>Weekly reviews</SectionTitle>
-          <WeeklyReviewList studentId={studentId} weeks={weeks} writeMissing />
+          <SectionTitle>Reviews, lesson to lesson</SectionTitle>
+          <PeriodReviewList studentId={studentId} periods={periods} writeMissing />
         </section>
 
         <section>
-          <SectionTitle>This week</SectionTitle>
+          <SectionTitle>{capitalize(practiceSpanLabel(week))}</SectionTitle>
           <Card>
             <WeekStrip week={week} large />
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <Pill tone={week.daysPracticed >= 5 ? "sage" : week.daysPracticed >= 3 ? "amber" : "muted"}>
-                {week.daysPracticed} of 7 days
+              <Pill tone={practiceTone(week) === "danger" ? "muted" : practiceTone(week)}>
+                {week.daysPracticed} of {week.days.length} days
               </Pill>
-              <Pill tone="plum">listened {week.daysListened} of 7</Pill>
+              <Pill tone="plum">listened {week.daysListened} of {week.days.length}</Pill>
               {week.totalMinutes > 0 && <Pill>{week.totalMinutes} min</Pill>}
             </div>
           </Card>

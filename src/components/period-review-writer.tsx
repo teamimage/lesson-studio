@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
 
-async function write(studentId: string, weekStart: string): Promise<string | null> {
+async function write(studentId: string, start: string): Promise<string | null> {
   for (let i = 0; i < 40; i++) {
-    const out = await once(studentId, weekStart);
+    const out = await once(studentId, start);
     if (out !== "busy") return out;
     // Another page is writing it; wait and ask again.
     await new Promise((r) => setTimeout(r, 8000));
@@ -14,11 +14,11 @@ async function write(studentId: string, weekStart: string): Promise<string | nul
   return "The review is taking a long time. Try again.";
 }
 
-async function once(studentId: string, weekStart: string): Promise<string | null> {
-  const res = await fetch("/api/practice/week", {
+async function once(studentId: string, start: string): Promise<string | null> {
+  const res = await fetch("/api/practice/period", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ studentId, weekStart }),
+    body: JSON.stringify({ studentId, start }),
   }).catch(() => null);
   const body = (await res?.json().catch(() => null)) as { ok?: boolean; busy?: boolean; error?: string } | null;
   if (!body) return "Couldn't reach the server. Try again.";
@@ -27,19 +27,20 @@ async function once(studentId: string, weekStart: string): Promise<string | null
 }
 
 /**
- * Writes a week's review. With `auto` it starts as soon as it is on screen
- * (finished weeks); otherwise it is a button (this week so far, or a retry).
- * `quiet` shows nothing unless it fails (used on the Home practice page).
+ * Writes a lesson-to-lesson practice review. With `auto` it starts as soon as
+ * it is on screen (finished periods); otherwise it is a button (the open
+ * period so far, or a retry). `quiet` shows nothing at all (used on the Home
+ * practice, student and lesson pages to write the period that just ended).
  */
-export function WeekReviewWriter({
+export function PeriodReviewWriter({
   studentId,
-  weekStart,
+  start,
   auto = false,
   quiet = false,
   label = "Write the review",
 }: {
   studentId: string;
-  weekStart: string;
+  start: string;
   auto?: boolean;
   quiet?: boolean;
   label?: string;
@@ -52,7 +53,7 @@ export function WeekReviewWriter({
   async function run() {
     setBusy(true);
     setError(null);
-    const err = await write(studentId, weekStart);
+    const err = await write(studentId, start);
     setBusy(false);
     if (err) setError(err);
     else router.refresh();
@@ -69,7 +70,7 @@ export function WeekReviewWriter({
   return (
     <div className="no-print flex flex-wrap items-center gap-3 text-sm">
       {busy ? (
-        <span className="text-muted">Writing the weekly review… this takes about half a minute.</span>
+        <span className="text-muted">Writing the practice review… this takes about half a minute.</span>
       ) : (
         <Button type="button" variant="secondary" className="min-h-9 px-3 text-sm" onClick={run}>
           {error ? "Try again" : label}

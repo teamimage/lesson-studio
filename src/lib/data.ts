@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/types";
-import { addDays, daysBetween, todayISO } from "@/lib/format";
+import { addDays, daysBetween, formatDate, todayISO } from "@/lib/format";
 
 export type Student = Tables<"students">;
 export type Lesson = Tables<"lessons">;
@@ -16,9 +16,17 @@ export type LessonFull = Lesson & {
   assignments: Assignment[];
 };
 
+/**
+ * Practice since the last lesson (lessons are a week or two apart, never
+ * calendar weeks). On a lesson day it still shows the stretch that led up to
+ * it, so the pre-lesson brief has something to say. With no lesson in the
+ * last four weeks it falls back to the last 7 days.
+ */
 export type PracticeWeek = {
-  /** ISO dates of the 7 days ending today, oldest first. */
+  /** ISO dates from the day of the last lesson through today, oldest first. */
   days: string[];
+  /** Date of the lesson the stretch starts from, or null for "last 7 days". */
+  since: string | null;
   logs: PracticeLog[];
   daysPracticed: number;
   daysListened: number;
@@ -103,9 +111,23 @@ export async function listDraftLessons(): Promise<(Lesson & { students: Pick<Stu
   return data ?? [];
 }
 
+/** Dates of the student's lessons up to today, any status, oldest first, no repeats. */
+export async function listLessonDates(studentId: string, today = todayISO()): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("lessons")
+    .select("lesson_date")
+    .eq("student_id", studentId)
+    .lte("lesson_date", today)
+    .order("lesson_date");
+  return [...new Set((data ?? []).map((l) => l.lesson_date))];
+}
+
 export async function getPracticeWeek(studentId: string, today = todayISO()): Promise<PracticeWeek> {
   const supabase = await createClient();
-  const start = addDays(today, -6);
+  const dates = await listLessonDates(studentId, today);
+  const last = [...dates].reverse().find((d) => d < today && daysBetween(d, today) <= 28) ?? null;
+  const start = last ?? addDays(today, -6);
   const { data } = await supabase
     .from("practice_logs")
     .select("*")
@@ -114,16 +136,28 @@ export async function getPracticeWeek(studentId: string, today = todayISO()): Pr
     .lte("practice_date", today)
     .order("practice_date");
   const logs = data ?? [];
-  const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  const days = Array.from({ length: daysBetween(start, today) + 1 }, (_, i) => addDays(start, i));
   const practiced = logs.filter((l) => (l.minutes ?? 0) > 0 || l.completed_assignment_ids.length > 0);
   return {
     days,
+    since: last,
     logs,
     daysPracticed: practiced.length,
     daysListened: logs.filter((l) => l.listened).length,
     totalMinutes: logs.reduce((n, l) => n + (l.minutes ?? 0), 0),
     notes: logs.filter((l) => l.parent_note?.trim()),
   };
+}
+
+/** Colour for a days-practised pill, scaled to the length of the stretch. */
+export function practiceTone(week: PracticeWeek): "sage" | "amber" | "danger" {
+  const share = week.daysPracticed / Math.max(1, week.days.length);
+  return share >= 0.7 ? "sage" : share >= 0.4 ? "amber" : "danger";
+}
+
+/** "since the Oct 27 lesson" or "in the last 7 days". */
+export function practiceSpanLabel(week: PracticeWeek): string {
+  return week.since ? `since the ${formatDate(week.since)} lesson` : "in the last 7 days";
 }
 
 export async function listPracticeLogs(studentId: string, limit = 60): Promise<PracticeLog[]> {

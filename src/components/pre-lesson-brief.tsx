@@ -2,10 +2,18 @@ import Link from "next/link";
 import { AssignmentList } from "@/components/assignment-list";
 import { WeekStrip } from "@/components/week-strip";
 import { Card, LinkButton, Pill, Row, SectionTitle } from "@/components/ui";
-import { type LessonFull, type PracticeWeek, type Repertoire, type Student, staleReview } from "@/lib/data";
+import {
+  type LessonFull,
+  type PracticeWeek,
+  type Repertoire,
+  type Student,
+  practiceSpanLabel,
+  practiceTone,
+  staleReview,
+} from "@/lib/data";
 import { capitalize, formatDate, relativeDay } from "@/lib/format";
 
-// The pre-lesson brief: last time, what was assigned, how the week at home
+// The pre-lesson brief: last time, what was assigned, how practice at home
 // went, and what to consider today. Shown on its own page and inline on the
 // Desk student card.
 export function PreLessonBrief({
@@ -28,7 +36,8 @@ export function PreLessonBrief({
   const stale = staleReview(repertoire);
   const learning = repertoire.filter((r) => r.status === "learning" || r.status === "preview");
   const polishing = repertoire.filter((r) => r.status === "polishing");
-  const practiceTone = week.daysPracticed >= 5 ? "sage" : week.daysPracticed >= 3 ? "amber" : "danger";
+  const tone = practiceTone(week);
+  const lightPractice = week.daysPracticed / Math.max(1, week.days.length) < 0.35;
 
   return (
     <div className="flex flex-col gap-5">
@@ -99,12 +108,12 @@ export function PreLessonBrief({
             </Link>
           }
         >
-          At home this week
+          At home {practiceSpanLabel(week)}
         </SectionTitle>
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-1.5">
-            <Pill tone={practiceTone}>practiced {week.daysPracticed} of 7 days</Pill>
-            <Pill tone="plum">listened {week.daysListened} of 7</Pill>
+            <Pill tone={tone}>practiced {week.daysPracticed} of {week.days.length} days</Pill>
+            <Pill tone="plum">listened {week.daysListened} of {week.days.length}</Pill>
             {week.totalMinutes > 0 && <Pill>{week.totalMinutes} min total</Pill>}
           </div>
           <WeekStrip week={week} />
@@ -117,7 +126,7 @@ export function PreLessonBrief({
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted">No parent notes this week.</p>
+            <p className="text-sm text-muted">No parent notes since the last lesson.</p>
           )}
         </Card>
       </section>
@@ -136,13 +145,13 @@ export function PreLessonBrief({
               {stale.length === 1 ? "hasn't" : "haven't"} come up lately.
             </p>
           )}
-          {week.daysPracticed <= 2 && last && (
+          {lightPractice && last && (
             <p>
-              <span className="font-medium">Light practice week. </span>
+              <span className="font-medium">Light practice since the last lesson. </span>
               Ask the parent what got in the way before adding anything new.
             </p>
           )}
-          {!last?.suggestions && stale.length === 0 && week.daysPracticed > 2 && (
+          {!last?.suggestions && stale.length === 0 && !lightPractice && (
             <p className="text-muted">Nothing flagged. Add suggestions in the lesson record to see them here.</p>
           )}
         </Card>

@@ -8,7 +8,9 @@ import { Button, Card, LinkButton, Pill, Row, SectionTitle } from "@/components/
 import { approveLesson, deleteLesson, unapproveLesson } from "@/app/lessons/actions";
 import { requireTeacher } from "@/lib/auth";
 import { getLesson, getStudent } from "@/lib/data";
-import { formatDate, humanize } from "@/lib/format";
+import { daysBetween, formatDate, humanize, todayISO } from "@/lib/format";
+import { listPeriods } from "@/lib/practice/period";
+import { PeriodReviewWriter } from "@/components/period-review-writer";
 import { listArchivedForLesson, listRecordingsForLesson } from "@/lib/recordings";
 import { ArchivedRecordings, RecordingList } from "@/components/recording-player";
 import { RecordingUploader } from "@/components/recording-uploader";
@@ -54,12 +56,17 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     getLessonAi(id),
   ]);
   if (!lesson) notFound();
-  const [student, scores] = await Promise.all([
+  // A new lesson closes the practice period before it: write that review now
+  // (quietly, in the background) so it is ready for the teacher and family.
+  const fresh = lesson.status === "draft" && Math.abs(daysBetween(lesson.lesson_date, todayISO())) <= 1;
+  const [student, scores, periods] = await Promise.all([
     getStudent(lesson.student_id),
     listScores(lesson.student_id, { includeArchived: true }),
+    fresh ? listPeriods(lesson.student_id, 2) : Promise.resolve([]),
   ]);
   if (!student) notFound();
   const isDraft = lesson.status === "draft";
+  const closedPeriod = periods.find((p) => p.nextLesson === lesson.lesson_date && p.needsWriting);
 
   // Jumps into the video: music stand moments, plus the AI's timeline (from
   // its draft, or the "4:10 ..." lines older drafts put in the notes).
@@ -181,6 +188,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                   </Link>
                 </div>
               )}
+              {closedPeriod && <PeriodReviewWriter studentId={student.id} start={closedPeriod.start} auto quiet />}
               <RecordingUploader lessonId={id} autoOpen={!!upload} />
               <ProcessVideo
                 // Remount when the server state moves (e.g. processing started on upload).

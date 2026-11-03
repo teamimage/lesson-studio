@@ -221,7 +221,7 @@ export function LessonForm({
         />
       </Section>
 
-      <Section title="Focus point" hint="The one or two things that matter this week, in words a parent can repeat.">
+      <Section title="Focus point" hint="The one or two things that matter until the next lesson, in words a parent can repeat.">
         <Textarea
           value={basics.focus_points}
           onChange={(e) => set("focus_points", e.target.value)}
@@ -236,7 +236,7 @@ export function LessonForm({
         action={
           previousAssignments.length > 0 ? (
             <button type="button" onClick={carryForward} className="text-sm font-medium text-accent-ink underline">
-              Copy last week&apos;s
+              Copy last lesson&apos;s
             </button>
           ) : undefined
         }

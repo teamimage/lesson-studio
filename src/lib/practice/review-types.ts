@@ -4,7 +4,7 @@
 /**
  * What a "going well" or "work on" bullet is about. Kept as data so later
  * checks (scale recognition, intonation scoring) can add their own bullets
- * and the weekly review can spot the same topic coming up again.
+ * and the lesson-to-lesson review can spot the same topic coming up again.
  */
 export const POINT_TOPICS = [
   "intonation",
@@ -45,7 +45,7 @@ export type PracticeAnalysis = {
   not_counted_reason: string;
   summary: string;
   items: PracticeItem[];
-  /** Missing on reviews written before the weekly-review update. */
+  /** Missing on reviews written before the practice-review update. */
   repertoire?: RepertoireCheck[];
   other: { label: string; minutes: number }[];
   timeline: { start: string; end: string; label: string }[];
@@ -58,7 +58,8 @@ export type PracticeAnalysis = {
   tips?: string[];
 };
 
-export type WeekReview = {
+/** Claude's written part of a lesson-to-lesson practice review. */
+export type PeriodReview = {
   summary: string;
   encouragement: string;
   going_well: ReviewPoint[];

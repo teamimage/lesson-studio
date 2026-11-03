@@ -1,20 +1,26 @@
--- Weekly practice reviews: one row per student per week (Monday to Sunday).
+-- Practice reviews, lesson to lesson: one row per student per period.
 --
--- The numbers on the weekly review page (days, minutes, check marks) are
--- worked out live from practice_logs and practice_sessions. This table keeps
--- only Claude's written part (summary, encouraging line, going well, things
--- to work on, trends), so it isn't paid for twice. A finished week is written
--- the first time anyone opens it (or the Home practice page) after Sunday;
--- the current week can be written "so far" on request.
+-- A period runs from one lesson to the day before the next (a week, two
+-- weeks, whatever the gap). The table keeps its original name; week_start
+-- holds the period's first day (the lesson date) and through_date the last
+-- day the written review covers.
 --
--- Parents and the student's teacher can read and write their student's rows.
+-- The numbers on the review page (days, minutes, check marks) are worked out
+-- live from practice_logs and practice_sessions. This table keeps only
+-- Claude's written part (summary, encouraging line, going well, things to
+-- work on, trends), so it isn't paid for twice. A finished period is written
+-- when the next lesson opens or the first time anyone views it after that;
+-- the open period can be written "so far" on request.
+--
+-- Safe to run more than once. Parents and the student's teacher can read and
+-- write their student's rows.
 
 create table if not exists public.practice_weeks (
   id uuid primary key default gen_random_uuid(),
   student_id uuid not null references public.students(id) on delete cascade,
   teacher_id uuid not null references public.teachers(id) on delete cascade,
-  week_start date not null,                       -- a Monday
-  through_date date,                              -- last day the review covers (week_start + 6 = final)
+  week_start date not null,                       -- first day of the period (a lesson date)
+  through_date date,                              -- last day the review covers
   status text not null default 'generating'
     check (status in ('generating', 'done', 'error')),
   review jsonb,
@@ -33,7 +39,7 @@ create policy "family and teacher manage practice weeks" on public.practice_week
   with check (public.teaches_student(student_id) or public.parents_student(student_id));
 grant all on public.practice_weeks to authenticated;
 
--- AI costs for weekly reviews, logged against the student's teacher.
+-- AI costs for practice reviews, logged against the student's teacher.
 alter table public.ai_usage
   add column if not exists practice_week_id uuid references public.practice_weeks(id) on delete set null;
 alter table public.ai_usage drop constraint if exists ai_usage_kind_check;
