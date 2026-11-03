@@ -20,7 +20,7 @@ type Params = Promise<{ id: string }>;
 // during the lesson; it shows the clock and whether the music stand is running.
 export default function LiveLessonPage({ params }: { params: Params }) {
   return (
-    <Suspense fallback={<Shell title=" " tab="studio">{null}</Shell>}>
+    <Suspense fallback={<Shell title=" " tab="studio" proposedTab="desk">{null}</Shell>}>
       <Body params={params} />
     </Suspense>
   );
@@ -67,7 +67,7 @@ async function Body({ params }: { params: Params }) {
       }
       eyebrow={formatDate(lesson.lesson_date, "long")}
       back={{ href: `/students/${student.id}`, label: student.name }}
-      tab="studio"
+      tab="studio" proposedTab="desk"
     >
       {!ended && <AutoRefresh />}
       <div className="flex flex-col gap-5">

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* App version switch (header dropdown): proposed: styles apply only in the
+   proposed version, classic: only in the current one. */
+@custom-variant proposed (&:where([data-ui="proposed"], [data-ui="proposed"] *));
+@custom-variant classic (&:where(html:not([data-ui="proposed"]), html:not([data-ui="proposed"]) *));
+
 /* Warm, mild palette: cream paper, terracotta accent, sage for "done",
    plum for the family (parent) side. Dark mode stays warm. */
 :root {

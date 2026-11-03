@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cx } from "./ui";
+import { VersionSwitch } from "./version-switch";
 
 type Tab = "studio" | "desk" | "family" | "settings";
 
@@ -13,6 +14,7 @@ export function Shell({
   back,
   actions,
   tab,
+  proposedTab,
   children,
   wide,
 }: {
@@ -21,6 +23,8 @@ export function Shell({
   back?: { href: string; label: string };
   actions?: ReactNode;
   tab?: Tab;
+  /** Tab to light up in the proposed version, when it differs (lesson day lights Desk). */
+  proposedTab?: Tab;
   children: ReactNode;
   wide?: boolean;
 }) {
@@ -45,13 +49,16 @@ export function Shell({
                 Lesson Studio
               </Link>
             )}
-            <div className="ml-auto flex items-center gap-2">{actions}</div>
+            <div className="ml-auto flex items-center gap-2">
+              {actions}
+              <VersionSwitch />
+            </div>
           </div>
           <nav aria-label="Sections" className="-mx-1 flex gap-1 overflow-x-auto pb-1.5 pt-0.5 sm:justify-center">
-            <TabLink href="/teacher" active={tab === "desk"} label="Desk" icon="▦" />
-            <TabLink href="/" active={tab === "studio"} label="Studio" icon="♪" />
-            <TabLink href="/family" active={tab === "family"} label="Home practice" icon="⌂" />
-            <TabLink href="/settings" active={tab === "settings"} label="Settings" icon="⚙" />
+            <TabLink href="/teacher" tab="desk" current={tab} proposed={proposedTab ?? tab} label="Desk" icon="▦" />
+            <TabLink href="/" tab="studio" current={tab} proposed={proposedTab ?? tab} label="Studio" proposedLabel="Students" icon="♪" />
+            <TabLink href="/family" tab="family" current={tab} proposed={proposedTab ?? tab} label="Home practice" icon="⌂" />
+            <TabLink href="/settings" tab="settings" current={tab} proposed={proposedTab ?? tab} label="Settings" icon="⚙" />
           </nav>
         </div>
       </header>
@@ -76,30 +83,50 @@ export function Shell({
   );
 }
 
+// Both versions are drawn from the same markup; the classic:/proposed:
+// variants (globals.css) pick the look from <html data-ui>, so the header
+// stays prerendered. Proposed: 44px tall, 16px text, bold + underline cue.
 function TabLink({
   href,
   label,
+  proposedLabel,
   icon,
-  active,
+  tab,
+  current,
+  proposed,
 }: {
   href: string;
   label: string;
+  proposedLabel?: string;
   icon: string;
-  active?: boolean;
+  tab: Tab;
+  current?: Tab;
+  proposed?: Tab;
 }) {
+  const onCurrent = current === tab;
+  const onProposed = proposed === tab;
   return (
     <Link
       href={href}
-      aria-current={active ? "page" : undefined}
+      aria-current={onCurrent ? "page" : undefined}
       className={cx(
-        "flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[14px] font-medium",
-        active ? "bg-accent-soft text-accent-ink" : "text-muted hover:text-ink",
+        "flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[14px] font-medium text-muted hover:text-ink",
+        "proposed:min-h-11 proposed:px-4 proposed:text-[16px]",
+        onCurrent && "classic:bg-accent-soft classic:text-accent-ink",
+        onProposed && "proposed:bg-accent-soft proposed:font-semibold proposed:text-accent-ink proposed:underline proposed:decoration-2 proposed:underline-offset-[6px]",
       )}
     >
-      <span className="text-sm leading-none" aria-hidden>
+      <span className="text-sm leading-none proposed:text-base" aria-hidden>
         {icon}
       </span>
-      {label}
+      {proposedLabel ? (
+        <>
+          <span className="proposed:hidden">{label}</span>
+          <span className="hidden proposed:inline">{proposedLabel}</span>
+        </>
+      ) : (
+        label
+      )}
     </Link>
   );
 }
