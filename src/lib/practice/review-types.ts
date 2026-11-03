@@ -2,6 +2,7 @@
 // them and the pages that show them.
 
 import type { ScaleSummary } from "./scales";
+import type { MusicMatch } from "@/lib/melody";
 
 /**
  * What a "going well" or "work on" bullet is about. Kept as data so later
@@ -73,6 +74,11 @@ export type PracticeAnalysis = {
    * other fixed-pitch instruments, and when too few notes were held).
    */
   intonation?: SessionIntonation;
+  /**
+   * Stretches matched by code against the notes Claude read from the
+   * student's uploaded music. Missing when no music has its notes read.
+   */
+  music?: MusicMatch[];
   /** Older reviews only. */
   flow?: string;
   tips?: string[];

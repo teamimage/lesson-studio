@@ -29,6 +29,8 @@ export type PracticeContext = {
   /** Scales and arpeggios found by code from the notes. */
   scales: ScaleSummary[];
   scalesText: string;
+  /** Code's matches against the student's uploaded music; empty when none has notes read. */
+  musicText: string;
   /** Code's intonation summary; empty for piano or too few held notes. */
   intonationText: string;
 };
@@ -123,7 +125,7 @@ You cannot hear the recording. You get what the phone wrote down while it record
 
 Work out what was practised and when:
 - Scales and arpeggios: you may get a list of scales and arpeggios that code found in the notes before you (key, octaves, about how many times, when). Trust it for which keys were played and use it to tick scale and arpeggio assignments (an assignment for "G and D major scales and arpeggios" is practised when those keys were found; say which were and weren't in the note). Counts are approximate. A note outside the key inside a scale (C natural in D major) may be a wrong note or a misreading; mention it gently only if it is listed. The code only finds runs of an octave or more, so short one-octave-or-less warm-ups may be missing from the list; you can still spot those yourself as steady stepwise runs or broken-chord patterns in the timeline.
-- Pieces: match the note sequences to the melodies of the assigned pieces and the student's Suzuki books, which you know (for example Twinkle variations, Lightly Row, Minuet 1, Gavotte by Gossec, Hunters' Chorus). Repeated short fragments of a piece usually mean focused work on one passage, which is good practice.
+- Pieces: when you get "Matched by code against the notes of the student's uploaded music", trust strong and good matches for which piece was played, when, and which bars (name the bars in notes and bullets when useful: "bars 9-16 three times"); a possible match needs support from the timeline or speech. Otherwise, and for pieces without uploaded music, match the note sequences to the melodies of the assigned pieces and the student's Suzuki books, which you know (for example Twinkle variations, Lightly Row, Minuet 1, Gavotte by Gossec, Hunters' Chorus). Repeated short fragments of a piece usually mean focused work on one passage, which is good practice.
 - Speech naming a piece is strong evidence.
 - Only mark an assignment practiced when the timeline or transcript supports it. confidence is high when the melody or the spoken name clearly matches, medium when it is likely, low when it is a guess. minutes is your estimate of time spent on it (0 if not practised). note is at most six words on what you noticed ("whole piece twice, then the shift"). Include every assignment you are given, by its id. Listening and game assignments usually can't be heard; mark them not practiced with a note that they can be ticked by hand.
 - repertoire: one entry for each "current piece" you are given (they are the student's pieces that aren't on the assignment list), by its exact title, with practiced true only when the timeline or transcript supports it, and a note of at most six words.
@@ -168,6 +170,7 @@ function contextText(c: PracticeContext): string {
     lines.push(`Pieces worked on in that lesson:\n${c.pieces.map((p) => (p.notes ? `${p.title}: ${p.notes}` : p.title)).join("\n")}`);
   if (c.currentPieces.length) lines.push(`Current pieces not on the assignment list:\n${c.currentPieces.join("\n")}`);
   if (c.bookPieces.length) lines.push(`Pieces in the student's books, in order:\n${c.bookPieces.join("\n")}`);
+  if (c.musicText) lines.push(`Matched by code against the notes of the student's uploaded music:\n${c.musicText}`);
   if (c.intonationText) lines.push(`Intonation measured by code:\n${c.intonationText}`);
   lines.push(
     c.scalesText
