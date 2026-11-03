@@ -1,7 +1,7 @@
 // Finds the staff lines and bar lines on a page of printed sheet music, from
-// its pixels. Runs in the browser (the Bar map page draws each page image on a
-// canvas and passes the pixels here). Pure code with no imports, so it can be
-// tested on its own.
+// its pixels. Runs on the server in the bar map job (bar-job.ts decodes each
+// page image and passes the pixels here). Pure code with no imports, so it can
+// be tested on its own.
 //
 // How it works:
 // 1. Pixels become dark/light with a threshold picked from the page itself.

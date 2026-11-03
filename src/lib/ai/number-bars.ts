@@ -1,35 +1,35 @@
 import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { SCORES_BUCKET } from "@/lib/constants";
-import type { Json } from "@/lib/supabase/types";
-import { parseAnalysis, sectionAt, sectionLabel, type ScoreSection } from "@/lib/score-analysis";
+import type { Database, Json } from "@/lib/supabase/types";
+import { sectionLabel, type ScoreSection } from "@/lib/score-analysis";
 import { parseBarMap, parsePageBars, type BarLine, type PageBars } from "@/lib/bar-map";
 import type { DetectedLine } from "@/lib/bar-detect";
-import { MissingKeyError } from "./assemblyai";
 import { anthropicClient, usageRows } from "./draft-lesson";
 import { musicModel } from "./read-music";
 import { claudeCost, type ClaudeUsage } from "./pricing";
 
-// Making a score's bar map, once per upload. The browser has already found the
-// lines of music and their bar lines in each page image (bar-detect.ts); here
-// Claude looks at the pages and says which piece each line belongs to and the
-// number of its first bar. Where Claude's own count of bars on a line, or its
+// Numbering a score's bars, for the bar map job (bar-job.ts). The server has
+// already found the lines of music and their bar lines in each page image
+// (bar-detect.ts); here Claude looks at the pages and says, for each line,
+// whether it is part of a piece or exercise (mapped) or only an example inside
+// the teaching text (left out), which piece it belongs to and the number of
+// its first bar. Where Claude's own count of bars on a line, or its
 // numbering, disagrees with what was found, the line is flagged for the
 // teacher to check.
 
-type Db = Awaited<ReturnType<typeof createClient>>;
-
-const PAGES_PER_CALL = 10;
-const PARALLEL_CALLS = 4;
-const LINK_SECONDS = 60 * 60;
+export type Db = SupabaseClient<Database>;
 
 export type DetectedPage = { page: number; lines: DetectedLine[] };
-export type NumberBarsResult =
-  | { ok: true; pages: number; flagged: number; map: { page: number; bars: PageBars }[] }
-  | { ok: false; error: string };
 
-class BarsError extends Error {
+/** What Claude said about one line of music. */
+export type LineAnswer = { piece: number; first_bar: number; bars: number; kind: LineKind; title: string };
+export type LineKind = "piece" | "exercise" | "example";
+/** Claude's answers by page, then by line number (from 1). */
+export type Answer = Map<number, Map<number, LineAnswer>>;
+
+export class BarsError extends Error {
   constructor(
     message: string,
     public usage: ClaudeUsage[] = [],
@@ -56,10 +56,12 @@ const SCHEMA = {
             items: {
               type: "object",
               additionalProperties: false,
-              required: ["line", "piece", "first_bar", "bars"],
+              required: ["line", "kind", "piece", "title", "first_bar", "bars"],
               properties: {
                 line: { type: "integer" },
+                kind: { type: "string", enum: ["piece", "exercise", "example"] },
                 piece: { type: "integer" },
+                title: { type: "string" },
                 first_bar: { type: "integer" },
                 bars: { type: "integer" },
               },
@@ -74,8 +76,13 @@ const SCHEMA = {
 const SYSTEM = `You number the bars (measures) in a student's sheet music. You see pages as images, each labelled with its upload page number. A bar-line finder has already found the lines of music (staff systems) on each page, numbered from the top of the page, with where each line sits and how many bars it found on it.
 
 For every line listed, give:
+- kind: what the line is.
+  - "piece": part of a piece of music the student plays (a solo, a movement, a song).
+  - "exercise": part of an exercise or study the student plays as a whole: a numbered or titled exercise, etude, position study, scale or arpeggio study, a practice drill printed as music to play through.
+  - "example": music printed only to illustrate the teaching text: a few notes showing a bowing, fingering, rhythm or tonalization point, a sample or excerpt quoted inside an explanation, a fingering chart or a diagram drawn on a staff. Also anything that isn't really music (text, a picture, a chart) that the finder took for a line. When a page is mostly explanation with small musical examples between paragraphs, those lines are "example". When unsure between "exercise" and "example", ask whether a teacher would assign it to be practised by itself: if so it is an exercise.
 - piece: the number of the piece from the list that this line belongs to, or 0 if it is not part of any listed piece.
-- first_bar: the number of the first bar on that line, counting from the start of its piece. The first full bar of a piece is bar 1; an incomplete opening bar (a pickup, upbeat or anacrusis) is bar 0. If a bar number is printed at the start of the line, that number is right: use it. Otherwise count on from the line before. Repeat signs don't restart the count; first and second endings are counted as separate bars, the way printed bar numbers do. A new piece, movement or exercise starting on a line starts again from 1 (or 0 with a pickup).
+- title: the name of the piece or exercise as printed (e.g. "Exercise 3", "Gavotte"), "" if none is printed or the line is an example.
+- first_bar: the number of the first bar on that line, counting from the start of its piece or exercise. The first full bar is bar 1; an incomplete opening bar (a pickup, upbeat or anacrusis) is bar 0. If a bar number is printed at the start of the line, that number is right: use it. Otherwise count on from the line before. Repeat signs don't restart the count; first and second endings are counted as separate bars, the way printed bar numbers do. A new piece, movement or exercise starting on a line starts again from 1 (or 0 with a pickup). For an example, give 0.
 - bars: how many bars YOU count on that line (a pickup counts as one, and so does a bar that runs on to the next line). Count it yourself; the finder can miss a bar line or take a note stem for one.
 
 Lines are given top to bottom; match them to the staff systems you see in that order. Return every listed line of every page.`;
@@ -94,11 +101,13 @@ function pageText(p: DetectedPage, section: ScoreSection | null): string {
   return [head, ...lines].join("\n");
 }
 
-type Answer = Map<number, Map<number, { piece: number; first_bar: number; bars: number }>>;
+const KINDS: LineKind[] = ["piece", "exercise", "example"];
 
-async function askClaude(
+/** Asks Claude about one group of pages. Gives up after `timeoutMs` so a slow call can't outlive the server function. */
+export async function askClaude(
   batch: { p: DetectedPage; url: string; section: ScoreSection | null }[],
   pieces: ScoreSection[],
+  timeoutMs: number,
 ): Promise<{ answer: Answer; usage: ClaudeUsage[] }> {
   const content: Anthropic.Beta.BetaContentBlockParam[] = [
     {
@@ -110,17 +119,20 @@ async function askClaude(
     content.push({ type: "text", text: pageText(b.p, b.section) });
     content.push({ type: "image", source: { type: "url", url: b.url } });
   }
-  content.push({ type: "text", text: "Give the piece and first bar number of every line listed." });
+  content.push({ type: "text", text: "Give the kind, piece and first bar number of every line listed." });
 
-  const stream = anthropicClient().beta.messages.stream({
-    model: musicModel(),
-    max_tokens: 8000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
-    system: SYSTEM,
-    messages: [{ role: "user", content }],
-  });
+  const stream = anthropicClient().beta.messages.stream(
+    {
+      model: musicModel(),
+      max_tokens: 8000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
+      system: SYSTEM,
+      messages: [{ role: "user", content }],
+    },
+    { signal: AbortSignal.timeout(timeoutMs) },
+  );
   const message = await stream.finalMessage();
   const usage = usageRows(message);
   if (message.stop_reason === "refusal") throw new BarsError("Claude declined to number these bars.", usage);
@@ -128,27 +140,34 @@ async function askClaude(
   const answer: Answer = new Map();
   try {
     const raw = JSON.parse(text) as {
-      pages?: { page: number; lines?: { line: number; piece: number; first_bar: number; bars: number }[] }[];
+      pages?: { page: number; lines?: (Partial<LineAnswer> & { line: number })[] }[];
     };
     for (const p of raw.pages ?? []) {
-      const m = new Map<number, { piece: number; first_bar: number; bars: number }>();
-      for (const l of p.lines ?? []) m.set(Number(l.line), l);
+      const m = new Map<number, LineAnswer>();
+      for (const l of p.lines ?? [])
+        m.set(Number(l.line), {
+          piece: Math.round(Number(l.piece)) || 0,
+          first_bar: Math.round(Number(l.first_bar)) || 0,
+          bars: Math.round(Number(l.bars)) || 0,
+          kind: KINDS.includes(l.kind as LineKind) ? (l.kind as LineKind) : "piece",
+          title: typeof l.title === "string" ? l.title.slice(0, 80) : "",
+        });
       answer.set(Number(p.page), m);
     }
   } catch {
-    throw new BarsError("Claude's answer couldn't be read. Try again.", usage);
+    throw new BarsError("Claude's answer couldn't be read.", usage);
   }
   return { answer, usage };
 }
 
-/** Groups pages into calls, starting a new call where a piece starts when it can. */
-function batches<T extends { p: DetectedPage }>(pages: T[], sections: ScoreSection[]): T[][] {
+/** Groups pages into calls of at most `size`, starting a new call where a piece starts when it can. */
+export function batches<T extends { p: DetectedPage }>(pages: T[], sections: ScoreSection[], size: number): T[][] {
   const starts = new Set(sections.map((s) => s.start_page));
   const out: T[][] = [];
   let cur: T[] = [];
   for (const x of pages) {
-    const full = cur.length >= PAGES_PER_CALL;
-    const goodBreak = starts.has(x.p.page) && cur.length >= PAGES_PER_CALL - 3;
+    const full = cur.length >= size;
+    const goodBreak = starts.has(x.p.page) && cur.length >= size - 2;
     if (cur.length && (full || goodBreak)) {
       out.push(cur);
       cur = [];
@@ -159,22 +178,31 @@ function batches<T extends { p: DetectedPage }>(pages: T[], sections: ScoreSecti
   return out;
 }
 
-/** The finished map of one page: found lines + Claude's numbers, flagging disagreements. */
-function buildPage(
+/**
+ * The finished map of one page: found lines + Claude's numbers, flagging
+ * disagreements. Lines Claude called examples are left out.
+ */
+export function buildPage(
   p: DetectedPage,
-  said: Map<number, { piece: number; first_bar: number; bars: number }> | undefined,
+  said: Map<number, LineAnswer> | undefined,
   pieces: ScoreSection[],
   pageSection: ScoreSection | null,
   prev: BarLine | null,
   madeAt: string,
-): PageBars {
+): { bars: PageBars; skipped: number } {
   const lines: BarLine[] = [];
+  let skipped = 0;
   let before = prev;
   p.lines.forEach((d, i) => {
     const count = d.dividers.length + 1;
     const a = said?.get(i + 1);
+    if (a?.kind === "example") {
+      skipped++;
+      return;
+    }
     const piece = a && a.piece >= 1 && a.piece <= pieces.length ? sectionLabel(pieces[a.piece - 1]) : "";
-    const label = a ? piece : pageSection ? sectionLabel(pageSection) : "";
+    // An exercise that isn't one of the listed pieces goes by its printed name.
+    const label = a ? piece || (a.kind === "exercise" ? a.title : "") : pageSection ? sectionLabel(pageSection) : "";
     // What the line before says this one should start on.
     const follows = before && before.piece === label ? before.first + lineCount(before) : null;
     const first = a ? Math.max(0, a.first_bar) : (follows ?? 1);
@@ -195,110 +223,11 @@ function buildPage(
     lines.push(line);
     before = line;
   });
-  return { lines, checked: false, made_at: madeAt };
+  return { bars: { lines, checked: false, made_at: madeAt }, skipped };
 }
 
 function lineCount(l: BarLine): number {
   return l.dividers.length + 1;
-}
-
-function clean(lines: DetectedLine[]): DetectedLine[] {
-  const f = (v: unknown) => Math.min(Math.max(Number(v) || 0, 0), 1);
-  return (Array.isArray(lines) ? lines : [])
-    .slice(0, 40)
-    .map((l) => ({
-      top: f(l.top),
-      bottom: f(l.bottom),
-      left: f(l.left),
-      right: f(l.right),
-      dividers: (Array.isArray(l.dividers) ? l.dividers : []).slice(0, 60).map(f),
-      staves: Math.min(4, Math.max(1, Math.round(Number(l.staves) || 1))),
-    }))
-    .filter((l) => l.bottom > l.top && l.right > l.left);
-}
-
-/**
- * Numbers the bars on the pages the browser measured and saves the bar map on
- * the score's pages. Pages not sent keep the map they had.
- */
-export async function numberBars(teacherId: string, scoreId: string, detected: DetectedPage[]): Promise<NumberBarsResult> {
-  const db = await createClient();
-  const { data: score } = await db.from("scores").select("*").eq("id", scoreId).maybeSingle();
-  if (!score) return { ok: false, error: "That music wasn't found." };
-  const rawPages = Array.isArray(score.pages) ? (score.pages as Record<string, unknown>[]) : [];
-  const sections = parseAnalysis(score.analysis)?.sections ?? [];
-  if (!sections.length) return { ok: false, error: "Let Claude read the music first, so it knows the pieces." };
-
-  const sent = new Map<number, DetectedPage>();
-  for (const d of Array.isArray(detected) ? detected : []) {
-    const page = Math.round(Number(d?.page));
-    if (page >= 1 && page <= rawPages.length) sent.set(page, { page, lines: clean(d.lines) });
-  }
-  const pages = [...sent.values()].sort((a, b) => a.page - b.page);
-  if (!pages.length) return { ok: false, error: "No pages were measured." };
-
-  const paths = pages.map((p) => String(rawPages[p.page - 1]?.path ?? ""));
-  const { data: signed } = await db.storage.from(SCORES_BUCKET).createSignedUrls(paths, LINK_SECONDS);
-  const withUrls = pages.map((p, i) => ({
-    p,
-    url: signed?.find((s) => s.path === paths[i])?.signedUrl ?? "",
-    section: sectionAt(sections, p.page),
-  }));
-  if (withUrls.some((x) => !x.url)) return { ok: false, error: "Couldn't open the page images. Try again." };
-
-  let usage: ClaudeUsage[] = [];
-  const answer: Answer = new Map();
-  try {
-    // Only pages with lines on them need Claude.
-    const ask = withUrls.filter((x) => x.p.lines.length);
-    const groups = batches(ask, sections);
-    for (let i = 0; i < groups.length; i += PARALLEL_CALLS) {
-      const results = await Promise.allSettled(groups.slice(i, i + PARALLEL_CALLS).map((g) => askClaude(g, sections)));
-      for (const r of results) {
-        if (r.status === "fulfilled") {
-          usage = [...usage, ...r.value.usage];
-          for (const [k, v] of r.value.answer) answer.set(k, v);
-        } else {
-          if (r.reason instanceof BarsError) usage = [...usage, ...r.reason.usage];
-          throw r.reason;
-        }
-      }
-    }
-  } catch (e) {
-    await logUsage(db, teacherId, scoreId, usage);
-    console.error("numberBars", scoreId, e);
-    const error =
-      e instanceof BarsError || e instanceof MissingKeyError ? e.message : "Numbering the bars didn't work. Try again.";
-    return { ok: false, error };
-  }
-
-  const madeAt = new Date().toISOString();
-  const built = new Map<number, PageBars>();
-  let prev: BarLine | null = null;
-  for (const x of withUrls) {
-    // A gap in the pages sent means the line before isn't known.
-    if (!sent.has(x.p.page - 1)) prev = null;
-    const bars = buildPage(x.p, answer.get(x.p.page), sections, x.section, prev, madeAt);
-    built.set(x.p.page, bars);
-    prev = bars.lines[bars.lines.length - 1] ?? prev;
-  }
-
-  // Save on the pages as they are now (a Replace file meanwhile wins).
-  const { data: fresh } = await db.from("scores").select("pages").eq("id", scoreId).maybeSingle();
-  const now = Array.isArray(fresh?.pages) ? (fresh.pages as Record<string, unknown>[]) : [];
-  if (now.length !== rawPages.length || now.some((p, i) => p?.path !== rawPages[i]?.path)) {
-    await logUsage(db, teacherId, scoreId, usage);
-    return { ok: false, error: "The music was replaced while the bars were being numbered. Try again." };
-  }
-  const next = now.map((p, i) => (built.has(i + 1) ? { ...p, bars: built.get(i + 1) } : p));
-  const { error } = await db
-    .from("scores")
-    .update({ pages: next as unknown as Json })
-    .eq("id", scoreId);
-  await logUsage(db, teacherId, scoreId, usage);
-  if (error) return { ok: false, error: "Couldn't save the bar map. Try again." };
-  const flagged = [...built.values()].reduce((n, p) => n + p.lines.filter((l) => l.check).length, 0);
-  return { ok: true, pages: built.size, flagged, map: [...built].map(([page, bars]) => ({ page, bars })) };
 }
 
 /** Saves the teacher's corrections to one page's bar map (and the pages whose numbers moved with it). */
@@ -324,7 +253,7 @@ export async function saveBarPages(
   return error ? { ok: false, error: "Couldn't save. Try again." } : { ok: true };
 }
 
-async function logUsage(db: Db, teacherId: string, scoreId: string, usage: ClaudeUsage[]) {
+export async function logUsage(db: Db, teacherId: string, scoreId: string, usage: ClaudeUsage[]) {
   if (!usage.length) return;
   await db.from("ai_usage").insert(
     usage.map((u) => ({
