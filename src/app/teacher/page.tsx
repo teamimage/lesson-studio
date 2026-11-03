@@ -26,6 +26,9 @@ import {
 } from "@/lib/data";
 import { addDays, capitalize, formatDate, humanize, parseISODate, relativeDay, todayISO } from "@/lib/format";
 import { listRecordingsForStudent } from "@/lib/recordings";
+import { getConsentStatus } from "@/lib/recording-consent-data";
+import { consentPath } from "@/lib/recording-consent";
+import { getUiVersion } from "@/lib/ui-version-server";
 import { listPracticeDays } from "@/lib/practice/data";
 import { assignmentCounts, listPracticeRange, nextLesson, practiced } from "@/lib/teacher-data";
 
@@ -83,7 +86,7 @@ async function Desk({ searchParams }: { searchParams: SearchParams }) {
 async function StudentPanel({ student }: { student: Student }) {
   const id = student.id;
   const today = todayISO();
-  const [lessons, week, month, repertoire, recordings, music, teacher, practiceDays] = await Promise.all([
+  const [lessons, week, month, repertoire, recordings, music, teacher, practiceDays, consent, ui] = await Promise.all([
     listLessons(id, 20),
     getPracticeWeek(id),
     listPracticeRange(id, 28),
@@ -92,7 +95,10 @@ async function StudentPanel({ student }: { student: Student }) {
     listScoreIndex(id),
     getTeacherForStudent(student),
     listPracticeDays(id, addDays(today, -27), today),
+    getConsentStatus(id),
+    getUiVersion(),
   ]);
+  const proposed = ui === "proposed";
 
   const latest = lessons[0] ?? null;
   const plan = lessons.find((l) => l.status === "approved") ?? null;
@@ -161,6 +167,11 @@ async function StudentPanel({ student }: { student: Student }) {
                 <Pill>No lesson day set</Pill>
               )}
               {drafts.length > 0 && <Pill tone="amber">{drafts.length} draft{drafts.length === 1 ? "" : "s"} to approve</Pill>}
+              {proposed && consent.state !== "signed" && (
+                <Link href={consentPath(id, `/teacher?student=${id}`)} className="no-underline">
+                  <Pill tone="danger">Consent needed · collect now ›</Pill>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -204,12 +215,12 @@ async function StudentPanel({ student }: { student: Student }) {
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <DeskLink
-            href={`/teacher/${id}`}
-            title="View student"
-            detail="Profile, parents, goals and repertoire"
+            href={proposed ? `/students/${id}` : `/teacher/${id}`}
+            title={proposed ? "Student page" : "View student"}
+            detail={proposed ? "Lessons, practice, music, videos and parents" : "Profile, parents, goals and repertoire"}
           />
           <DeskLink
-            href={`/teacher/${id}/recordings`}
+            href={proposed ? `/students/${id}?open=videos#videos` : `/teacher/${id}/recordings`}
             title="Recordings"
             detail={
               recordings.length === 0

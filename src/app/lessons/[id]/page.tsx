@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -35,6 +36,8 @@ import {
 import { findSection, momentsKey, parseMusicLinks, viewerHref } from "@/lib/music-links";
 import { applyBarMap } from "@/lib/bar-map";
 import { pageRange } from "@/lib/score-analysis";
+import { getUiVersion } from "@/lib/ui-version-server";
+import { Fold } from "@/components/fold";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ approved?: string; upload?: string; video?: string }>;
@@ -51,13 +54,15 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   await requireTeacher();
   const { id } = await params;
   const { approved, upload, video } = await searchParams;
-  const [lesson, recordings, archived, standEvents, ai] = await Promise.all([
+  const [lesson, recordings, archived, standEvents, ai, ui] = await Promise.all([
     getLesson(id),
     listRecordingsForLesson(id),
     listArchivedForLesson(id),
     listStandEvents(id),
     getLessonAi(id),
+    getUiVersion(),
   ]);
+  const proposed = ui === "proposed";
   if (!lesson) notFound();
   // A new lesson closes the practice period before it: write that review now
   // (quietly, in the background) so it is ready for the teacher and family.
@@ -146,7 +151,18 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         }))}
       >
         <div className="flex flex-col gap-5">
-          {isDraft && (
+          {proposed && (
+            <LessonStatus
+              lessonId={id}
+              studentId={student.id}
+              hasVideo={recordings.length > 0}
+              aiStatus={ai.state.status}
+              hasNotes={!!(lesson.summary || lesson.focus_points || lesson.assignments.length > 0)}
+              isDraft={isDraft}
+              canUpload={consent.state === "signed"}
+            />
+          )}
+          {isDraft && !proposed && (
             <Card tone="amber" className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
                 <Pill tone="amber">Draft</Pill>
@@ -181,8 +197,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 </Card>
               )}
               <RecordingList recordings={recordings} editable />
-              <ArchivedRecordings recordings={archived} />
-              {!isDraft && (
+              {!proposed && <ArchivedRecordings recordings={archived} />}
+              {!isDraft && !proposed && (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                   <span className="text-sage">
                     ✓ Approved
@@ -230,7 +246,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                     durationSeconds: r.duration_seconds,
                   }))}
               />
-              {(ai.transcript || ai.costUsd > 0) && (
+              {!proposed && (ai.transcript || ai.costUsd > 0) && (
                 <details className="rounded-2xl border border-rule bg-sheet px-4 py-3 text-sm">
                   <summary className="cursor-pointer font-medium">
                     Transcript
@@ -311,7 +327,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             <section id="review" className="scroll-mt-4">
               <SectionTitle
                 action={
-                  canLinkMusic ? (
+                  canLinkMusic && !proposed ? (
                     <LinkMusic
                       lessonId={id}
                       linked={musicLinked}
@@ -366,6 +382,54 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             </Card>
           )}
 
+          {proposed ? (
+            <Fold title="More tools" meta="music links, old videos, transcript, delete">
+              {canLinkMusic && (
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <span className="text-muted">Match the review clips to the sheet music:</span>
+                  <LinkMusic lessonId={id} linked={musicLinked} autoStart={!musicLinked && ai.state.status === "done"} />
+                </div>
+              )}
+              <ArchivedRecordings recordings={archived} />
+              {(ai.transcript || ai.costUsd > 0) && (
+                <details className="rounded-2xl border border-rule bg-sheet px-4 py-3 text-sm">
+                  <summary className="cursor-pointer font-medium">
+                    Transcript
+                    {ai.costUsd > 0 ? ` · AI cost for this lesson ${formatUsd(ai.costUsd)}` : ""}
+                  </summary>
+                  {ai.transcript ? (
+                    <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap font-sans text-[14px] leading-relaxed text-muted">
+                      {ai.transcript}
+                    </pre>
+                  ) : (
+                    <p className="mt-2 text-muted">No transcript yet.</p>
+                  )}
+                </details>
+              )}
+              <div className="flex flex-wrap gap-3 text-sm">
+                <Link href={`/lessons/${id}/sheet`} className="text-accent-ink underline">
+                  Print lesson sheet
+                </Link>
+                <Link href={`/lessons/${id}/edit`} className="text-accent-ink underline">
+                  Edit as a form
+                </Link>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                {!isDraft && (
+                  <form action={unapproveLesson}>
+                    <input type="hidden" name="lesson_id" value={id} />
+                    <input type="hidden" name="student_id" value={student.id} />
+                    <button className="text-muted underline">Move back to draft</button>
+                  </form>
+                )}
+                <form action={deleteLesson} className="ml-auto">
+                  <input type="hidden" name="lesson_id" value={id} />
+                  <input type="hidden" name="student_id" value={student.id} />
+                  <button className="text-danger underline">Delete this record</button>
+                </form>
+              </div>
+            </Fold>
+          ) : (
           <div className="mt-4 flex flex-wrap gap-3 text-sm">
             {!isDraft && (
               <form action={unapproveLesson}>
@@ -380,8 +444,109 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               <button className="text-danger underline">Delete this record</button>
             </form>
           </div>
+          )}
         </div>
       </VideoPopupProvider>
     </Shell>
+  );
+}
+
+type AiStatus = "none" | "transcribing" | "drafting" | "done" | "error";
+
+// Proposed version: where this lesson stands, and the one thing to do next.
+function LessonStatus({
+  lessonId,
+  studentId,
+  hasVideo,
+  aiStatus,
+  hasNotes,
+  isDraft,
+  canUpload,
+}: {
+  lessonId: string;
+  studentId: string;
+  hasVideo: boolean;
+  aiStatus: AiStatus;
+  hasNotes: boolean;
+  isDraft: boolean;
+  canUpload: boolean;
+}) {
+  const processing = aiStatus === "transcribing" || aiStatus === "drafting";
+  const steps: { label: string; state: "done" | "now" | "todo" }[] = [
+    { label: "Video", state: hasVideo ? "done" : hasNotes ? "done" : "now" },
+    {
+      label: "Processed",
+      state: aiStatus === "done" || (!hasVideo && hasNotes) ? "done" : hasVideo ? "now" : "todo",
+    },
+    { label: "Draft ready", state: hasNotes ? "done" : processing ? "now" : "todo" },
+    { label: "Approved", state: !isDraft ? "done" : hasNotes ? "now" : "todo" },
+    { label: "Family can see", state: !isDraft ? "done" : "todo" },
+  ];
+
+  let next: ReactNode;
+  if (!isDraft) {
+    next = (
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="font-medium text-sage">✓ Done. The family can see this lesson.</span>
+        <LinkButton href={`/family/${studentId}`} variant="secondary" className="text-sm">
+          Parent view
+        </LinkButton>
+      </div>
+    );
+  } else if (hasNotes && (!hasVideo || aiStatus === "done" || aiStatus === "error" || aiStatus === "none")) {
+    next = (
+      <form action={approveLesson} className="flex flex-wrap gap-2">
+        <input type="hidden" name="lesson_id" value={lessonId} />
+        <input type="hidden" name="student_id" value={studentId} />
+        <Button variant="sage" className="min-h-12 flex-1 text-[17px]">
+          Read it over, then approve and share
+        </Button>
+      </form>
+    );
+  } else if (processing) {
+    next = <p className="text-[16px]">The video is being processed. The draft appears here in a few minutes.</p>;
+  } else if (hasVideo) {
+    next = (
+      <LinkButton href="#recordings" className="min-h-12 text-[17px]">
+        Next: process the video ↓
+      </LinkButton>
+    );
+  } else {
+    next = canUpload ? (
+      <LinkButton href={`/lessons/${lessonId}?upload=1#recordings`} className="min-h-12 text-[17px]">
+        Next: upload the lesson video
+      </LinkButton>
+    ) : (
+      <p className="text-[16px]">Collect recording consent first (below), then upload the video.</p>
+    );
+  }
+
+  return (
+    <Card tone={isDraft ? "amber" : "sage"} className="flex flex-col gap-3">
+      <ol className="flex flex-wrap gap-x-1 gap-y-2 text-sm" aria-label="Lesson progress">
+        {steps.map((st, i) => (
+          <li key={st.label} className="flex items-center gap-1">
+            <span
+              className={
+                st.state === "done"
+                  ? "rounded-full bg-sage-soft px-2.5 py-1 font-semibold text-sage"
+                  : st.state === "now"
+                    ? "rounded-full bg-accent-soft px-2.5 py-1 font-semibold text-accent-ink ring-2 ring-accent/40"
+                    : "rounded-full bg-rule/60 px-2.5 py-1 text-muted"
+              }
+            >
+              {st.state === "done" ? "✓ " : ""}
+              {st.label}
+            </span>
+            {i < steps.length - 1 && (
+              <span aria-hidden className="text-muted">
+                ›
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+      {next}
+    </Card>
   );
 }

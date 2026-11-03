@@ -25,9 +25,13 @@ import { ConsentNeeded } from "@/components/consent-needed";
 import { LocalDateTime } from "@/components/local-time";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { consentPath } from "@/lib/recording-consent";
+import { getUiVersion } from "@/lib/ui-version-server";
+import { listRecordingsForStudent } from "@/lib/recordings";
+import { StudentVideos } from "@/components/student-videos";
+import { Fold } from "@/components/fold";
 
 type Params = Promise<{ id: string }>;
-type SP = Promise<{ consent?: string }>;
+type SP = Promise<{ consent?: string; open?: string }>;
 
 export default function StudentPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
@@ -43,8 +47,10 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const sp = await searchParams;
   const student = await getStudent(id);
   if (!student) notFound();
-  const [lessons, week, repertoire, parents, music, sessions, periods, consent] = await Promise.all([
-    listLessons(id),
+  const ui = await getUiVersion();
+  const proposed = ui === "proposed";
+  const [lessons, week, repertoire, parents, music, sessions, periods, consent, recordings] = await Promise.all([
+    listLessons(id, proposed ? 50 : undefined),
     getPracticeWeek(id),
     listRepertoire(id),
     listParentsForStudent(id),
@@ -52,6 +58,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     listPracticeSessions(id, 5),
     listPeriods(id),
     getConsentStatus(id),
+    proposed ? listRecordingsForStudent(id, 100) : Promise.resolve([]),
   ]);
   const practiceDays = week.days.length ? await listPracticeDays(id, week.days[0], week.days[week.days.length - 1]) : {};
 
@@ -73,7 +80,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         </span>
       }
       eyebrow={student.current_book ?? undefined}
-      back={{ href: "/", label: "Studio" }}
+      back={{ href: "/", label: proposed ? "Students" : "Studio" }}
       tab="studio"
       actions={
         <>
@@ -124,6 +131,182 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           </div>
         </div>
 
+        {proposed ? (
+          <>
+            <Fold title="Lessons" meta={`${lessons.length} on record`} open>
+        <section>
+          <SectionTitle>Lesson history</SectionTitle>
+          {lessons.length === 0 ? (
+            <EmptyState
+              title="No lessons recorded yet"
+              action={<LinkButton href={`/students/${id}/lessons/new`}>Record the first lesson</LinkButton>}
+            />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {lessons.map((l) => (
+                <Link key={l.id} href={`/lessons/${l.id}`} className="block">
+                  <Card tone={l.status === "draft" ? "amber" : "sheet"} className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="font-semibold">{formatDate(l.lesson_date, "weekday")}</div>
+                      <Pill tone={l.status === "draft" ? "amber" : "sage"}>
+                        {l.status === "draft" ? "Draft" : "Approved"}
+                      </Pill>
+                    </div>
+                    {l.summary && <p className="line-clamp-2 text-sm text-muted">{l.summary}</p>}
+                    {l.lesson_pieces.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {l.lesson_pieces.map((p) => (
+                          <Pill key={p.id} tone="accent">
+                            {p.title}
+                          </Pill>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+            </Fold>
+            <Fold
+              title="Practice"
+              meta={`${week.daysPracticed} of ${week.days.length} days · ${week.totalMinutes} min`}
+              open
+            >
+        <section>
+          <SectionTitle
+            action={
+              <span className="text-sm text-muted">
+                {week.daysPracticed} of {week.days.length} days · {week.totalMinutes} min
+              </span>
+            }
+          >
+            Practice record
+          </SectionTitle>
+          <Card>
+            <div className="mb-2 text-sm font-medium text-muted">
+              {practiceSpanLabel(week).replace(/^./, (c) => c.toUpperCase())}
+            </div>
+            <WeekStrip week={week} days={practiceDays} teacherView />
+            {week.notes.length > 0 && (
+              <ul className="mt-3 flex flex-col gap-1.5 text-sm">
+                {week.notes.map((n) => (
+                  <li key={n.id} className="rounded-xl bg-plum-soft px-3 py-2">
+                    <span className="font-medium text-plum">{formatDate(n.practice_date)}:</span> {n.parent_note}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link href={`/family/${id}`} className="mt-3 inline-block text-sm text-accent-ink underline">
+              Open the parent view
+            </Link>
+          </Card>
+        </section>
+
+        {sessions.length > 0 && (
+          <section>
+            <SectionTitle>Practice reviews</SectionTitle>
+            <PracticeSessionList sessions={sessions} teacherView compact />
+          </section>
+        )}
+
+        <section>
+          <SectionTitle>Weekly practice reviews</SectionTitle>
+          <PeriodReviewList studentId={id} periods={periods} writeMissing />
+        </section>
+
+            </Fold>
+            <Fold
+              id="videos"
+              title="Videos"
+              meta={`${recordings.length} video${recordings.length === 1 ? "" : "s"}`}
+              open={sp.open === "videos"}
+            >
+              <StudentVideos studentId={id} lessons={lessons} recordings={recordings} showTitle={false} />
+            </Fold>
+            <Fold title="Music &amp; repertoire" meta={`${music.length} uploaded`} open={sp.open === "music"}>
+        <section>
+          <SectionTitle>Repertoire map</SectionTitle>
+          <RepertoireMap
+            studentId={id}
+            instrument={student.instrument}
+            repertoire={repertoire}
+            scores={music}
+            editable
+          />
+        </section>
+
+            </Fold>
+            <Fold
+              title="Parents &amp; consent"
+              meta={consent.state === "signed" ? "consent signed" : "consent needed"}
+              open={consent.state !== "signed" || sp.open === "parents"}
+            >
+        <section>
+          <SectionTitle
+            action={
+              <Link href={`/students/${id}/edit`} className="text-sm text-accent-ink underline">
+                Manage
+              </Link>
+            }
+          >
+            Parents
+          </SectionTitle>
+          <p className="mb-2 text-sm">
+            {consent.state === "signed" ? (
+              <>
+                ✓ Recording consent signed by {consent.consent.signerName} on{" "}
+                <LocalDateTime iso={consent.consent.signedAt} />.{" "}
+              </>
+            ) : (
+              <span className="text-danger">No recording consent on file. </span>
+            )}
+            <Link href={consentPath(id)} className="text-accent-ink underline">
+              {consent.state === "signed" ? "View or withdraw" : "Collect consent"}
+            </Link>
+          </p>
+          {parents.length === 0 ? (
+            <p className="text-sm text-muted">No parent linked yet. Add one so they can see the home plan.</p>
+          ) : (
+            <ul className="text-[16px]">
+              {parents.map((p) => (
+                <li key={p.id}>
+                  {p.name} <span className="text-muted">· {p.email}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        {(student.goals || student.notes || student.lesson_day) && (
+          <Card className="flex flex-col gap-2 text-[16px]">
+            {student.lesson_day && (
+              <div>
+                <span className="text-muted">Lessons: </span>
+                {student.lesson_day}
+                {student.lesson_time ? ` at ${student.lesson_time}` : ""}
+              </div>
+            )}
+            {student.goals && (
+              <div>
+                <span className="text-muted">Goals: </span>
+                {student.goals}
+              </div>
+            )}
+            {student.notes && (
+              <div>
+                <span className="text-muted">Private notes: </span>
+                {student.notes}
+              </div>
+            )}
+          </Card>
+        )}
+
+            </Fold>
+          </>
+        ) : (
+          <>
         <section>
           <SectionTitle>Lesson history</SectionTitle>
           {lessons.length === 0 ? (
@@ -271,6 +454,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             </ul>
           )}
         </section>
+          </>
+        )}
       </div>
     </Shell>
   );

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Lora, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
+import { UI_BOOT_SCRIPT } from "@/lib/ui-version";
 
 // Headings: Lora, a warm old-style serif whose capital J sits on the
 // baseline (David disliked Fraunces' descending J in "James").
@@ -37,7 +38,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${display.variable} ${body.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: UI_BOOT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
