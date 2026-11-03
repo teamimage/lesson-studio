@@ -7,7 +7,9 @@ import { analyzePractice, type PracticeAnalysis } from "@/lib/ai/analyze-practic
 import { DraftError } from "@/lib/ai/draft-lesson";
 import { bookPieces } from "@/lib/ai/process-lesson";
 import { claudeCost, TRANSCRIPTION_MODEL, transcriptionCost, type ClaudeUsage } from "@/lib/ai/pricing";
-import { activityText, parseActivity, tooQuiet } from "./activity";
+import { activityText, clock, parseActivity, tooQuiet } from "./activity";
+import { extractNotes } from "./notes";
+import { findScales, scaleLabel, summarizeScales, type ScaleSummary } from "./scales";
 
 // A practice session after Stop:
 //
@@ -219,8 +221,9 @@ async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
   let usage: ClaudeUsage[] = [];
   let analysis: PracticeAnalysis;
   try {
-    const out = await analyzePractice(await contextFor(db, s));
-    analysis = out.analysis;
+    const ctx = await contextFor(db, s);
+    const out = await analyzePractice(ctx);
+    analysis = { ...out.analysis, scales: ctx.scales };
     usage = out.usage;
   } catch (e) {
     if (e instanceof DraftError) usage = e.usage;
@@ -300,6 +303,7 @@ async function contextFor(db: Db, s: PracticeSession) {
   ]);
   if (!student) throw new Error("That student wasn't found.");
   const activity = parseActivity(s.activity);
+  const scales = summarizeScales(findScales(extractNotes(activity)));
   const assignments = (lesson?.assignments ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
   return {
     studentName: student.name,
@@ -316,7 +320,20 @@ async function contextFor(db: Db, s: PracticeSession) {
     playingSeconds: s.playing_seconds,
     activity: activityText(activity),
     transcript: s.transcript ?? "",
+    scales,
+    scalesText: scalesText(scales),
   };
+}
+
+/** The code-found scales as lines for Claude. */
+export function scalesText(scales: ScaleSummary[]): string {
+  return scales
+    .map((g) => {
+      const when = g.when.map((w) => `${clock(w.start)}-${clock(w.end)}`).join(", ");
+      const off = g.off_notes.length ? `; notes outside the key: ${g.off_notes.join(", ")}` : "";
+      return `${scaleLabel(g)}, ${g.octaves} octave${g.octaves === 1 ? "" : "s"}, about ${g.times} time${g.times === 1 ? "" : "s"}, at ${when}${off}`;
+    })
+    .join("\n");
 }
 
 async function logClaude(db: Db, s: PracticeSession, usage: ClaudeUsage[]) {

@@ -7,7 +7,8 @@ const MIN_HZ = 60; // below cello C2 (65 Hz)
 const MAX_HZ = 2100; // around C7
 const THRESHOLD = 0.15;
 
-export type Pitch = { hz: number; note: string; cents: number };
+/** midi is fractional (45.12 = A2, 12 cents sharp). */
+export type Pitch = { hz: number; note: string; cents: number; midi: number };
 
 export function levelDb(buf: Float32Array): number {
   let peak = 0;
@@ -69,5 +70,6 @@ export function detectPitch(buf: Float32Array, sampleRate: number): Pitch | null
     hz,
     note: `${NOTE_NAMES[((nearest % 12) + 12) % 12]}${Math.floor(nearest / 12) - 1}`,
     cents: Math.round((midi - nearest) * 100),
+    midi,
   };
 }

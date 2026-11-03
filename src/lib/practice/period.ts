@@ -9,6 +9,7 @@ import { MissingKeyError } from "@/lib/ai/assemblyai";
 import { claudeCost, type ClaudeUsage } from "@/lib/ai/pricing";
 import type { PracticeAnalysis, PeriodReview } from "./review-types";
 import type { PracticeSessionView } from "./data";
+import { scaleLine } from "./scales";
 
 // Practice reviews from one lesson to the next.
 //
@@ -204,6 +205,7 @@ export async function getPeriod(studentId: string, day: string, today = todayISO
 
   const sessions: PracticeSessionView[] = periodSess.map((s) => ({
     ...s,
+    activity: null,
     review: (s.analysis as PracticeAnalysis | null) ?? null,
     titles,
   }));
@@ -462,6 +464,7 @@ function periodInput(student: Tables<"students">, p: PeriodData, prev: PeriodRev
           const parts = [
             `${day(s.practice_date)}, ${Math.round(s.duration_seconds / 60)} min${r.counted === false ? " (not counted)" : ""}: ${r.summary}`,
           ];
+          if (r.scales?.length) parts.push(`  Scales and arpeggios found by code: ${r.scales.map(scaleLine).join("; ")}`);
           if (r.going_well?.length) parts.push(`  Going well: ${r.going_well.map((x) => x.text).join("; ")}`);
           const work = r.work_on?.length ? r.work_on.map((x) => x.text) : (r.tips ?? []);
           if (work.length) parts.push(`  Work on: ${work.join("; ")}`);

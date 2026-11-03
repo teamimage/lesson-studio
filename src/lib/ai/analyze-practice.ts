@@ -2,6 +2,7 @@ import "server-only";
 import { anthropicClient, DraftError, lessonModel, usageRows } from "./draft-lesson";
 import type { ClaudeUsage } from "./pricing";
 import { POINT_TOPICS, PRACTICE_GRADES, type PracticeAnalysis } from "@/lib/practice/review-types";
+import type { ScaleSummary } from "@/lib/practice/scales";
 
 // Claude reads a home practice session (the sound timeline the phone wrote
 // down while recording, plus any talking AssemblyAI transcribed) and works
@@ -25,6 +26,9 @@ export type PracticeContext = {
   playingSeconds: number;
   activity: string;
   transcript: string;
+  /** Scales and arpeggios found by code from the notes. */
+  scales: ScaleSummary[];
+  scalesText: string;
 };
 
 const POINT = {
@@ -116,7 +120,7 @@ const SYSTEM = `You review a child's recorded home music practice for their fami
 You cannot hear the recording. You get what the phone wrote down while it recorded: one line per second with sound, giving the loudest level (dB below full scale; quieter than -50 dB counts as quiet) and the notes it detected in that second, in order, as note names with octave (C4 is middle C), sometimes with the average distance from the nearest note in cents. Quiet stretches are folded into one line. The pitch detector follows one melody line: chords and piano accompaniment come out as their top or strongest note, and it can briefly jump an octave. You may also get a transcript of anything said aloud (often the parent or child naming what comes next). Long stretches of music can produce garbled words in the transcript; ignore those.
 
 Work out what was practised and when:
-- Scales and arpeggios show as steady stepwise runs or broken-chord patterns up and down, often repeated. Name the key when you can.
+- Scales and arpeggios: you may get a list of scales and arpeggios that code found in the notes before you (key, octaves, about how many times, when). Trust it for which keys were played and use it to tick scale and arpeggio assignments (an assignment for "G and D major scales and arpeggios" is practised when those keys were found; say which were and weren't in the note). Counts are approximate. A note outside the key inside a scale (C natural in D major) may be a wrong note or a misreading; mention it gently only if it is listed. The code only finds runs of an octave or more, so short one-octave-or-less warm-ups may be missing from the list; you can still spot those yourself as steady stepwise runs or broken-chord patterns in the timeline.
 - Pieces: match the note sequences to the melodies of the assigned pieces and the student's Suzuki books, which you know (for example Twinkle variations, Lightly Row, Minuet 1, Gavotte by Gossec, Hunters' Chorus). Repeated short fragments of a piece usually mean focused work on one passage, which is good practice.
 - Speech naming a piece is strong evidence.
 - Only mark an assignment practiced when the timeline or transcript supports it. confidence is high when the melody or the spoken name clearly matches, medium when it is likely, low when it is a guess. minutes is your estimate of time spent on it (0 if not practised). note is at most six words on what you noticed ("whole piece twice, then the shift"). Include every assignment you are given, by its id. Listening and game assignments usually can't be heard; mark them not practiced with a note that they can be ticked by hand.
@@ -162,6 +166,11 @@ function contextText(c: PracticeContext): string {
     lines.push(`Pieces worked on in that lesson:\n${c.pieces.map((p) => (p.notes ? `${p.title}: ${p.notes}` : p.title)).join("\n")}`);
   if (c.currentPieces.length) lines.push(`Current pieces not on the assignment list:\n${c.currentPieces.join("\n")}`);
   if (c.bookPieces.length) lines.push(`Pieces in the student's books, in order:\n${c.bookPieces.join("\n")}`);
+  lines.push(
+    c.scalesText
+      ? `Scales and arpeggios found by code:\n${c.scalesText}`
+      : "Scales and arpeggios found by code: none of an octave or more.",
+  );
   return lines.join("\n\n");
 }
 
