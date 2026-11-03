@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
 import { booksFor } from "@/lib/suzuki";
+import { lessonMainId, setLessonMain } from "@/lib/main-camera";
 import type { Json, Tables } from "@/lib/supabase/types";
 import { getTranscription, MissingKeyError, submitTranscription } from "./assemblyai";
 import { DraftError, draftLesson, timeLesson, type LessonDraft } from "./draft-lesson";
@@ -54,15 +55,23 @@ export function stateOf(row: Transcript | null): ProcessState {
   };
 }
 
+/**
+ * The transcript behind the lesson's AI notes: the main camera's, when it
+ * has one, else the newest. (A lesson filmed from two angles can have a
+ * transcript for each if the main camera was changed after processing.)
+ */
 export async function latestTranscript(db: Db, lessonId: string): Promise<Transcript | null> {
-  const { data } = await db
-    .from("lesson_transcripts")
-    .select("*")
-    .eq("lesson_id", lessonId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return data;
+  const [{ data: rows }, mainId] = await Promise.all([
+    db
+      .from("lesson_transcripts")
+      .select("*")
+      .eq("lesson_id", lessonId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    lessonMainId(db, lessonId),
+  ]);
+  if (!rows?.length) return null;
+  return rows.find((r) => r.recording_id === mainId) ?? rows[0];
 }
 
 function messageOf(e: unknown): string {
@@ -87,6 +96,9 @@ export async function start(teacherId: string, lessonId: string, recordingId: st
     .maybeSingle();
   // Check the tables exist before paying for a transcription that couldn't be saved.
   if (tableError) return { status: "error", error: SETUP_ERROR };
+  // The video the AI notes come from is the main camera. Best effort: before
+  // multi-angle.sql is run this just doesn't save.
+  await setLessonMain(db, lessonId, rec.id);
   if (existing?.status === "transcribing" || existing?.status === "drafting") return stateOf(existing);
   if (existing?.transcript) return redraft(teacherId, lessonId);
 

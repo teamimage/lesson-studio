@@ -10,6 +10,7 @@ import { deleteStream } from "@/lib/stream";
 import { latestTranscript, start as startProcessing } from "@/lib/ai/process-lesson";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { CONSENT_SETUP_MESSAGE, consentNeededMessage } from "@/lib/recording-consent";
+import { lessonMainId, setLessonMain } from "@/lib/main-camera";
 
 export type StartRecordingInput = {
   lessonId: string;
@@ -156,6 +157,20 @@ export async function restoreRecording(fd: FormData) {
 }
 
 /**
+ * Makes a video the lesson's main camera: its sound plays on every angle,
+ * and it is the one the AI notes are made from.
+ */
+export async function setMainRecording(fd: FormData) {
+  await requireTeacher();
+  const id = String(fd.get("recording_id") ?? "");
+  const supabase = await createClient();
+  const { data: rec } = await supabase.from("recordings").select("*").eq("id", id).maybeSingle();
+  if (!rec) return;
+  if (!(await setLessonMain(supabase, rec.lesson_id, rec.id))) redirect(`/lessons/${rec.lesson_id}?video=main-setup#recordings`);
+  revalidateRecording(rec);
+}
+
+/**
  * Saves when a recording's first frame happened (wall-clock), so the music
  * stand's page turns can be placed on the video.
  */
@@ -194,6 +209,10 @@ async function autoProcess(teacherId: string, lessonId: string, recordingId: str
     const supabase = await createClient();
     const { data: lesson } = await supabase.from("lessons").select("status").eq("id", lessonId).maybeSingle();
     if (lesson?.status !== "draft") return;
+    // With a main camera chosen, only that video is processed; otherwise the
+    // first one to finish uploading is (and becomes the main camera).
+    const main = await lessonMainId(supabase, lessonId);
+    if (main && main !== recordingId) return;
     if (await latestTranscript(supabase, lessonId)) return;
     if (!process.env.ANTHROPIC_API_KEY || !process.env.ASSEMBLYAI_API_KEY) return;
     await startProcessing(teacherId, lessonId, recordingId);

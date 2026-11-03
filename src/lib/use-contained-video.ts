@@ -18,11 +18,12 @@ export const CONTAINED_VIDEO_PROPS = {
  * - pauses when the page is hidden (home screen, app switch, screen off,
  *   another tab), when the page is left, and when the player goes away
  *   (navigating to another page, closing the popup);
- * - only one lesson video plays at a time;
+ * - only one lesson video plays at a time (the angles of one multi-angle
+ *   player share a `group` and may play together, for the main camera's sound);
  * - the phone's lock-screen / notification controls can't start it again
  *   while the app is in the background.
  */
-export function useContainedVideo(ref: RefObject<HTMLVideoElement | null>) {
+export function useContainedVideo(ref: RefObject<HTMLVideoElement | null>, group?: string) {
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
@@ -36,7 +37,9 @@ export function useContainedVideo(ref: RefObject<HTMLVideoElement | null>) {
     const onPlay = () => {
       if (document.visibilityState === "hidden") return pause();
       document.querySelectorAll("video").forEach((other) => {
-        if (other !== video && !other.paused) other.pause();
+        if (other === video || other.paused) return;
+        if (group && other.dataset.angleGroup === group) return;
+        other.pause();
       });
       claimMediaSession(video);
     };
@@ -65,7 +68,7 @@ export function useContainedVideo(ref: RefObject<HTMLVideoElement | null>) {
       pause();
       releaseMediaSession(video);
     };
-  }, [ref]);
+  }, [ref, group]);
 }
 
 let sessionOwner: HTMLVideoElement | null = null;

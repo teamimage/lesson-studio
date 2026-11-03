@@ -13,7 +13,7 @@ import {
   type StandScore,
 } from "@/lib/stand-timeline";
 import { cx } from "@/components/ui";
-import { LessonVideo } from "@/components/lesson-video";
+import { AngleVideo } from "@/components/angle-video";
 
 /**
  * A lesson video next to the music that was open on the stand at each moment:
@@ -30,7 +30,7 @@ export function LessonTimeline({
   scores: StandScore[];
 }) {
   const playable = recordings.filter((r) => r.url);
-  const [selectedId, setSelectedId] = useState(playable[0]?.id);
+  const [selectedId, setSelectedId] = useState((playable.find((r) => r.isMain) ?? playable[0])?.id);
   const rec = playable.find((r) => r.id === selectedId) ?? playable[0];
   const byId = useMemo(() => new Map(scores.map((s) => [s.id, s])), [scores]);
   const segments = useMemo(() => buildSegments(events), [events]);
@@ -38,7 +38,7 @@ export function LessonTimeline({
   const marks = events.filter((e) => e.kind === "mark" && e.rect && e.score_id);
   const syncs = events.filter((e) => e.kind === "sync");
 
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState<number | null>(rec?.duration_seconds ? Number(rec.duration_seconds) : null);
   const [starts, setStarts] = useState<Record<string, { at: number | null; source: string | null }>>(() =>
@@ -93,42 +93,32 @@ export function LessonTimeline({
 
   return (
     <div className="flex flex-col gap-4">
-      {playable.length > 1 && (
-        <div className="flex flex-wrap gap-2">
-          {playable.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => {
-                setSelectedId(r.id);
-                setTime(0);
-                setDuration(r.duration_seconds ? Number(r.duration_seconds) : null);
-              }}
-              className={cx(
-                "rounded-full border px-3 py-1 text-sm",
-                r.id === rec?.id ? "border-accent bg-accent-soft font-semibold text-accent-ink" : "border-rule",
-              )}
-            >
-              {r.label || r.file_name}
-            </button>
-          ))}
-        </div>
-      )}
-
       {rec ? (
         <div className="grid gap-3 md:grid-cols-[3fr_2fr]">
-          <LessonVideo
-            key={rec.id}
-            ref={videoRef}
-            recordingId={rec.id}
-            src={rec.url!}
-            streamReady={rec.streamReady}
-            controls
-            playsInline
-            preload="metadata"
-            className="aspect-video w-full rounded-2xl bg-black"
-            onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
-            onLoadedMetadata={(e) => Number.isFinite(e.currentTarget.duration) && setDuration(e.currentTarget.duration)}
-          />
+          <div className="min-w-0">
+            <AngleVideo
+              angles={playable.map((r) => ({
+                id: r.id,
+                url: r.url,
+                streamReady: r.streamReady,
+                name: r.label || r.file_name,
+                startedAt: starts[r.id]?.at == null ? null : new Date(starts[r.id].at!).toISOString(),
+                isMain: r.isMain,
+              }))}
+              current={rec.id}
+              onSwitch={(id) => {
+                const r = playable.find((p) => p.id === id);
+                setSelectedId(id);
+                setDuration(r?.duration_seconds ? Number(r.duration_seconds) : null);
+              }}
+              videoRef={videoRef}
+              className="aspect-video w-full rounded-2xl bg-black"
+              onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+              onLoadedMetadata={(e) =>
+                Number.isFinite(e.currentTarget.duration) && setDuration(e.currentTarget.duration)
+              }
+            />
+          </div>
           <div className="flex min-h-40 flex-col overflow-hidden rounded-2xl border border-rule bg-white">
             <div className="border-b border-rule bg-sheet px-3 py-1.5 text-sm">
               {t0 === null ? (

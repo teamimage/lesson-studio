@@ -260,6 +260,7 @@ export type Database = {
           focus_points: string | null;
           id: string;
           lesson_date: string;
+          main_recording_id: string | null;
           next_lesson_date: string | null;
           parent_message: string | null;
           status: Database["public"]["Enums"]["lesson_status"];
@@ -277,6 +278,7 @@ export type Database = {
           focus_points?: string | null;
           id?: string;
           lesson_date?: string;
+          main_recording_id?: string | null;
           next_lesson_date?: string | null;
           parent_message?: string | null;
           status?: Database["public"]["Enums"]["lesson_status"];
@@ -294,6 +296,7 @@ export type Database = {
           focus_points?: string | null;
           id?: string;
           lesson_date?: string;
+          main_recording_id?: string | null;
           next_lesson_date?: string | null;
           parent_message?: string | null;
           status?: Database["public"]["Enums"]["lesson_status"];

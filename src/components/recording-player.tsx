@@ -1,5 +1,10 @@
 import type { Recording, RecordingWithUrl } from "@/lib/recordings";
-import { deleteRecording, restoreRecording } from "@/app/lessons/recording-actions";
+import {
+  deleteRecording,
+  restoreRecording,
+  setMainRecording,
+} from "@/app/lessons/recording-actions";
+import { AnglePlayer } from "@/components/angle-video";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { Pill } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/confirm-submit";
@@ -13,72 +18,136 @@ import { streamingEnabled } from "@/lib/stream";
  * open the original with Full quality; parents just watch the streaming copy. Rows still uploading show as pending. When fast
  * streaming is set up, teachers also see the streaming copy being prepared.
  */
-export function RecordingList({ recordings, editable = false }: { recordings: RecordingWithUrl[]; editable?: boolean }) {
-  const shown = editable ? recordings : recordings.filter((r) => r.url || r.streamReady);
+export function RecordingList({
+  recordings,
+  editable = false,
+}: {
+  recordings: RecordingWithUrl[];
+  editable?: boolean;
+}) {
+  const shown = editable
+    ? recordings
+    : recordings.filter((r) => r.url || r.streamReady);
   if (shown.length === 0) return null;
   const streaming = streamingEnabled();
+  // Two or more cameras: one player with an angle switch, then a row per video.
+  const playable = shown.filter((r) => r.url || r.streamReady);
+  const angles = playable.length > 1;
+  const choosingMain = editable && shown.length > 1;
   return (
-    <ul className="flex flex-col gap-3">
-      {shown.map((r) => (
-        <li key={r.id} className="overflow-hidden rounded-2xl border border-rule bg-sheet">
-          {r.url || r.streamReady ? (
-            <LessonVideo
-              recordingId={r.id}
-              src={r.url}
-              streamReady={r.streamReady}
-              controls
-              playsInline
-              preload="metadata"
-              className="aspect-video w-full bg-black"
-            />
-          ) : (
-            <div className="flex aspect-video w-full items-center justify-center bg-rule/40 text-sm text-muted">
-              Upload not finished. Choose the same file again to continue it.
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm">
-            <span className="font-medium">{r.label || r.file_name}</span>
-            {r.status !== "ready" && <Pill tone="amber">Uploading</Pill>}
-            {editable && r.streamReady && <Pill tone="sage">Fast streaming</Pill>}
-            <span className="text-muted">
-              {[r.duration_seconds ? formatDuration(Number(r.duration_seconds)) : null, formatBytes(Number(r.size_bytes))]
-                .filter(Boolean)
-                .join(" · ")}
-            </span>
-            {editable && r.url && (
-              <a
-                href={`/recordings/${r.id}/full`}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-auto text-accent-ink underline"
-              >
-                Full quality
-              </a>
+    <div className="flex flex-col gap-3">
+      {angles && (
+        <div className="overflow-hidden rounded-2xl border border-rule bg-sheet">
+          <AnglePlayer
+            className="aspect-video w-full bg-black"
+            angles={playable.map((r) => ({
+              id: r.id,
+              url: r.url,
+              streamReady: r.streamReady,
+              name: r.label || r.file_name,
+              startedAt: r.started_at,
+              isMain: r.isMain,
+            }))}
+          />
+        </div>
+      )}
+      {choosingMain && (
+        <p className="px-1 text-xs text-muted">
+          The main camera is the one with the microphone: its sound plays
+          whichever angle you watch, and the AI notes are made from it.
+        </p>
+      )}
+      <ul className="flex flex-col gap-3">
+        {shown.map((r) => (
+          <li
+            key={r.id}
+            className="overflow-hidden rounded-2xl border border-rule bg-sheet"
+          >
+            {angles && (r.url || r.streamReady) ? null : r.url ||
+              r.streamReady ? (
+              <LessonVideo
+                recordingId={r.id}
+                src={r.url}
+                streamReady={r.streamReady}
+                controls
+                playsInline
+                preload="metadata"
+                className="aspect-video w-full bg-black"
+              />
+            ) : (
+              <div className="flex aspect-video w-full items-center justify-center bg-rule/40 text-sm text-muted">
+                Upload not finished. Choose the same file again to continue it.
+              </div>
             )}
-          </div>
-          {editable && streaming && r.status === "ready" && !r.streamReady && (
-            <div className="border-t border-rule px-3 py-2">
-              <StreamStatus recordingId={r.id} initialStatus={r.stream_status} initialError={r.stream_error} />
-            </div>
-          )}
-          {editable && (
-            <div className="flex justify-end border-t border-rule px-3 py-2 text-sm">
-              <form action={deleteRecording}>
-                <input type="hidden" name="recording_id" value={r.id} />
-                <ConfirmSubmit
-                  className="text-danger underline"
-                  message={`Delete "${r.label || r.file_name}"${
-                    r.duration_seconds ? ` (${formatDuration(Number(r.duration_seconds))})` : ""
-                  } from this lesson?\n\nThe streaming copy is deleted. The original full-quality file and its transcript are kept, so you can bring it back here with Restore video. To free the space, delete it for good under Settings → Admin → Storage.`}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-sm">
+              <span className="font-medium">{r.label || r.file_name}</span>
+              {r.status !== "ready" && <Pill tone="amber">Uploading</Pill>}
+              {choosingMain && r.isMain && <Pill tone="sage">Main camera</Pill>}
+              {choosingMain && !r.isMain && (
+                <form action={setMainRecording}>
+                  <input type="hidden" name="recording_id" value={r.id} />
+                  <button className="text-accent-ink underline">
+                    Make main camera
+                  </button>
+                </form>
+              )}
+              {editable && r.streamReady && (
+                <Pill tone="sage">Fast streaming</Pill>
+              )}
+              <span className="text-muted">
+                {[
+                  r.duration_seconds
+                    ? formatDuration(Number(r.duration_seconds))
+                    : null,
+                  formatBytes(Number(r.size_bytes)),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+              {editable && r.url && (
+                <a
+                  href={`/recordings/${r.id}/full`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-auto text-accent-ink underline"
                 >
-                  Delete video
-                </ConfirmSubmit>
-              </form>
+                  Full quality
+                </a>
+              )}
             </div>
-          )}
-        </li>
-      ))}
-    </ul>
+            {editable &&
+              streaming &&
+              r.status === "ready" &&
+              !r.streamReady && (
+                <div className="border-t border-rule px-3 py-2">
+                  <StreamStatus
+                    recordingId={r.id}
+                    initialStatus={r.stream_status}
+                    initialError={r.stream_error}
+                  />
+                </div>
+              )}
+            {editable && (
+              <div className="flex justify-end border-t border-rule px-3 py-2 text-sm">
+                <form action={deleteRecording}>
+                  <input type="hidden" name="recording_id" value={r.id} />
+                  <ConfirmSubmit
+                    className="text-danger underline"
+                    message={`Delete "${r.label || r.file_name}"${
+                      r.duration_seconds
+                        ? ` (${formatDuration(Number(r.duration_seconds))})`
+                        : ""
+                    } from this lesson?\n\nThe streaming copy is deleted. The original full-quality file and its transcript are kept, so you can bring it back here with Restore video. To free the space, delete it for good under Settings → Admin → Storage.`}
+                  >
+                    Delete video
+                  </ConfirmSubmit>
+                </form>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -86,7 +155,11 @@ export function RecordingList({ recordings, editable = false }: { recordings: Re
  * Videos taken off this lesson with Delete video. The original is kept, so
  * Restore video puts it back and makes a new streaming copy.
  */
-export function ArchivedRecordings({ recordings }: { recordings: Recording[] }) {
+export function ArchivedRecordings({
+  recordings,
+}: {
+  recordings: Recording[];
+}) {
   if (recordings.length === 0) return null;
   return (
     <ul className="flex flex-col gap-2">
@@ -99,11 +172,18 @@ export function ArchivedRecordings({ recordings }: { recordings: Recording[] }) 
             <span className="font-medium">{r.label || r.file_name}</span>
             <span className="text-muted">
               {" · "}
-              {[r.duration_seconds ? formatDuration(Number(r.duration_seconds)) : null, formatBytes(Number(r.size_bytes))]
+              {[
+                r.duration_seconds
+                  ? formatDuration(Number(r.duration_seconds))
+                  : null,
+                formatBytes(Number(r.size_bytes)),
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
-            <div className="text-xs text-muted">Deleted from this lesson. The original is kept.</div>
+            <div className="text-xs text-muted">
+              Deleted from this lesson. The original is kept.
+            </div>
           </div>
           <form action={restoreRecording}>
             <input type="hidden" name="recording_id" value={r.id} />

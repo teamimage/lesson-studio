@@ -73,7 +73,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
   // Jumps into the video: music stand moments, plus the AI's timeline (from
   // its draft, or the "4:10 ..." lines older drafts put in the notes).
-  const playable = recordings.filter((r) => r.url);
+  // Main camera first, so music stand moments land on it where it covers them.
+  const playable = recordings.filter((r) => r.url).sort((a, b) => Number(b.isMain) - Number(a.isMain));
   const aiRecording = playable.some((r) => r.id === ai.state.recordingId) ? ai.state.recordingId! : null;
   const aiMoments = lessonAiMoments(ai.draft, lesson.teacher_notes);
   // Which sheet music each AI clip is about (matched by Claude, see link-music).
@@ -135,9 +136,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         }))}
         recordings={playable.map((r) => ({
           id: r.id,
+          lessonId: r.lesson_id,
           url: r.url,
           streamReady: r.streamReady,
           name: r.label || r.file_name,
+          startedAt: r.started_at,
+          isMain: r.isMain,
         }))}
       >
         <div className="flex flex-col gap-5">
@@ -163,6 +167,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <section id="recordings" className="scroll-mt-4">
             <SectionTitle>Lesson video</SectionTitle>
             <div className="flex flex-col gap-3">
+              {video === "main-setup" && (
+                <Card tone="amber" className="text-sm">
+                  The main camera wasn&apos;t saved. Run multi-angle.sql in the Supabase SQL Editor first, then try
+                  again.
+                </Card>
+              )}
               {video === "setup" && (
                 <Card tone="amber" className="text-sm">
                   The video wasn&apos;t deleted. Run archived-videos.sql in the Supabase SQL Editor first, so the
@@ -209,6 +219,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 lessonId={id}
                 isDraft={isDraft}
                 initial={ai.state}
+                mainId={recordings.find((r) => r.isMain && r.status === "ready")?.id ?? null}
                 recordings={recordings
                   .filter((r) => r.status === "ready")
                   .map((r) => ({
