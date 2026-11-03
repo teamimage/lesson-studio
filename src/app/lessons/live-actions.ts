@@ -62,15 +62,37 @@ export async function addLesson(fd: FormData) {
   redirect(`/lessons/${lessonId}?upload=1#recordings`);
 }
 
+/** Minutes from Start lesson (the lesson's created_at) to now, at least 1. */
+async function writeLessonLength(id: string, onlyIfEmpty: boolean) {
+  const supabase = await createClient();
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("id, created_at, duration_minutes")
+    .eq("id", id)
+    .maybeSingle();
+  if (!lesson) return false;
+  if (onlyIfEmpty && lesson.duration_minutes != null) return true;
+  const minutes = Math.max(1, Math.round((Date.now() - Date.parse(lesson.created_at)) / 60000));
+  await supabase.from("lessons").update({ duration_minutes: minutes }).eq("id", id);
+  revalidatePath(`/lessons/${id}`);
+  revalidatePath(`/lessons/${id}/live`);
+  return true;
+}
+
 /** End lesson: saves how long it ran (from Start lesson to now) and opens the lesson record. */
 export async function endLesson(fd: FormData) {
   await requireTeacher();
   const id = String(fd.get("lesson_id") ?? "");
-  const supabase = await createClient();
-  const { data: lesson } = await supabase.from("lessons").select("id, created_at").eq("id", id).maybeSingle();
-  if (!lesson) return;
-  const minutes = Math.max(1, Math.round((Date.now() - Date.parse(lesson.created_at)) / 60000));
-  await supabase.from("lessons").update({ duration_minutes: minutes }).eq("id", id);
-  revalidatePath(`/lessons/${id}`);
+  if (!(await writeLessonLength(id, false))) return;
   redirect(`/lessons/${id}`);
+}
+
+/**
+ * The music stand's End button: saves the lesson length the same way, so the
+ * iPad on the stand is all the teacher needs. A length already saved (End
+ * lesson pressed on the lesson card first) is kept.
+ */
+export async function endLessonFromStand(lessonId: string) {
+  await requireTeacher();
+  await writeLessonLength(lessonId, true);
 }
