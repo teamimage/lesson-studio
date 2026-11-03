@@ -1,6 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { LessonVideo } from "@/components/lesson-video";
 import { cx } from "@/components/ui";
 import { MusicPanel, type ViewerScore } from "@/components/score-viewer";
@@ -28,9 +36,12 @@ export function VideoPopupProvider({
   recordings,
   scores = [],
   studentId,
+  fullQuality = true,
   children,
 }: {
   recordings: PopupRecording[];
+  /** Offer the original file ("Full quality"). Off on the family side. */
+  fullQuality?: boolean;
   /** The student's music, so a clip can show the page it is about. */
   scores?: ViewerScore[];
   studentId?: string;
@@ -38,15 +49,22 @@ export function VideoPopupProvider({
 }) {
   const [jump, setJump] = useState<Jump | null>(null);
   const [nonce, setNonce] = useState(0);
-  const byId = new Map(recordings.filter((r) => r.url).map((r) => [r.id, r]));
+  const playable = (r: PopupRecording) => !!r.url || r.streamReady;
+  const byId = new Map(recordings.filter(playable).map((r) => [r.id, r]));
 
   const open = useCallback((j: Jump) => {
     setJump(j);
     setNonce((n) => n + 1);
   }, []);
-  const canPlay = useCallback((id: string) => recordings.some((r) => r.id === id && r.url), [recordings]);
+  const canPlay = useCallback(
+    (id: string) =>
+      recordings.some((r) => r.id === id && (!!r.url || r.streamReady)),
+    [recordings],
+  );
   const rec = jump ? byId.get(jump.recordingId) : undefined;
-  const score = jump?.music ? scores.find((s) => s.id === jump.music!.scoreId) : undefined;
+  const score = jump?.music
+    ? scores.find((s) => s.id === jump.music!.scoreId)
+    : undefined;
 
   return (
     <VideoPopupContext.Provider value={{ open, canPlay }}>
@@ -57,6 +75,7 @@ export function VideoPopupProvider({
           rec={rec}
           jump={jump}
           music={score && studentId && jump.music ? { score, studentId } : null}
+          fullQuality={fullQuality}
           onClose={() => setJump(null)}
         />
       )}
@@ -69,7 +88,15 @@ export function useVideoPopup(): Ctx | null {
 }
 
 /** A small "▶ 4:10" button that opens the popup player at a moment. */
-export function JumpButton({ jump, className, children }: { jump: Jump; className?: string; children?: ReactNode }) {
+export function JumpButton({
+  jump,
+  className,
+  children,
+}: {
+  jump: Jump;
+  className?: string;
+  children?: ReactNode;
+}) {
   const popup = useVideoPopup();
   if (!popup?.canPlay(jump.recordingId)) return null;
   return (
@@ -96,11 +123,13 @@ function Popup({
   rec,
   jump,
   music,
+  fullQuality,
   onClose,
 }: {
   rec: PopupRecording;
   jump: Jump;
   music: { score: ViewerScore; studentId: string } | null;
+  fullQuality: boolean;
   onClose: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -155,7 +184,8 @@ function Popup({
           <div className="min-w-0 flex-1">
             <div className="font-semibold">{jump.label}</div>
             <div className="text-xs text-white/60">
-              {formatClock(jump.seconds)}–{end === null ? "end" : formatClock(end)} · {rec.name}
+              {formatClock(jump.seconds)}–
+              {end === null ? "end" : formatClock(end)} · {rec.name}
             </div>
           </div>
           <button
@@ -182,13 +212,16 @@ function Popup({
                 key={rec.id}
                 ref={videoRef}
                 recordingId={rec.id}
-                src={rec.url!}
+                src={rec.url}
                 streamReady={rec.streamReady}
                 controls
                 autoPlay
                 playsInline
                 preload="auto"
-                className={cx("aspect-video w-full bg-black", music ? "max-h-[34vh] lg:max-h-[60vh]" : "max-h-[60vh]")}
+                className={cx(
+                  "aspect-video w-full bg-black",
+                  music ? "max-h-[34vh] lg:max-h-[60vh]" : "max-h-[60vh]",
+                )}
                 onLoadedMetadata={() => {
                   if (!ready.current) {
                     ready.current = true;
@@ -205,7 +238,12 @@ function Popup({
                 }}
                 onSeeked={(e) => {
                   // Seeking back inside the clip arms the stop again.
-                  if (ended && end !== null && e.currentTarget.currentTime < end - 0.5) setEnded(false);
+                  if (
+                    ended &&
+                    end !== null &&
+                    e.currentTarget.currentTime < end - 0.5
+                  )
+                    setEnded(false);
                 }}
               />
               {ended && (
@@ -233,7 +271,10 @@ function Popup({
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
-              <button onClick={() => nudge(-10)} className="min-h-9 rounded-lg bg-white/10 px-3">
+              <button
+                onClick={() => nudge(-10)}
+                className="min-h-9 rounded-lg bg-white/10 px-3"
+              >
                 ↺ 10s
               </button>
               <button
@@ -245,22 +286,31 @@ function Popup({
               >
                 Back to {formatClock(jump.seconds)}
               </button>
-              <button onClick={() => nudge(10)} className="min-h-9 rounded-lg bg-white/10 px-3">
+              <button
+                onClick={() => nudge(10)}
+                className="min-h-9 rounded-lg bg-white/10 px-3"
+              >
                 10s ↻
               </button>
-              <a
-                href={`/recordings/${rec.id}/full?t=${Math.floor(time)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-auto text-white/80 underline"
-              >
-                Full quality
-              </a>
+              {fullQuality && rec.url && (
+                <a
+                  href={`/recordings/${rec.id}/full?t=${Math.floor(time)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ml-auto text-white/80 underline"
+                >
+                  Full quality
+                </a>
+              )}
             </div>
           </div>
           {music && jump.music && (
             <div className="flex h-[42vh] min-h-0 flex-col border-t border-white/10 lg:h-[70vh] lg:flex-[2] lg:border-t-0 lg:border-l">
-              <MusicPanel music={jump.music} score={music.score} studentId={music.studentId} />
+              <MusicPanel
+                music={jump.music}
+                score={music.score}
+                studentId={music.studentId}
+              />
             </div>
           )}
         </div>
