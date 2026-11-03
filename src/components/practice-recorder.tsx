@@ -18,7 +18,8 @@ import { Button, Card, cx } from "@/components/ui";
 
 const CHUNK_SIZE = 6 * 1024 * 1024;
 const MAX_SECONDS = 2 * 60 * 60;
-const TICK_MS = 100;
+// Twenty looks a second: enough readings per note to tell sharp from flat.
+const TICK_MS = 50;
 
 type Phase =
   | { name: "idle" }
@@ -213,7 +214,7 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
     source.connect(analyser);
     const buf = new Float32Array(analyser.fftSize);
     activityRef.current = [];
-    let current: { t: number; db: number; notes: string[]; cents: number[] } | null = null;
+    let current: { t: number; db: number; notes: string[]; cents: number[]; fine: number[] } | null = null;
     const push = () => {
       if (!current) return;
       const c = current.cents.length
@@ -224,6 +225,7 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
         db: Math.round(current.db),
         n: current.notes,
         ...(c !== undefined ? { c: Math.round(c) } : {}),
+        ...(current.fine.some((v) => v > 0) ? { p: current.fine } : {}),
       });
     };
 
@@ -240,18 +242,21 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
       const sec = Math.floor(secs);
       if (!current || current.t !== sec) {
         push();
-        current = { t: sec, db: -100, notes: [], cents: [] };
+        current = { t: sec, db: -100, notes: [], cents: [], fine: [] };
       }
       analyser.getFloatTimeDomainData(buf);
       const db = levelDb(buf);
       current.db = Math.max(current.db, db);
+      let reading = 0;
       if (db > QUIET_DB) {
         const p = detectPitch(buf, ctx.sampleRate);
         if (p) {
           if (current.notes[current.notes.length - 1] !== p.note && current.notes.length < 20) current.notes.push(p.note);
           current.cents.push(p.cents);
+          reading = Math.round(p.midi * 100);
         }
       }
+      if (current.fine.length < 30) current.fine.push(reading);
       setLevel(db);
       setElapsed(secs);
       if (secs >= MAX_SECONDS) stop();

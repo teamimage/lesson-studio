@@ -26,7 +26,8 @@ export async function listPracticeSessions(studentId: string, limit = 10): Promi
     ? await db.from("assignments").select("id, title").in("lesson_id", lessonIds)
     : { data: [] as { id: string; title: string }[] };
   const titles = Object.fromEntries((assignments ?? []).map((a) => [a.id, a.title]));
-  return data.map((s) => ({ ...s, review: (s.analysis as PracticeAnalysis | null) ?? null, titles }));
+  // The sound timeline is large (fine pitch readings) and pages don't show it.
+  return data.map((s) => ({ ...s, activity: null, review: (s.analysis as PracticeAnalysis | null) ?? null, titles }));
 }
 
 /** One recorded session, trimmed for the practice chart's day popup. */

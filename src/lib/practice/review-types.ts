@@ -1,6 +1,8 @@
 // Shapes of the AI practice reviews, shared by the server code that writes
 // them and the pages that show them.
 
+import type { ScaleSummary } from "./scales";
+
 /**
  * What a "going well" or "work on" bullet is about. Kept as data so later
  * checks (scale recognition, intonation scoring) can add their own bullets
@@ -61,6 +63,11 @@ export type PracticeAnalysis = {
   going_well?: ReviewPoint[];
   work_on?: ReviewPoint[];
   teacher_note: string;
+  /**
+   * Scales and arpeggios found by code from the notes (not by Claude).
+   * Missing on reviews written before Nov 3 2026.
+   */
+  scales?: ScaleSummary[];
   /** Older reviews only. */
   flow?: string;
   tips?: string[];

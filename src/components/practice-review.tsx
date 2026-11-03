@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cx } from "@/components/ui";
 import { workOnTexts, type PracticeAnalysis } from "@/lib/practice/review-types";
+import { scaleLine } from "@/lib/practice/scales";
 
 // The body of one practice session review: check marks against the assigned
 // items and current pieces, an encouraging line, "Going well" and "Things to
@@ -128,6 +129,24 @@ export function PracticeReviewBody({
           <CheckGroup label="Assigned" rows={assigned} showLabel={current.length > 0} />
           <CheckGroup label="Current pieces" rows={current} showLabel />
         </>
+      )}
+
+      {(r.scales?.length ?? 0) > 0 && (
+        <div className={compact ? "text-sm" : undefined}>
+          {!compact && <Label>Scales and arpeggios heard</Label>}
+          <ul className={cx("flex flex-wrap gap-1.5", !compact && "mt-1")}>
+            {compact && <li className="text-muted">Scales heard:</li>}
+            {r.scales!.map((g) => (
+              <li
+                key={`${g.kind}-${g.key}`}
+                className="rounded-full bg-sage-soft px-2.5 py-0.5 text-sm"
+                title={g.off_notes.length ? `Notes outside the key: ${g.off_notes.join(", ")}` : undefined}
+              >
+                {scaleLine(g)}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {(goingWell.length > 0 || workOn.length > 0) && (

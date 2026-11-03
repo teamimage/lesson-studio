@@ -12,6 +12,12 @@ export type ActivitySecond = {
   n: string[];
   /** Average distance from the nearest note in cents (0-50), when notes were heard. */
   c?: number;
+  /**
+   * Fine pitch readings for that second, about 20 of them, in hundredths of
+   * a MIDI note (4312 = G2, 12 cents sharp; 0 = no clear pitch). Sessions
+   * from before Nov 3 2026 don't have them.
+   */
+  p?: number[];
 };
 
 /** Below this level a second counts as quiet. */
@@ -82,5 +88,8 @@ export function parseActivity(raw: unknown): ActivitySecond[] {
       db: Number(x.db) || -100,
       n: Array.isArray(x.n) ? x.n.map(String).slice(0, 20) : [],
       ...(typeof x.c === "number" ? { c: x.c } : {}),
+      ...(Array.isArray(x.p)
+        ? { p: x.p.slice(0, 40).map((v) => (typeof v === "number" && v > 0 && v < 13000 ? Math.round(v) : 0)) }
+        : {}),
     }));
 }
