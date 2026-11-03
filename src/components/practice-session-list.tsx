@@ -5,7 +5,7 @@ import type { PracticeSessionView } from "@/lib/practice/data";
 import { PracticePoller, PracticeSessionButtons } from "@/components/practice-session-controls";
 import { PracticeReviewBody, checklist } from "@/components/practice-review";
 
-// Practice reviews, newest first. Each one: a one-line summary, check marks
+// Practice reviews, newest first. Each one: a short summary (up to about five lines), check marks
 // for the assigned items and current pieces, an encouraging line, and short
 // "Going well" / "Things to work on" lists. The teacher also sees a short
 // teacher-only note, and can use the compact layout for a quick glance.
