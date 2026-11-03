@@ -4,6 +4,9 @@
    proposed version, classic: only in the current one. */
 @custom-variant proposed (&:where([data-ui="proposed"], [data-ui="proposed"] *));
 @custom-variant classic (&:where(html:not([data-ui="proposed"]), html:not([data-ui="proposed"]) *));
+/* Version 3 (task-first): v3: styles apply only there, notv3: everywhere else. */
+@custom-variant v3 (&:where([data-ui="v3"], [data-ui="v3"] *));
+@custom-variant notv3 (&:where(html:not([data-ui="v3"]), html:not([data-ui="v3"]) *));
 
 /* Warm, mild palette: cream paper, terracotta accent, sage for "done",
    plum for the family (parent) side. Dark mode stays warm. */

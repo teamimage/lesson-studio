@@ -24,7 +24,8 @@ type Ctx = {
   open: (jump: Jump) => void;
   canPlay: (recordingId: string) => boolean;
 };
-const VideoPopupContext = createContext<Ctx | null>(null);
+/** Exported so the version 3 lesson story can play jumps in its own inline player. */
+export const VideoPopupContext = createContext<Ctx | null>(null);
 
 /**
  * Wraps a page whose rows jump into the lesson video. Opening a jump shows
