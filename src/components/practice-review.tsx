@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { cx } from "@/components/ui";
 import { workOnTexts, type PracticeAnalysis } from "@/lib/practice/review-types";
 import { scaleLine } from "@/lib/practice/scales";
+import { tendencyText, verdictText } from "@/lib/practice/intonation";
+import type { IntonationGroup, IntonationVerdict, SessionIntonation } from "@/lib/practice/review-types";
 
 // The body of one practice session review: check marks against the assigned
 // items and current pieces, an encouraging line, "Going well" and "Things to
@@ -149,6 +151,8 @@ export function PracticeReviewBody({
         </div>
       )}
 
+      {r.intonation && <IntonationBlock i={r.intonation} compact={compact} teacherView={teacherView} />}
+
       {(goingWell.length > 0 || workOn.length > 0) && (
         <div className="grid gap-2 sm:grid-cols-2">
           <PointList title="Going well" tone="sage" items={goingWell} />
@@ -211,6 +215,68 @@ function CheckGroup({ label, rows, showLabel }: { label: string; rows: CheckRow[
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function VerdictChip({ v }: { v: IntonationVerdict }) {
+  return (
+    <span
+      className={cx(
+        "rounded-full px-2 py-0.5 text-[13px] font-medium",
+        v === "good" ? "bg-sage-soft text-sage" : v === "fair" ? "bg-amber-soft" : "bg-accent-soft text-accent-ink",
+      )}
+    >
+      {verdictText(v)}
+    </span>
+  );
+}
+
+function since(g: Pick<IntonationGroup, "score" | "prev_score">): string {
+  if (g.prev_score === undefined) return "";
+  const d = g.score - g.prev_score;
+  return d >= 8 ? "better than last time" : d <= -8 ? "a little shakier than last time" : "";
+}
+
+/** Coarse intonation: one verdict overall and per scale or piece, with leaning notes. */
+function IntonationBlock({ i, compact, teacherView }: { i: SessionIntonation; compact: boolean; teacherView: boolean }) {
+  const pct = (n: number) => (teacherView ? ` · ${n}% in tune` : "");
+  if (compact)
+    return (
+      <div className="flex flex-wrap items-center gap-1.5 text-sm">
+        <span className="text-muted">Intonation:</span>
+        <VerdictChip v={i.verdict} />
+        {since(i) && <span className="text-muted">{since(i)}</span>}
+      </div>
+    );
+  return (
+    <div>
+      <Label>Intonation</Label>
+      <ul className="mt-1 flex flex-col gap-1 text-[15px]">
+        <li className="flex flex-wrap items-center gap-1.5">
+          <span className="font-medium">Overall</span>
+          <VerdictChip v={i.verdict} />
+          <span className="text-sm text-muted">
+            {[since(i), i.tendencies.map(tendencyText).join(", ")].filter(Boolean).join(" · ")}
+            {pct(i.score)}
+          </span>
+        </li>
+        {i.groups.map((g) => (
+          <li key={g.label} className="flex flex-wrap items-center gap-1.5">
+            <span className="font-medium">{g.label}</span>
+            <VerdictChip v={g.verdict} />
+            <span className="text-sm text-muted">
+              {[since(g), g.tendencies.map(tendencyText).join(", ")].filter(Boolean).join(" · ")}
+              {pct(g.score)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {teacherView && i.offset !== 0 && (
+        <div className="mt-1 text-xs text-muted">
+          Judged against the instrument&apos;s own tuning ({Math.abs(i.offset)} cents {i.offset > 0 ? "above" : "below"} A=440).
+        </div>
+      )}
     </div>
   );
 }

@@ -29,6 +29,8 @@ export type PracticeContext = {
   /** Scales and arpeggios found by code from the notes. */
   scales: ScaleSummary[];
   scalesText: string;
+  /** Code's intonation summary; empty for piano or too few held notes. */
+  intonationText: string;
 };
 
 const POINT = {
@@ -142,7 +144,7 @@ Write for the parent and child in a warm, encouraging, plain voice. Never scold,
 - summary: a short paragraph of 2 to 4 sentences (at most about five lines on a phone) on what the session covered: what was played, in what order, and anything that stood out. Plain and warm, no lists.
 - encouragement: one short, specific, encouraging line for the child ("Lovely steady bow on the long notes in Gavotte!"). Empty only when the session wasn't counted.
 - going_well: 3 or 4 bullets, each under 10 words, on what is going well, as specific as the evidence allows ("Played Gavotte all the way through", "Steady D major scale, two octaves"). Fewer only for a very short session.
-- work_on: 3 or 4 bullets, each under 10 words, on what to work on next, concrete and tied to the assignments and the teacher's focus: intonation on a named note or passage, rushing in a named spot, tempo, tone, a section that keeps stopping, or the practice routine itself (long breaks, skipping an assignment, noodling between pieces). Examples: "Intonation on the F# in Gavotte", "Try not to rush bar 12", "Start with the hard spot, slowly". Only claim intonation or rhythm problems the note data supports (cents far from 0 on the same note again and again, or the same passage played much faster each time); otherwise keep to what you can tell.
+- work_on: 3 or 4 bullets, each under 10 words, on what to work on next, concrete and tied to the assignments and the teacher's focus: intonation on a named note or passage, rushing in a named spot, tempo, tone, a section that keeps stopping, or the practice routine itself (long breaks, skipping an assignment, noodling between pieces). Examples: "Intonation on the F# in Gavotte", "Try not to rush bar 12", "Start with the hard spot, slowly". Only claim intonation or rhythm problems the evidence supports; otherwise keep to what you can tell. For intonation, use the "Intonation measured by code" section when you get it: it is measured from the held notes against the instrument's own tuning, per scale, per stretch of playing, with the notes that lean sharp or flat. Treat it as a coarse guide: "sounding good" (most held notes in tune), "mostly good", "needs work". Name a leaning note when it is listed ("Lift the 3rd finger B in G major, it tends flat"), mention improvement against last time when the numbers show it, and never quote percentages or cents to the family. When the intonation section is missing (piano, or too few held notes) say nothing about intonation. Without the section, fall back to the per-second cents in the timeline (far from 0 on the same note again and again).
   Each bullet has a topic (intonation, rhythm, tempo, tone, notes, technique, memory, focus, routine or other) and piece: the piece, scale or exercise it is about, or empty.
 - teacher_note: one or two factual sentences for the teacher only (what was and wasn't covered, anything that may need attention). Empty if nothing to add.`;
 
@@ -166,6 +168,7 @@ function contextText(c: PracticeContext): string {
     lines.push(`Pieces worked on in that lesson:\n${c.pieces.map((p) => (p.notes ? `${p.title}: ${p.notes}` : p.title)).join("\n")}`);
   if (c.currentPieces.length) lines.push(`Current pieces not on the assignment list:\n${c.currentPieces.join("\n")}`);
   if (c.bookPieces.length) lines.push(`Pieces in the student's books, in order:\n${c.bookPieces.join("\n")}`);
+  if (c.intonationText) lines.push(`Intonation measured by code:\n${c.intonationText}`);
   lines.push(
     c.scalesText
       ? `Scales and arpeggios found by code:\n${c.scalesText}`

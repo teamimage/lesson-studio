@@ -68,9 +68,44 @@ export type PracticeAnalysis = {
    * Missing on reviews written before Nov 3 2026.
    */
   scales?: ScaleSummary[];
+  /**
+   * Coarse intonation check by code (Nov 3 2026 on; missing for piano and
+   * other fixed-pitch instruments, and when too few notes were held).
+   */
+  intonation?: SessionIntonation;
   /** Older reviews only. */
   flow?: string;
   tips?: string[];
+};
+
+export type IntonationVerdict = "good" | "fair" | "needs work";
+
+export type IntonationGroup = {
+  /** "G major scale", a piece title, or "Whole session". */
+  label: string;
+  kind: "scale" | "arpeggio" | "piece" | "session";
+  /** Held notes measured. */
+  notes: number;
+  /** Share of held notes in tune, 0-100. */
+  score: number;
+  verdict: IntonationVerdict;
+  /** Notes that lean the same way again and again, most off first. */
+  tendencies: { note: string; degree?: string; cents: number }[];
+  /** Same group in the most recent earlier session that had it. */
+  prev_score?: number;
+  prev_date?: string;
+};
+
+export type SessionIntonation = {
+  /** The instrument's tuning against A=440, in cents. */
+  offset: number;
+  score: number;
+  notes: number;
+  verdict: IntonationVerdict;
+  tendencies: IntonationGroup["tendencies"];
+  prev_score?: number;
+  prev_date?: string;
+  groups: IntonationGroup[];
 };
 
 /** Claude's written part of a lesson-to-lesson practice review. */

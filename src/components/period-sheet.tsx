@@ -3,6 +3,7 @@ import type { Student } from "@/lib/data";
 import type { Tables } from "@/lib/supabase/types";
 import { capitalize, formatDate, parseISODate } from "@/lib/format";
 import { type CheckGridRow, type PeriodData } from "@/lib/practice/period";
+import { intonationTrend, verdictText } from "@/lib/practice/intonation";
 
 // The lesson-to-lesson practice review as a printable page: the period's
 // numbers, check marks per day for every assigned item and current piece, and Claude's short
@@ -54,6 +55,9 @@ export function PeriodSheet({
       : `Since the ${formatDate(w.start)} lesson`
     : `${formatDate(w.start)} to the ${formatDate(w.nextLesson)} lesson`;
   const sessions = w.sessions.filter((s) => s.status === "done" && s.review);
+  const tuning = intonationTrend(
+    sessions.map((s) => ({ practice_date: s.practice_date, started_at: s.started_at, intonation: s.review?.intonation })),
+  );
 
   return (
     <>
@@ -153,6 +157,30 @@ export function PeriodSheet({
                 </tbody>
               </table>
             </div>
+          </section>
+        )}
+
+        {tuning.length > 0 && (
+          <section className="mt-6">
+            <H>Intonation, session by session</H>
+            <ul className="mt-1 flex flex-col gap-1 text-[14px]">
+              {tuning.map((row) => (
+                <li key={row.label} className="grid grid-cols-[150px_1fr] gap-2">
+                  <span className="font-medium">{row.label}</span>
+                  <span>
+                    {row.points.map((p, i) => (
+                      <span key={i} className="mr-3 inline-block whitespace-nowrap">
+                        <span className="text-[#5d524a]">{formatDate(p.date, "weekday")}: </span>
+                        <span style={{ color: p.verdict === "good" ? C.sage : p.verdict === "fair" ? C.muted : C.accent }}>
+                          {verdictText(p.verdict)}
+                        </span>
+                        {teacherView && <span className="text-[#5d524a]"> ({p.score}%)</span>}
+                      </span>
+                    ))}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 
