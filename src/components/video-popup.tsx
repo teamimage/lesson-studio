@@ -13,6 +13,7 @@ import { AngleVideo, angleShift, openingAngle, type Angle } from "@/components/a
 import { cx } from "@/components/ui";
 import { MusicPanel, type ViewerScore } from "@/components/score-viewer";
 import { formatClock, type Jump } from "@/lib/lesson-moments";
+import { useBackToClose } from "@/lib/use-back-to-close";
 
 export type PopupRecording = Angle & {
   /** Videos of the same lesson are camera angles of each other. */
@@ -60,6 +61,9 @@ export function VideoPopupProvider({
     [recordings],
   );
   const rec = jump ? byId.get(jump.recordingId) : undefined;
+  const close = useCallback(() => setJump(null), []);
+  // Back closes the clip instead of leaving the lesson page.
+  useBackToClose(!!(jump && rec), close);
   const score = jump?.music
     ? scores.find((s) => s.id === jump.music!.scoreId)
     : undefined;
@@ -75,7 +79,7 @@ export function VideoPopupProvider({
           jump={jump}
           music={score && studentId && jump.music ? { score, studentId } : null}
           fullQuality={fullQuality}
-          onClose={() => setJump(null)}
+          onClose={close}
         />
       )}
     </VideoPopupContext.Provider>
