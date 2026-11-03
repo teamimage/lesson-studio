@@ -74,3 +74,54 @@ function formatUtterances(utterances: Utterance[] | null | undefined): string {
     })
     .join("\n");
 }
+
+// A short spoken instruction from the teacher (a minute or two at most):
+// the audio is sent to AssemblyAI's upload endpoint, transcribed without
+// speaker labels, and polled until the text is ready.
+// https://www.assemblyai.com/docs/api-reference/files/upload
+export async function transcribeClip(
+  audio: ArrayBuffer,
+  keyterms: string[],
+  timeoutMs = 45_000,
+): Promise<{ text: string; audioSeconds: number }> {
+  const up = await fetch("https://api.assemblyai.com/v2/upload", {
+    method: "POST",
+    headers: { authorization: key(), "content-type": "application/octet-stream" },
+    body: audio,
+    cache: "no-store",
+  });
+  const upBody = (await up.json().catch(() => ({}))) as { upload_url?: string; error?: string };
+  if (!up.ok || !upBody.upload_url) throw new Error(upBody.error || `Transcription upload said ${up.status}.`);
+
+  const res = await fetch(API, {
+    method: "POST",
+    headers: { authorization: key(), "content-type": "application/json" },
+    body: JSON.stringify({
+      audio_url: upBody.upload_url,
+      speech_models: [TRANSCRIPTION_MODEL],
+      language_code: "en",
+      ...(keyterms.length ? { keyterms_prompt: keyterms.slice(0, 200) } : {}),
+    }),
+    cache: "no-store",
+  });
+  const body = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+  if (!res.ok || !body.id) throw new Error(body.error || `Transcription service said ${res.status}.`);
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 800));
+    const poll = await fetch(`${API}/${encodeURIComponent(body.id)}`, {
+      headers: { authorization: key() },
+      cache: "no-store",
+    });
+    const p = (await poll.json().catch(() => ({}))) as {
+      status?: string;
+      error?: string;
+      text?: string | null;
+      audio_duration?: number | null;
+    };
+    if (p.status === "error") throw new Error(p.error || "Transcription failed.");
+    if (p.status === "completed") return { text: (p.text ?? "").trim(), audioSeconds: Number(p.audio_duration) || 0 };
+  }
+  throw new Error("Transcription took too long. Try again, or type the change.");
+}

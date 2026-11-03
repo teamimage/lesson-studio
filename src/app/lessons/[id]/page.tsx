@@ -20,6 +20,7 @@ import { formatUsd } from "@/lib/ai/pricing";
 import { LessonReview } from "@/components/lesson-review";
 import { VideoPopupProvider } from "@/components/video-popup";
 import { LinkMusic } from "@/components/link-music";
+import { VoiceEditSection } from "@/components/voice-edit";
 import {
   assignmentJumps,
   buildMoments,
@@ -92,6 +93,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     lesson.assignments,
     lesson.lesson_pieces,
   );
+  // What each section reads like now, for the top of the hold-to-change panel.
+  const piecesText = lesson.lesson_pieces
+    .map((p) => `${p.title} (${humanize(p.activity).toLowerCase()})${p.notes ? `: ${p.notes}` : ""}`)
+    .join("\n");
+  const assignmentsText = lesson.assignments
+    .map((a, i) => `${i + 1}. ${a.title}${a.how ? `: ${a.how}` : ""}`)
+    .join("\n");
   const videoNames =
     playable.length > 1 ? Object.fromEntries(playable.map((r) => [r.id, r.label || r.file_name])) : undefined;
 
@@ -212,35 +220,49 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
           <Card className="divide-y divide-rule">
             {lesson.lesson_pieces.length > 0 && (
-              <Row label="Pieces">
-                <ul className="flex flex-col gap-1">
-                  {lesson.lesson_pieces.map((p) => {
-                    const found = findSection(scores, p.title);
-                    return (
-                      <li key={p.id} className="flex flex-wrap items-baseline gap-x-2">
-                        <span className="font-medium">{p.title}</span>
-                        {found && (
-                          <Link
-                            href={viewerHref(student.id, found.score.id, {
-                              from: found.section.start_page,
-                              to: found.section.end_page,
-                            })}
-                            className="text-sm text-accent-ink underline"
-                          >
-                            ♪ Music, {pageRange(found.section)}
-                          </Link>
-                        )}
-                        <span className="text-sm text-muted">{humanize(p.activity).toLowerCase()}</span>
-                        {p.notes && <span className="w-full text-sm text-muted">{p.notes}</span>}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Row>
+              <VoiceEditSection lessonId={id} section="pieces" current={piecesText}>
+                <Row label="Pieces">
+                  <ul className="flex flex-col gap-1">
+                    {lesson.lesson_pieces.map((p) => {
+                      const found = findSection(scores, p.title);
+                      return (
+                        <li key={p.id} className="flex flex-wrap items-baseline gap-x-2">
+                          <span className="font-medium">{p.title}</span>
+                          {found && (
+                            <Link
+                              href={viewerHref(student.id, found.score.id, {
+                                from: found.section.start_page,
+                                to: found.section.end_page,
+                              })}
+                              className="text-sm text-accent-ink underline"
+                            >
+                              ♪ Music, {pageRange(found.section)}
+                            </Link>
+                          )}
+                          <span className="text-sm text-muted">{humanize(p.activity).toLowerCase()}</span>
+                          {p.notes && <span className="w-full text-sm text-muted">{p.notes}</span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </Row>
+              </VoiceEditSection>
             )}
-            {lesson.summary && <Row label="Today we">{lesson.summary}</Row>}
-            {lesson.focus_points && <Row label="Focus">{lesson.focus_points}</Row>}
-            {lesson.parent_message && <Row label="To parent">{lesson.parent_message}</Row>}
+            {lesson.summary && (
+              <VoiceEditSection lessonId={id} section="summary" current={lesson.summary}>
+                <Row label="Today we">{lesson.summary}</Row>
+              </VoiceEditSection>
+            )}
+            {lesson.focus_points && (
+              <VoiceEditSection lessonId={id} section="focus_points" current={lesson.focus_points}>
+                <Row label="Focus">{lesson.focus_points}</Row>
+              </VoiceEditSection>
+            )}
+            {lesson.parent_message && (
+              <VoiceEditSection lessonId={id} section="parent_message" current={lesson.parent_message}>
+                <Row label="To parent">{lesson.parent_message}</Row>
+              </VoiceEditSection>
+            )}
             {(lesson.duration_minutes || lesson.next_lesson_date) && (
               <Row label="Details">
                 {lesson.duration_minutes ? `${lesson.duration_minutes} minutes. ` : ""}
@@ -248,6 +270,9 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               </Row>
             )}
           </Card>
+          <p className="-mt-3 px-1 text-xs text-muted">
+            Hold any section of the notes to change it by voice or typing.
+          </p>
 
           {moments.length > 0 && (
             <section id="review" className="scroll-mt-4">
@@ -270,11 +295,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
           <section>
             <SectionTitle>Practice assignments</SectionTitle>
-            {lesson.assignments.length === 0 ? (
-              <p className="text-sm text-muted">No assignments yet.</p>
-            ) : (
-              <AssignmentList assignments={lesson.assignments} jumps={jumps} />
-            )}
+            <VoiceEditSection lessonId={id} section="assignments" current={assignmentsText}>
+              {lesson.assignments.length === 0 ? (
+                <p className="py-1 text-sm text-muted">No assignments yet. Hold here to add some by voice.</p>
+              ) : (
+                <AssignmentList assignments={lesson.assignments} jumps={jumps} />
+              )}
+            </VoiceEditSection>
           </section>
 
           <section id="timeline" className="scroll-mt-4">
@@ -293,8 +320,16 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           {(lesson.suggestions || lesson.teacher_notes) && (
             <Card tone="plum" className="divide-y divide-plum/15">
               <div className="pb-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-plum">Teacher only</div>
-              {lesson.suggestions && <Row label="Next time">{lesson.suggestions}</Row>}
-              {lesson.teacher_notes && <Row label="Notes">{lesson.teacher_notes}</Row>}
+              {lesson.suggestions && (
+                <VoiceEditSection lessonId={id} section="suggestions" current={lesson.suggestions}>
+                  <Row label="Next time">{lesson.suggestions}</Row>
+                </VoiceEditSection>
+              )}
+              {lesson.teacher_notes && (
+                <VoiceEditSection lessonId={id} section="teacher_notes" current={lesson.teacher_notes}>
+                  <Row label="Notes">{lesson.teacher_notes}</Row>
+                </VoiceEditSection>
+              )}
             </Card>
           )}
 

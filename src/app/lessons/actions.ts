@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Enums } from "@/lib/supabase/types";
 import { Constants } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
+import { isNoteSection, isTextSection, type SectionProposal, type TextSection } from "@/lib/note-sections";
 
 export type PieceInput = {
   title: string;
@@ -44,7 +45,10 @@ function orNull(s: string): string | null {
 }
 
 function parsePayload(fd: FormData): LessonInput {
-  const raw = JSON.parse(String(fd.get("payload") ?? "{}")) as Partial<LessonInput>;
+  return parsePayloadObject(JSON.parse(String(fd.get("payload") ?? "{}")) as Partial<LessonInput>);
+}
+
+function parsePayloadObject(raw: Partial<LessonInput>): LessonInput {
   const activities = Constants.public.Enums.piece_activity;
   const kinds = Constants.public.Enums.assignment_kind;
   return {
@@ -111,27 +115,43 @@ export async function saveLesson(fd: FormData) {
     id = data.id;
   }
 
-  if (input.pieces.length) {
-    await supabase.from("lesson_pieces").insert(
-      input.pieces.map((p, i) => ({
-        lesson_id: id,
-        title: p.title,
-        activity: p.activity,
-        notes: orNull(p.notes),
-        sort_order: i + 1,
-      })),
-    );
-  }
-  // Assignments are updated in place where possible: practice logs point at
-  // their ids, and a re-insert would lose the family's checkmarks.
+  await writePieces(supabase, id, input.pieces);
+  await writeAssignments(supabase, id, input.student_id, input.assignments);
+
+  if (approve) await approveById(id);
+  else if (intent === "update") await syncRepertoire(id);
+
+  revalidateLesson(id, input.student_id);
+  redirect(`/lessons/${id}${approve ? "?approved=1" : ""}`);
+}
+
+type Db = Awaited<ReturnType<typeof createClient>>;
+
+// Pieces are replaced (the caller deletes the old rows first).
+async function writePieces(supabase: Db, id: string, pieces: PieceInput[]) {
+  if (!pieces.length) return;
+  await supabase.from("lesson_pieces").insert(
+    pieces.map((p, i) => ({
+      lesson_id: id,
+      title: p.title,
+      activity: p.activity,
+      notes: orNull(p.notes),
+      sort_order: i + 1,
+    })),
+  );
+}
+
+// Assignments are updated in place where possible: practice logs point at
+// their ids, and a re-insert would lose the family's checkmarks.
+async function writeAssignments(supabase: Db, id: string, studentId: string, assignments: AssignmentInput[]) {
   const { data: existingRows } = await supabase.from("assignments").select("id").eq("lesson_id", id);
   const existing = new Set((existingRows ?? []).map((r) => r.id));
   const keep = new Set<string>();
   const inserts = [];
-  for (const [i, a] of input.assignments.entries()) {
+  for (const [i, a] of assignments.entries()) {
     const row = {
       lesson_id: id,
-      student_id: input.student_id,
+      student_id: studentId,
       kind: a.kind,
       title: a.title,
       how: orNull(a.how),
@@ -148,12 +168,47 @@ export async function saveLesson(fd: FormData) {
   const stale = [...existing].filter((x) => !keep.has(x));
   if (stale.length) await supabase.from("assignments").delete().in("id", stale);
   if (inserts.length) await supabase.from("assignments").insert(inserts);
+}
 
-  if (approve) await approveById(id);
-  else if (intent === "update") await syncRepertoire(id);
+/**
+ * Saves one section of a lesson after the teacher accepted a change they
+ * dictated or typed on the lesson page (see components/voice-edit.tsx).
+ */
+export async function saveLessonSection(
+  lessonId: string,
+  proposal: SectionProposal,
+): Promise<{ ok: true } | { error: string }> {
+  await requireTeacher();
+  const supabase = await createClient();
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("id, student_id, status")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (!lesson) return { error: "Lesson not found." };
+  const section = proposal?.section;
+  if (!isNoteSection(section)) return { error: "Unknown section." };
 
-  revalidateLesson(id, input.student_id);
-  redirect(`/lessons/${id}${approve ? "?approved=1" : ""}`);
+  if (proposal.section === "pieces") {
+    const raw = { pieces: proposal.pieces } as unknown as Partial<LessonInput>;
+    const { pieces } = parsePayloadObject(raw);
+    const { error } = await supabase.from("lesson_pieces").delete().eq("lesson_id", lessonId);
+    if (error) return { error: "Couldn't save. Try again." };
+    await writePieces(supabase, lessonId, pieces);
+    if (lesson.status === "approved") await syncRepertoire(lessonId);
+  } else if (proposal.section === "assignments") {
+    const raw = { assignments: proposal.assignments } as unknown as Partial<LessonInput>;
+    const { assignments } = parsePayloadObject(raw);
+    await writeAssignments(supabase, lessonId, lesson.student_id, assignments);
+  } else if (isTextSection(proposal.section)) {
+    const { error } = await supabase
+      .from("lessons")
+      .update({ [proposal.section]: orNull(clean(proposal.text)) } as Partial<Record<TextSection, string | null>>)
+      .eq("id", lessonId);
+    if (error) return { error: "Couldn't save. Try again." };
+  }
+  revalidateLesson(lessonId, lesson.student_id);
+  return { ok: true };
 }
 
 export async function approveLesson(fd: FormData) {
