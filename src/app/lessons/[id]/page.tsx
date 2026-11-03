@@ -14,6 +14,8 @@ import { PeriodReviewWriter } from "@/components/period-review-writer";
 import { listArchivedForLesson, listRecordingsForLesson } from "@/lib/recordings";
 import { ArchivedRecordings, RecordingList } from "@/components/recording-player";
 import { RecordingUploader } from "@/components/recording-uploader";
+import { ConsentNeeded } from "@/components/consent-needed";
+import { getConsentStatus } from "@/lib/recording-consent-data";
 import { LessonTimeline } from "@/components/lesson-timeline";
 import { listScores, listStandEvents } from "@/lib/scores";
 import { ProcessVideo } from "@/components/process-video";
@@ -59,10 +61,11 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   // A new lesson closes the practice period before it: write that review now
   // (quietly, in the background) so it is ready for the teacher and family.
   const fresh = lesson.status === "draft" && Math.abs(daysBetween(lesson.lesson_date, todayISO())) <= 1;
-  const [student, scores, periods] = await Promise.all([
+  const [student, scores, periods, consent] = await Promise.all([
     getStudent(lesson.student_id),
     listScores(lesson.student_id, { includeArchived: true }),
     fresh ? listPeriods(lesson.student_id, 2) : Promise.resolve([]),
+    getConsentStatus(lesson.student_id),
   ]);
   if (!student) notFound();
   const isDraft = lesson.status === "draft";
@@ -189,7 +192,17 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 </div>
               )}
               {closedPeriod && <PeriodReviewWriter studentId={student.id} start={closedPeriod.start} auto quiet />}
-              <RecordingUploader lessonId={id} autoOpen={!!upload} />
+              {consent.state === "signed" ? (
+                <RecordingUploader lessonId={id} autoOpen={!!upload} />
+              ) : (
+                <ConsentNeeded
+                  studentId={student.id}
+                  studentName={student.name}
+                  state={consent.state}
+                  next={`/lessons/${id}?upload=1#recordings`}
+                  what="uploading a video"
+                />
+              )}
               <ProcessVideo
                 // Remount when the server state moves (e.g. processing started on upload).
                 key={`${ai.state.status}-${ai.state.recordingId ?? ""}`}

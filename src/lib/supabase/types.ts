@@ -401,6 +401,69 @@ export type Database = {
         };
         Relationships: [];
       };
+      recording_consents: {
+        Row: {
+          id: string;
+          teacher_id: string;
+          student_id: string | null;
+          student_name: string;
+          signer_name: string;
+          signer_relationship: string;
+          signer_email: string;
+          signature_png: string;
+          signed_at: string;
+          collected_by: string;
+          collected_email: string;
+          collected_how: string;
+          statement_version: string;
+          statement: string;
+          revoked_at: string | null;
+          revoked_by: string | null;
+          revoked_email: string | null;
+          revoked_reason: string | null;
+        };
+        Insert: {
+          id?: string;
+          teacher_id: string;
+          student_id?: string | null;
+          student_name?: string;
+          signer_name: string;
+          signer_relationship?: string;
+          signer_email?: string;
+          signature_png?: string;
+          signed_at?: string;
+          collected_by?: string;
+          collected_email?: string;
+          collected_how?: string;
+          statement_version: string;
+          statement: string;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          revoked_email?: string | null;
+          revoked_reason?: string | null;
+        };
+        Update: {
+          id?: string;
+          teacher_id?: string;
+          student_id?: string | null;
+          student_name?: string;
+          signer_name?: string;
+          signer_relationship?: string;
+          signer_email?: string;
+          signature_png?: string;
+          signed_at?: string;
+          collected_by?: string;
+          collected_email?: string;
+          collected_how?: string;
+          statement_version?: string;
+          statement?: string;
+          revoked_at?: string | null;
+          revoked_by?: string | null;
+          revoked_email?: string | null;
+          revoked_reason?: string | null;
+        };
+        Relationships: [];
+      };
       practice_weeks: {
         Row: {
           created_at: string;

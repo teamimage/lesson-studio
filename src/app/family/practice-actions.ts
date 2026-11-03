@@ -7,6 +7,8 @@ import { PRACTICE_BUCKET } from "@/lib/constants";
 import type { Json } from "@/lib/supabase/types";
 import { parseActivity, playingSeconds } from "@/lib/practice/activity";
 import { attachRecording, deleteRecording, finishUpload, retry, type PracticeState } from "@/lib/practice/process";
+import { getConsentStatus } from "@/lib/recording-consent-data";
+import { CONSENT_SETUP_MESSAGE, consentNeededMessage } from "@/lib/recording-consent";
 
 export type NewPracticeInput = {
   studentId: string;
@@ -38,6 +40,9 @@ export async function createPracticeSession(input: NewPracticeInput): Promise<{ 
   const db = await createClient();
   const { data: student } = await db.from("students").select("id, teacher_id").eq("id", input.studentId).maybeSingle();
   if (!student) return { error: "That student wasn't found." };
+  const consent = await getConsentStatus(student.id);
+  if (consent.state === "setup") return { error: CONSENT_SETUP_MESSAGE };
+  if (consent.state !== "signed") return { error: consentNeededMessage("this student") };
 
   const { data: plan } = await db
     .from("lessons")

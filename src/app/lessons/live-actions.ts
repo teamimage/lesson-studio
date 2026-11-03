@@ -5,11 +5,15 @@ import { revalidatePath } from "next/cache";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { findOrCreateTodayLesson } from "@/lib/lesson-today";
+import { hasConsent } from "@/lib/recording-consent-data";
+import { consentPath } from "@/lib/recording-consent";
 
 /** Start lesson: today's lesson for the student (reused if already started), shown as the lesson card. */
 export async function startLesson(fd: FormData) {
   const { teacher } = await requireTeacher();
   const studentId = String(fd.get("student_id") ?? "");
+  // No recording without a signed parent consent: collect it first.
+  if (!(await hasConsent(studentId))) redirect(consentPath(studentId, `/students/${studentId}`));
   const lessonId = await findOrCreateTodayLesson(studentId, teacher.id);
   if (!lessonId) redirect(`/students/${studentId}?error=lesson`);
   revalidatePath(`/students/${studentId}`);

@@ -38,6 +38,8 @@ import { savePractice } from "../actions";
 import { isPlayable, listRecordingsForLesson } from "@/lib/recordings";
 import { RecordingList } from "@/components/recording-player";
 import { PracticeRecorder } from "@/components/practice-recorder";
+import { ConsentNeeded } from "@/components/consent-needed";
+import { getConsentStatus } from "@/lib/recording-consent-data";
 import { PracticeSessionList } from "@/components/practice-session-list";
 import { listPracticeDays, listPracticeSessions } from "@/lib/practice/data";
 import { listPeriods } from "@/lib/practice/period";
@@ -90,7 +92,7 @@ async function Body({
       ? sp.date
       : today;
 
-  const [plan, week, log, history, teacher, sessions, periods] =
+  const [plan, week, log, history, teacher, sessions, periods, consent] =
     await Promise.all([
       getCurrentPlan(studentId),
       getPracticeWeek(studentId),
@@ -99,6 +101,7 @@ async function Body({
       getTeacherForStudent(student),
       listPracticeSessions(studentId, 10),
       listPeriods(studentId),
+      getConsentStatus(studentId),
     ]);
   const practiceDays = week.days.length
     ? await listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1])
@@ -170,11 +173,22 @@ async function Body({
             <Notice tone="danger">Couldn&apos;t save that. Try again.</Notice>
           )}
 
-          <PracticeRecorder
-            studentId={studentId}
-            firstName={firstName}
-            hasPlan={!!plan}
-          />
+          {consent.state === "signed" ? (
+            <PracticeRecorder
+              studentId={studentId}
+              firstName={firstName}
+              hasPlan={!!plan}
+            />
+          ) : (
+            <ConsentNeeded
+              studentId={studentId}
+              studentName={student.name}
+              state={consent.state}
+              next={`/family/${studentId}`}
+              what="recording practice"
+              canCollect={isTeacher}
+            />
+          )}
 
           {!plan ? (
             <Card className="text-sm text-muted">
