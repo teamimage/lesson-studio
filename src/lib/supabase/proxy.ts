@@ -1,8 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Paths that don't need a signed-in user.
-const PUBLIC_PATHS = ["/login", "/auth"];
+// Paths that don't need a signed-in user. /api/jobs/ is the server calling
+// itself to carry on a background job: it brings the user's access token and
+// checks it there, since it has no cookies.
+const PUBLIC_PATHS = ["/login", "/auth", "/api/jobs/"];
 
 // Refreshes the Supabase session cookie on every request and sends
 // signed-out visitors to /login.

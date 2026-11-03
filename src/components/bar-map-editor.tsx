@@ -2,45 +2,62 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Pill, cx } from "@/components/ui";
-import { detectBars, type DetectedLine } from "@/lib/bar-detect";
 import { lineBars, shiftFollowing, type BarLine, type PageBars } from "@/lib/bar-map";
 import { sectionAt, sectionLabel, type ScoreSection } from "@/lib/score-analysis";
 import { saveBarMap } from "@/app/students/music-actions";
 
-// The Bar map page: make the map once (the browser finds the lines of music
-// and bar lines on each page, then Claude numbers them), then look through it
-// and correct anything that's off. Every change saves by itself.
+// The Bar map page: make the map once (a job on the server finds the lines
+// of music and bar lines on each page, then Claude numbers them, leaving out
+// examples inside the teaching text), then look through it and correct
+// anything that's off. Every change saves by itself.
+//
+// The job runs on the server: the page only starts it and follows along, so
+// closing the page or putting the phone to sleep doesn't stop it.
 
 export type BarMapPage = { url: string | null; w: number; h: number; bars: PageBars | null };
 
-// Wide enough for thin bar lines to survive, small enough to be quick on an iPad.
-const DETECT_WIDTH = 1400;
+type JobView = {
+  status: "none" | "running" | "done" | "error";
+  phase?: "measure" | "number" | "save";
+  progress: number;
+  stale: boolean;
+  error?: string;
+  result?: { pages: number; flagged: number; skipped: number };
+  map?: (PageBars | null)[];
+};
 
-async function pagePixels(url: string): Promise<{ data: Uint8ClampedArray; w: number; h: number }> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`page image ${res.status}`);
-  const bitmap = await createImageBitmap(await res.blob());
-  const scale = Math.min(1, DETECT_WIDTH / bitmap.width);
-  const w = Math.max(1, Math.round(bitmap.width * scale));
-  const h = Math.max(1, Math.round(bitmap.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  if (!ctx) throw new Error("no canvas");
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(0, 0, w, h);
-  ctx.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close?.();
-  return { data: ctx.getImageData(0, 0, w, h).data, w, h };
+const POLL_MS = 2500;
+
+/** A small ring that fills as the job goes, for inside the button. */
+function ProgressRing({ value }: { value: number }) {
+  const r = 8;
+  const c = 2 * Math.PI * r;
+  const v = Math.min(100, Math.max(0, value));
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden className="-ml-1 shrink-0">
+      <circle cx="10" cy="10" r={r} fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <circle
+        cx="10"
+        cy="10"
+        r={r}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray={c}
+        strokeDashoffset={c * (1 - v / 100)}
+        transform="rotate(-90 10 10)"
+        style={{ transition: "stroke-dashoffset 0.6s ease" }}
+      />
+    </svg>
+  );
 }
 
-type Phase =
-  | { kind: "idle" }
-  | { kind: "measuring"; done: number; total: number }
-  | { kind: "numbering"; pages: number }
-  | { kind: "error"; message: string }
-  | { kind: "made"; pages: number; flagged: number };
+function phaseText(job: JobView): string {
+  if (job.phase === "measure") return "Finding the lines of music and bar lines on each page…";
+  if (job.phase === "number") return "Claude is numbering the bars and leaving out examples…";
+  return "Saving the bar map…";
+}
 
 export function BarMapEditor({
   scoreId,
@@ -52,7 +69,10 @@ export function BarMapEditor({
   sections: ScoreSection[];
 }) {
   const [map, setMap] = useState<(PageBars | null)[]>(() => pages.map((p) => p.bars));
-  const [phase, setPhase] = useState<Phase>({ kind: "idle" });
+  const [job, setJob] = useState<JobView | null>(null);
+  // Set once a job finishes while this page watches, to say how it went.
+  const [justMade, setJustMade] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ page: number; line: number } | null>(null);
   const [onlyToCheck, setOnlyToCheck] = useState(false);
   const [save, setSave] = useState<"saved" | "saving" | "error" | null>(null);
@@ -69,7 +89,7 @@ export function BarMapEditor({
   const made = musicPages.filter((n) => map[n - 1]);
   const checked = made.filter((n) => map[n - 1]?.checked);
   const toCheck = made.filter((n) => !map[n - 1]?.checked && map[n - 1]!.lines.some((l) => l.check));
-  const busy = phase.kind === "measuring" || phase.kind === "numbering";
+  const busy = job?.status === "running";
 
   const flush = async () => {
     timer.current = null;
@@ -107,55 +127,72 @@ export function BarMapEditor({
     [],
   );
 
+  // Follow the job on the server: on opening the page, and every few seconds while it runs.
+  const resumed = useRef(false);
+  const lastStatus = useRef<JobView["status"] | null>(null);
+  useEffect(() => {
+    let stop = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const check = async () => {
+      try {
+        const res = await fetch(`/api/scores/${scoreId}/bars`, { cache: "no-store" });
+        const next = (await res.json()) as JobView;
+        if (stop) return;
+        if (next.status === "running" && next.stale && !resumed.current) {
+          // It was cut off (the server stopped mid-step): carry on from where it got to.
+          resumed.current = true;
+          await fetch(`/api/scores/${scoreId}/bars`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ resume: true }),
+          }).catch(() => null);
+        }
+        if (lastStatus.current === "running" && next.status === "done") {
+          setJustMade(true);
+          if (next.map) {
+            const fresh = [...latest.current];
+            for (const n of musicPages) fresh[n - 1] = next.map[n - 1] ?? null;
+            latest.current = fresh;
+            setMap(fresh);
+          }
+        }
+        lastStatus.current = next.status;
+        setJob(next);
+        if (next.status === "running") timer = setTimeout(check, POLL_MS);
+      } catch {
+        if (!stop) timer = setTimeout(check, POLL_MS * 2);
+      }
+    };
+    if (job === null || job.status === "running") void check();
+    return () => {
+      stop = true;
+      if (timer) clearTimeout(timer);
+    };
+    // Re-run when a job starts or ends.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scoreId, job?.status, job === null]);
+
   const make = async () => {
     if (checked.length && !confirm("Make the bar map again? Your corrections and checked pages will be replaced."))
       return;
     setSelected(null);
-    const detected: { page: number; lines: DetectedLine[] }[] = [];
-    try {
-      for (let i = 0; i < musicPages.length; i++) {
-        setPhase({ kind: "measuring", done: i, total: musicPages.length });
-        const n = musicPages[i];
-        const url = pages[n - 1]?.url;
-        if (!url) continue;
-        const px = await pagePixels(url);
-        // Let the page repaint between pages.
-        await new Promise((r) => setTimeout(r, 0));
-        detected.push({ page: n, lines: detectBars(px.data, px.w, px.h) });
-      }
-    } catch (e) {
-      console.error("bar map", e);
-      setPhase({ kind: "error", message: "Couldn't open the page images. Reload the page and try again." });
-      return;
-    }
-    if (!detected.some((d) => d.lines.length)) {
-      setPhase({
-        kind: "error",
-        message: "No lines of music were found on these pages. A bar map needs clear printed pages (a PDF works best).",
-      });
-      return;
-    }
-    setPhase({ kind: "numbering", pages: detected.length });
+    setStartError(null);
+    setJustMade(false);
+    resumed.current = false;
     try {
       const res = await fetch(`/api/scores/${scoreId}/bars`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pages: detected }),
+        body: "{}",
       });
-      const out = (await res.json()) as
-        | { ok: true; pages: number; flagged: number; map: { page: number; bars: PageBars }[] }
-        | { ok: false; error: string };
-      if (!out.ok) {
-        setPhase({ kind: "error", message: out.error });
-        return;
+      const out = (await res.json()) as { ok: true; job: JobView } | { ok: false; error: string };
+      if (!out.ok) setStartError(out.error);
+      else {
+        lastStatus.current = out.job.status;
+        setJob(out.job);
       }
-      const next = [...latest.current];
-      for (const m of out.map) next[m.page - 1] = m.bars;
-      latest.current = next;
-      setMap(next);
-      setPhase({ kind: "made", pages: out.pages, flagged: out.flagged });
     } catch {
-      setPhase({ kind: "error", message: "Numbering the bars didn't finish. Try again." });
+      setStartError("Couldn't reach the server to start the bar map. Check the connection and try again.");
     }
   };
 
@@ -189,26 +226,42 @@ export function BarMapEditor({
         ) : (
           <p className="text-sm text-muted">No bar map yet.</p>
         )}
-        {phase.kind === "measuring" && (
+        {job?.status === "running" && (
           <p className="text-sm text-muted">
-            Finding the bar lines: page {phase.done + 1} of {phase.total}…
+            {phaseText(job)} It keeps going on the server if you close this page; come back any time to see it.
           </p>
         )}
-        {phase.kind === "numbering" && (
-          <p className="text-sm text-muted">Claude is numbering the bars on {phase.pages} pages. This takes a minute or two…</p>
+        {startError && <p className="text-sm text-danger">{startError}</p>}
+        {!startError && job?.status === "error" && (
+          <p className="text-sm text-danger">{job.error || "The bar map didn't finish."} </p>
         )}
-        {phase.kind === "error" && <p className="text-sm text-danger">{phase.message}</p>}
-        {phase.kind === "made" && (
+        {justMade && job?.status === "done" && job.result && (
           <p className="text-sm text-sage">
-            Done: {phase.pages} pages mapped.{" "}
-            {phase.flagged > 0
-              ? `${phase.flagged} line${phase.flagged === 1 ? " is" : "s are"} marked in yellow to look at.`
+            Done: {job.result.pages} pages mapped.{" "}
+            {job.result.skipped > 0 &&
+              `${job.result.skipped} example${job.result.skipped === 1 ? "" : "s"} in the teaching text left out. `}
+            {job.result.flagged > 0
+              ? `${job.result.flagged} line${job.result.flagged === 1 ? " is" : "s are"} marked in yellow to look at.`
               : "Nothing looked off, but have a quick look through."}
           </p>
         )}
         <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={make} disabled={busy || musicPages.length === 0} variant={made.length ? "secondary" : "primary"}>
-            {busy ? "Working…" : made.length ? "Make the bar map again" : "Make the bar map"}
+          <Button
+            onClick={make}
+            disabled={busy || job === null || musicPages.length === 0}
+            variant={made.length && !busy ? "secondary" : "primary"}
+            aria-live="polite"
+          >
+            {busy ? (
+              <span className="flex items-center gap-2">
+                <ProgressRing value={job.progress} />
+                Mapping… {job.progress}%
+              </span>
+            ) : made.length ? (
+              "Make the bar map again"
+            ) : (
+              "Make the bar map"
+            )}
           </Button>
           {toCheck.length > 0 && (
             <label className="flex items-center gap-2 text-sm">
