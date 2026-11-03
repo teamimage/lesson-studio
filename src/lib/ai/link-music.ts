@@ -78,7 +78,7 @@ For every moment, say which piece of the uploaded music it is about:
 - piece: the number of the piece from the music list, or 0 if the moment is not about any of them (warm-up, scales, posture, a piece that isn't uploaded, a break, talk).
 - bars: the bar (measure) numbers worked on in that moment if the teacher names or clearly implies them, e.g. "9", "13-15", "1-8"; "" if none. "The first two lines" or "from the beginning" is not a bar number: leave it "" unless the bars are stated.
 
-Use what is said in the transcript from the moment's time until the next moment. A moment belongs to a piece when the teacher is working on that piece (including exercises taken from it, like playing its rhythm on an open string). Use the piece names the teacher says; if a piece is only called by a nickname or "this piece", follow the lesson's context. Return one entry per moment.`;
+Use what is said in the transcript from the moment's time until the next moment. A moment belongs to a piece when the teacher is working on that piece (including exercises taken from it, like playing its rhythm on an open string). If the list has a separate exercise page for that piece (like "Preparation Exercises for ...") and the teacher is working from that page rather than the piece itself, choose the exercise page. Use the piece names the teacher says; if a piece is only called by a nickname or "this piece", follow the lesson's context. Return one entry per moment.`;
 
 const STEP2_SCHEMA = {
   type: "object",
@@ -108,6 +108,7 @@ const STEP2_SCHEMA = {
 const STEP2_SYSTEM = `You find bars (measures) in sheet music. You see pages of a student's music as images, each labelled with its upload page number and the piece on it. For each request (a piece and a bar range), find those bars and give a box around them.
 
 - Count bars from the start of the piece (the first full bar is bar 1, a pickup bar is bar 0). Use printed bar numbers when they are there (they usually sit above the first bar of a line).
+- Before answering, count through the piece line by line and work out the first bar number of every line; repeat signs and first/second endings do not restart the count.
 - page: the upload page number where the bars start.
 - x, y, w, h: the box as fractions of that page's width and height (0 to 1), from the top-left corner. Cover the whole height of the staff line(s) the bars are on, plus a little margin, and only the width of those bars. If the range runs onto the next line, cover all its lines on that page.
 - found: false if you can't find the bars on these pages (then give the piece's first page and a box of 0s).`;

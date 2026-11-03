@@ -4,7 +4,7 @@ import { RECORDINGS_BUCKET } from "@/lib/constants";
 import { booksFor } from "@/lib/suzuki";
 import type { Json, Tables } from "@/lib/supabase/types";
 import { getTranscription, MissingKeyError, submitTranscription } from "./assemblyai";
-import { DraftError, draftLesson, type LessonDraft } from "./draft-lesson";
+import { DraftError, draftLesson, timeLesson, type LessonDraft } from "./draft-lesson";
 import { claudeCost, TRANSCRIPTION_MODEL, transcriptionCost, type ClaudeUsage } from "./pricing";
 
 // Lesson video → transcript → drafted lesson record.
@@ -27,6 +27,8 @@ export type ProcessState = {
   applied?: boolean;
   /** When the current step began, for the progress bar. */
   since?: string;
+  /** "Redo clip times" just finished. */
+  retimed?: boolean;
 };
 
 const SETUP_ERROR =
@@ -173,10 +175,33 @@ export async function advance(teacherId: string, lessonId: string): Promise<Proc
   return runDraft(db, teacherId, claimed, false);
 }
 
+/**
+ * Fetches the finished transcript again from AssemblyAI (free; it keeps the
+ * job) and saves it if it reads differently, so transcripts made before the
+ * finer time stamps get them. Any failure keeps the saved one.
+ */
+async function refreshTranscript(db: Db, row: Transcript): Promise<Transcript> {
+  if (!row.provider_job_id) return row;
+  try {
+    const result = await getTranscription(row.provider_job_id);
+    if (result.status !== "completed" || !result.text || result.text === row.transcript) return row;
+    const { data } = await db
+      .from("lesson_transcripts")
+      .update({ transcript: result.text })
+      .eq("id", row.id)
+      .select("*")
+      .maybeSingle();
+    return data ?? row;
+  } catch {
+    return row;
+  }
+}
+
 export async function redraft(teacherId: string, lessonId: string): Promise<ProcessState> {
   const db = await createClient();
-  const row = await latestTranscript(db, lessonId);
-  if (!row?.transcript) return { status: "error", error: "There's no transcript to draft from yet." };
+  const found = await latestTranscript(db, lessonId);
+  if (!found?.transcript) return { status: "error", error: "There's no transcript to draft from yet." };
+  const row = found.status === "done" || found.status === "error" ? await refreshTranscript(db, found) : found;
   const { data: claimed } = await db
     .from("lesson_transcripts")
     .update({ status: "drafting", error: null, updated_at: now() })
@@ -186,6 +211,54 @@ export async function redraft(teacherId: string, lessonId: string): Promise<Proc
     .maybeSingle();
   if (!claimed) return stateOf(row);
   return runDraft(db, teacherId, claimed, true);
+}
+
+/**
+ * "Redo clip times": works out the Lesson review moments and the assignment
+ * video times again from the (re-fetched, finer) transcript, without touching
+ * the lesson record, so it is safe on approved lessons. The times are kept on
+ * draft.timing; the music links then go stale and are matched again.
+ */
+export async function retime(teacherId: string, lessonId: string): Promise<ProcessState> {
+  const db = await createClient();
+  const found = await latestTranscript(db, lessonId);
+  if (!found?.transcript) return { status: "error", error: "There's no transcript to time from yet." };
+  if (found.status !== "done") return stateOf(found);
+  const row = await refreshTranscript(db, found);
+  const { data: lesson } = await db
+    .from("lessons")
+    .select("lesson_pieces(title, notes, sort_order), assignments(title, how, sort_order)")
+    .eq("id", lessonId)
+    .maybeSingle();
+  if (!lesson) return { status: "error", error: "That lesson wasn't found." };
+  const bySort = <T extends { sort_order: number | null }>(a: T, b: T) => (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  let usage: ClaudeUsage[] = [];
+  try {
+    const out = await timeLesson({
+      transcript: row.transcript ?? "",
+      pieces: [...lesson.lesson_pieces].sort(bySort).map((p) => (p.notes ? `${p.title}: ${p.notes}` : p.title)),
+      assignments: [...lesson.assignments].sort(bySort).map((a) => a.title),
+    });
+    usage = out.usage;
+    await logClaude(db, teacherId, row, usage);
+    // Re-read the draft so nothing written meanwhile is lost.
+    const fresh = await latestTranscript(db, lessonId);
+    const draft = (fresh?.draft && typeof fresh.draft === "object" ? fresh.draft : {}) as Record<string, unknown>;
+    const { data } = await db
+      .from("lesson_transcripts")
+      .update({
+        draft: { ...draft, timing: { ...out.timing, made_at: now() } } as unknown as Json,
+        updated_at: now(),
+      })
+      .eq("id", row.id)
+      .select("*")
+      .maybeSingle();
+    return { ...stateOf(data ?? row), retimed: true };
+  } catch (e) {
+    if (e instanceof DraftError) usage = e.usage;
+    await logClaude(db, teacherId, row, usage);
+    return { ...stateOf(row), error: messageOf(e) };
+  }
 }
 
 async function runDraft(db: Db, teacherId: string, row: Transcript, replace: boolean): Promise<ProcessState> {

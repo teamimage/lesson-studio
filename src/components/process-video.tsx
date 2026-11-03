@@ -113,14 +113,21 @@ export function ProcessVideo({
           You can leave this page and come back; it picks up where it left off when you return.
         </p>
       )}
-      {state.status === "done" && (
+      {state.status === "done" && state.retimed && !state.error && (
+        <Notice tone="sage">
+          Clip times redone from the video. The Lesson review and the music highlights below now use them.
+        </Notice>
+      )}
+      {state.status === "done" && !state.retimed && (
         <Notice tone="sage">
           {state.applied
             ? "Draft written from the video. Read it over above, edit anything, then approve."
             : "Draft written, but this lesson is already approved, so nothing was changed. Move it back to draft and press Draft again to use it."}
         </Notice>
       )}
-      {state.status === "error" && state.error && <Notice tone="danger">{state.error}</Notice>}
+      {state.error && (state.status === "error" || state.status === "done") && (
+        <Notice tone="danger">{state.error}</Notice>
+      )}
 
       {(state.status === "none" || (state.status === "error" && !state.recordingId)) && (
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -161,6 +168,18 @@ export function ProcessVideo({
         >
           {busy ? "Drafting…" : "Draft again"}
         </Button>
+      )}
+
+      {state.status === "done" && (
+        <div className="flex flex-col gap-1">
+          <Button variant="secondary" disabled={busy} onClick={() => void run({ action: "retime" })}>
+            {busy ? "Working… (about a minute)" : "Redo clip times"}
+          </Button>
+          <p className="text-xs text-muted">
+            Finds where each part of the lesson starts in the video again, for the Lesson review, the Watch
+            links and the music highlights. The lesson notes are not changed.
+          </p>
+        </div>
       )}
     </Card>
   );
