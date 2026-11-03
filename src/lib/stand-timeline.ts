@@ -3,10 +3,15 @@
 
 import type { Json } from "@/lib/supabase/types";
 import type { AnalysisStatus, ScoreAnalysis, ScoreSection } from "@/lib/score-analysis";
+import type { PageBars } from "@/lib/bar-map";
 
 export type ScorePage = { path: string; w: number; h: number };
 /** A score page with a signed image URL. */
-export type ScorePageWithUrl = ScorePage & { url: string | null };
+export type ScorePageWithUrl = ScorePage & {
+  url: string | null;
+  /** The page's bar map, once made (see bar-map.ts). */
+  bars?: PageBars | null;
+};
 export type StandScore = {
   id: string;
   title: string;

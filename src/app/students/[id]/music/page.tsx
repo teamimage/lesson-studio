@@ -11,7 +11,7 @@ import { melodyProgressFor, type MelodyProgress } from "@/lib/ai/transcribe-melo
 import { MelodyReader } from "@/components/melody-reader";
 import { SCORE_KINDS } from "@/lib/constants";
 import { formatBytes } from "@/lib/format";
-import { pageRange, sectionLabel, STATUS_LABELS, type SectionStatus } from "@/lib/score-analysis";
+import { pageRange, sectionAt, sectionLabel, STATUS_LABELS, type SectionStatus } from "@/lib/score-analysis";
 import { viewerHref } from "@/lib/music-links";
 import Link from "next/link";
 import type { StandScore } from "@/lib/stand-timeline";
@@ -180,6 +180,7 @@ function ScoreRow({
             View the music (doesn&apos;t open the stand)
           </Link>
         )}
+        {score.pages.length > 0 && score.sections.length > 0 && <BarMapLink score={score} studentId={studentId} />}
         <MusicReading score={score} studentName={studentName} studentId={studentId} />
         {melody && score.analysisStatus === "done" && <MelodyReader scoreId={score.id} initial={melody} />}
         <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -219,6 +220,26 @@ function ScoreRow({
         </div>
       </div>
     </li>
+  );
+}
+
+// The bar map's state, linking to the page where it is made and checked.
+function BarMapLink({ score, studentId }: { score: StandScore; studentId: string }) {
+  const music = score.pages.filter((_, i) => sectionAt(score.sections, i + 1));
+  const mapped = music.filter((p) => p.bars);
+  const checked = mapped.filter((p) => p.bars?.checked);
+  const toLook = mapped.filter((p) => !p.bars?.checked && p.bars?.lines.some((l) => l.check));
+  return (
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <Link href={`/students/${studentId}/music/${score.id}/bars`} className="font-medium text-accent-ink underline">
+        {mapped.length ? "Bar map" : "Make a bar map"}
+      </Link>
+      <span className="text-muted">
+        {mapped.length
+          ? `${checked.length} of ${music.length} pages checked${toLook.length ? ` · ${toLook.length} to look at` : ""}`
+          : "so lesson clips highlight the right bars"}
+      </span>
+    </p>
   );
 }
 
