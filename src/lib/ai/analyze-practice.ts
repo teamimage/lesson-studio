@@ -1,7 +1,7 @@
 import "server-only";
 import { anthropicClient, DraftError, lessonModel, usageRows } from "./draft-lesson";
 import type { ClaudeUsage } from "./pricing";
-import { POINT_TOPICS, type PracticeAnalysis } from "@/lib/practice/review-types";
+import { POINT_TOPICS, PRACTICE_GRADES, type PracticeAnalysis } from "@/lib/practice/review-types";
 
 // Claude reads a home practice session (the sound timeline the phone wrote
 // down while recording, plus any talking AssemblyAI transcribed) and works
@@ -44,6 +44,8 @@ const SCHEMA = {
   required: [
     "counted",
     "not_counted_reason",
+    "grade",
+    "grade_reason",
     "summary",
     "items",
     "repertoire",
@@ -57,6 +59,8 @@ const SCHEMA = {
   properties: {
     counted: { type: "boolean" },
     not_counted_reason: { type: "string" },
+    grade: { type: "string", enum: [...PRACTICE_GRADES, ""] },
+    grade_reason: { type: "string" },
     summary: { type: "string" },
     items: {
       type: "array",
@@ -121,6 +125,14 @@ Work out what was practised and when:
 - timeline: the session in order, as stretches start-end in m:ss with a short label ("Warm-up: D major scale", "Gavotte, whole piece", "Talking / break"). Usually 3 to 15 entries.
 
 counted: false only when the session clearly wasn't practice: almost nothing musical, or only random noodling, a few notes now and then, or long silence with sound only at the very start and end. A short but real practice counts. Put a one-sentence, non-judgemental reason in not_counted_reason (empty when counted).
+
+grade: a letter grade, A, B, C, D or F, for the quality of the practice in this session (not the child's talent or how hard the music is). Judge how well the time was used, from the evidence:
+- Coverage: how many of the assignments and current pieces were worked on, especially the teacher's focus.
+- Focused work: repeating a passage or hard spot, slow work, scales before pieces, rather than only playing straight through favourites.
+- Time on task: playing time against session length, few long breaks or noodling, and a length that is reasonable for the student's age (a focused 10 to 15 minutes is good practice for a young child).
+- Care: steady tempo and intonation where the note data shows it.
+A means focused practice that covered most of the list with real work on hard spots. B is good practice with one thing missing (a skipped assignment, little slow work). C is some useful practice but much left out or mostly playing through. D is a little real practice in a lot of wandering. F is reserved for a session that was counted but barely practice. Grade fairly and without inflation, but remember a parent and child will read it. Empty only when the session wasn't counted.
+grade_reason: one short, kind sentence (under 15 words) on the main reason for the grade, naming what would raise it when it isn't an A ("Covered everything with careful slow work on the shift." or "Lovely Gavotte; add the D major scale for an A.").
 
 Write for the parent and child in a warm, encouraging, plain voice. Never scold, shame or sound suspicious; the app is a helper, not a monitor. Keep everything short: these are a checklist and bullet points, not explanations.
 - summary: a short paragraph of 2 to 4 sentences (at most about five lines on a phone) on what the session covered: what was played, in what order, and anything that stood out. Plain and warm, no lists.

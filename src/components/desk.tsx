@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import type { PracticeLog } from "@/lib/data";
 import { addDays, formatDate, parseISODate } from "@/lib/format";
 import { practiced } from "@/lib/teacher-data";
+import type { PracticeDay } from "@/lib/practice/data";
+import { PracticeDayCell } from "./practice-day-popup";
 import { cx } from "./ui";
 
 // Pieces shared by the teacher desk pages.
@@ -45,7 +47,18 @@ export function DeskLink({ href, title, detail }: { href: string; title: string;
 }
 
 // Four weeks of practice, one row per week, oldest at the top.
-export function PracticeGrid({ logs, today }: { logs: PracticeLog[]; today: string }) {
+export function PracticeGrid({
+  logs,
+  today,
+  days,
+  teacherView = false,
+}: {
+  logs: PracticeLog[];
+  today: string;
+  /** Logs and recorded sessions by date; days in it open a popup when tapped. */
+  days?: Record<string, PracticeDay>;
+  teacherView?: boolean;
+}) {
   const start = addDays(today, -27);
   const weeks = Array.from({ length: 4 }, (_, w) => Array.from({ length: 7 }, (_, d) => addDays(start, w * 7 + d)));
   return (
@@ -56,26 +69,33 @@ export function PracticeGrid({ logs, today }: { logs: PracticeLog[]; today: stri
           <span key={d}>{parseISODate(d).toLocaleDateString("en-US", { weekday: "narrow" })}</span>
         ))}
       </div>
-      {weeks.map((days) => (
-        <div key={days[0]} className="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] items-center gap-1.5">
-          <span className="text-[12px] text-muted">{formatDate(days[0])}</span>
-          {days.map((d) => {
+      {weeks.map((week) => (
+        <div key={week[0]} className="grid grid-cols-[52px_repeat(7,minmax(0,1fr))] items-center gap-1.5">
+          <span className="text-[12px] text-muted">{formatDate(week[0])}</span>
+          {week.map((d) => {
             const log = logs.find((l) => l.practice_date === d);
             const did = practiced(log);
             const short = did && (log?.minutes ?? 0) > 0 && (log?.minutes ?? 0) < 10;
+            const sessions = days?.[d]?.sessions.length ?? 0;
             return (
-              <div
+              <PracticeDayCell
                 key={d}
-                title={`${formatDate(d, "weekday")}${log?.minutes ? ` · ${log.minutes} min` : ""}${log?.listened ? " · listened" : ""}`}
+                day={days?.[d]}
+                teacherView={teacherView}
+                title={`${formatDate(d, "weekday")}${log?.minutes ? ` · ${log.minutes} min` : ""}${log?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}`}
                 className={cx(
-                  "relative flex h-8 items-center justify-center rounded-lg text-[12px] font-semibold",
+                  "relative flex h-11 flex-col items-center justify-center rounded-lg",
                   did ? (short ? "bg-sage/40 text-ink" : "bg-sage text-white") : "bg-rule/50 text-muted",
                   d === today && "ring-2 ring-accent",
                 )}
               >
-                {log?.minutes ? log.minutes : ""}
+                <span className={cx("absolute top-0.5 left-1 text-[10px] leading-none", did ? "opacity-80" : "")}>
+                  {parseISODate(d).getDate()}
+                </span>
+                <span className="mt-1 text-[13px] font-semibold leading-none">{log?.minutes ? log.minutes : ""}</span>
                 {log?.listened && <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-plum" />}
-              </div>
+                {sessions > 0 && <span className="absolute top-0.5 right-1 text-[9px] leading-none" aria-hidden>●</span>}
+              </PracticeDayCell>
             );
           })}
         </div>

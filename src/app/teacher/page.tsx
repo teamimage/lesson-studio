@@ -24,8 +24,9 @@ import {
   listStudents,
   staleReview,
 } from "@/lib/data";
-import { capitalize, formatDate, humanize, parseISODate, relativeDay, todayISO } from "@/lib/format";
+import { addDays, capitalize, formatDate, humanize, parseISODate, relativeDay, todayISO } from "@/lib/format";
 import { listRecordingsForStudent } from "@/lib/recordings";
+import { listPracticeDays } from "@/lib/practice/data";
 import { assignmentCounts, listPracticeRange, nextLesson, practiced } from "@/lib/teacher-data";
 
 type SearchParams = Promise<{ student?: string }>;
@@ -82,7 +83,7 @@ async function Desk({ searchParams }: { searchParams: SearchParams }) {
 async function StudentPanel({ student }: { student: Student }) {
   const id = student.id;
   const today = todayISO();
-  const [lessons, week, month, repertoire, recordings, music, teacher] = await Promise.all([
+  const [lessons, week, month, repertoire, recordings, music, teacher, practiceDays] = await Promise.all([
     listLessons(id, 20),
     getPracticeWeek(id),
     listPracticeRange(id, 28),
@@ -90,6 +91,7 @@ async function StudentPanel({ student }: { student: Student }) {
     listRecordingsForStudent(id, 50),
     listScoreIndex(id),
     getTeacherForStudent(student),
+    listPracticeDays(id, addDays(today, -27), today),
   ]);
 
   const latest = lessons[0] ?? null;
@@ -316,11 +318,12 @@ async function StudentPanel({ student }: { student: Student }) {
             Home practice
           </SectionTitle>
           <p className="-mt-1 mb-2 text-sm text-muted">
-            The practice the parent checks off at home each day, from the Home practice tab. Each box is one day: green
-            means they practiced (the number is minutes), a purple dot means they listened to the recording.
+            The practice the parent checks off at home each day, from the Home practice tab. Each box is one day, with
+            its date in the corner: green means they practiced (the number is minutes), a purple dot means they listened
+            to the recording, and a small dot top right means a recorded session. Tap a day to see its practice and grade.
           </p>
           <Card className="flex flex-col gap-3">
-            <PracticeGrid logs={month} today={today} />
+            <PracticeGrid logs={month} today={today} days={practiceDays} teacherView />
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
               <span className="flex items-center gap-1.5">
                 <span className="h-3 w-3 rounded bg-sage" /> practiced
@@ -330,6 +333,9 @@ async function StudentPanel({ student }: { student: Student }) {
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-plum" /> listened
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-[9px] leading-none">●</span> recorded session (tap for grade)
               </span>
             </div>
             {month.some((l) => l.parent_note?.trim()) && (

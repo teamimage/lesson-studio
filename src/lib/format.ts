@@ -1,9 +1,20 @@
 // Small date helpers. Dates in the database are ISO strings (YYYY-MM-DD).
 
+/**
+ * The studio's time zone. The server runs in UTC, so without this "today"
+ * flips to tomorrow at 7 pm on the US east coast and evening practice lands
+ * on the wrong day. Set NEXT_PUBLIC_STUDIO_TIME_ZONE to change it.
+ */
+export const STUDIO_TIME_ZONE = process.env.NEXT_PUBLIC_STUDIO_TIME_ZONE || "America/New_York";
+
 export function todayISO(): string {
-  // Use the server's local date. Good enough for a single-timezone pilot.
-  const d = new Date();
-  return toISODate(d);
+  // en-CA formats dates as YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: STUDIO_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 export function toISODate(d: Date): string {

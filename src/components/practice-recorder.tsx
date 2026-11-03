@@ -307,6 +307,7 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
       return;
     }
     const supabase = createClient();
+    let failStatus: number | undefined;
     const ok = await new Promise<boolean>((resolve) => {
       const up = new tus.Upload(blob, {
         endpoint: resumableEndpoint(),
@@ -326,7 +327,10 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
           if (data.session) req.setHeader("authorization", `Bearer ${data.session.access_token}`);
         },
         onProgress: (sent, total) => setPhase({ name: "uploading", progress: total ? sent / total : 0 }),
-        onError: () => resolve(false),
+        onError: (err) => {
+          failStatus = (err as tus.DetailedError).originalResponse?.getStatus();
+          resolve(false);
+        },
         onSuccess: () => resolve(true),
       });
       up.start();
@@ -335,7 +339,12 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
       await deletePracticeSession(created.id).catch(() => {});
       setPhase({
         name: "error",
-        message: "The upload didn't finish. Check the Wi-Fi and press Try again; the recording is still on this page.",
+        message:
+          failStatus === 401 || failStatus === 403
+            ? "The upload wasn't allowed by the storage settings. Press Try again; if it keeps happening, tell your teacher. The recording is still on this page."
+            : failStatus === 413
+              ? "This recording is larger than the storage limit allows."
+              : "The upload didn't finish. Check the Wi-Fi and press Try again; the recording is still on this page.",
         retry: () => void upload(blob, input),
       });
       return;
