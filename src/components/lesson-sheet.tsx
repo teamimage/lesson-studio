@@ -4,6 +4,8 @@ import { capitalize, formatDate, parseISODate } from "@/lib/format";
 
 // The one-page printable lesson sheet for the parent. Plain, high-contrast,
 // letter-size. Shown on its own page and inline on the Desk student card.
+// On phones the section labels stack above full-width text; from sm up and
+// when printed it keeps the two-column label/text layout.
 export function LessonSheet({
   lesson,
   student,
@@ -34,29 +36,29 @@ export function LessonSheet({
               {student.current_book ? ` · ${student.current_book}` : ""}
             </div>
           </div>
-          <div className="text-right text-sm text-[#5d524a]">
+          <div className="text-sm text-[#5d524a] sm:text-right print:text-right">
             <div className="font-medium text-[#1b1613]">{formatDate(lesson.lesson_date, "long")}</div>
             {teacher?.name && <div>{teacher.name}</div>}
             {teacher?.studio_name && <div>{teacher.studio_name}</div>}
           </div>
         </header>
 
-        <dl className="mt-5 grid grid-cols-[110px_1fr] gap-x-4 gap-y-4 text-[15px] leading-relaxed">
+        <dl className="mt-5 grid grid-cols-1 gap-x-4 gap-y-1 text-[15px] sm:grid-cols-[110px_1fr] sm:gap-y-4 print:grid-cols-[110px_1fr] print:gap-y-4 leading-relaxed">
           {lesson.summary && (
             <>
-              <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Today we</dt>
+              <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Today we</dt>
               <dd className="whitespace-pre-line">{lesson.summary}</dd>
             </>
           )}
           {lesson.focus_points && (
             <>
-              <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Focus point</dt>
+              <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Focus point</dt>
               <dd className="whitespace-pre-line rounded-lg bg-[#f6e3d7] px-3 py-2 font-medium">{lesson.focus_points}</dd>
             </>
           )}
           {lesson.assignments.length > 0 && (
             <>
-              <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">
+              <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">
                 {lesson.assignments.every((a) => a.every_day) ? "Every day" : "Practice"}
               </dt>
               <dd>
@@ -75,7 +77,7 @@ export function LessonSheet({
               </dd>
             </>
           )}
-          <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Week tracker</dt>
+          <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Week tracker</dt>
           <dd>
             <div className="grid grid-cols-7 gap-1.5">
               {dayLabels.map((label, i) => (
@@ -89,13 +91,13 @@ export function LessonSheet({
           </dd>
           {lesson.parent_message && (
             <>
-              <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">From the teacher</dt>
+              <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">From the teacher</dt>
               <dd className="italic">“{lesson.parent_message}”</dd>
             </>
           )}
           {lesson.next_lesson_date && (
             <>
-              <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Next lesson</dt>
+              <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Next lesson</dt>
               <dd>
                 {formatDate(lesson.next_lesson_date, "long")}
                 {student.lesson_time ? `, ${student.lesson_time}` : ""}
