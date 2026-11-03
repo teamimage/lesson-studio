@@ -1,6 +1,6 @@
 import type { LessonFull, Student } from "@/lib/data";
 import type { Tables } from "@/lib/supabase/types";
-import { capitalize, formatDate, parseISODate } from "@/lib/format";
+import { capitalize, daysBetween, formatDate, parseISODate } from "@/lib/format";
 
 // The one-page printable lesson sheet for the parent. Plain, high-contrast,
 // letter-size. Shown on its own page and inline on the Desk student card.
@@ -15,11 +15,15 @@ export function LessonSheet({
   student: Student;
   teacher: Tables<"teachers"> | null;
 }) {
-  const weekStart = parseISODate(lesson.lesson_date);
-  const dayLabels = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
+  // One box per day from the day after this lesson up to the next one (a week
+  // or two); a week when the next lesson date isn't set.
+  const lessonDay = parseISODate(lesson.lesson_date);
+  const gap = lesson.next_lesson_date ? daysBetween(lesson.lesson_date, lesson.next_lesson_date) : 7;
+  const dayCount = gap >= 1 && gap <= 21 ? gap : 7;
+  const dayLabels = Array.from({ length: dayCount }, (_, i) => {
+    const d = new Date(lessonDay);
     d.setDate(d.getDate() + i + 1);
-    return d.toLocaleDateString("en-US", { weekday: "short" });
+    return dayCount > 7 ? `${d.toLocaleDateString("en-US", { weekday: "short" })} ${d.getDate()}` : d.toLocaleDateString("en-US", { weekday: "short" });
   });
 
   const firstName = student.name.split(" ")[0];
@@ -30,7 +34,7 @@ export function LessonSheet({
         <header className="flex flex-wrap items-end justify-between gap-2 border-b-2 border-[#b4623c] pb-3">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8f4a2a]">Lesson sheet</div>
-            <h1 className="mt-0.5 text-[26px] font-semibold leading-tight">{firstName}&apos;s practice this week</h1>
+            <h1 className="mt-0.5 text-[26px] font-semibold leading-tight">{firstName}&apos;s practice until the next lesson</h1>
             <div className="mt-1 text-sm text-[#5d524a]">
               {capitalize(student.instrument)}
               {student.current_book ? ` · ${student.current_book}` : ""}
@@ -77,7 +81,7 @@ export function LessonSheet({
               </dd>
             </>
           )}
-          <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Week tracker</dt>
+          <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Practice tracker</dt>
           <dd>
             <div className="grid grid-cols-7 gap-1.5">
               {dayLabels.map((label, i) => (

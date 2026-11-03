@@ -64,7 +64,7 @@ async function Body() {
               </div>
               {plan ? (
                 <div className="text-sm">
-                  <span className="text-muted">This week&apos;s focus: </span>
+                  <span className="text-muted">Focus: </span>
                   {plan.focus_points || plan.summary || `${plan.assignments.length} assignments`}
                 </div>
               ) : (

@@ -10,6 +10,7 @@ import { getViewer } from "@/lib/auth";
 import {
   getLatestLesson,
   getPracticeWeek,
+  practiceTone,
   listDraftLessons,
   listStudents,
 } from "@/lib/data";
@@ -120,7 +121,6 @@ async function Dashboard() {
           <div className="flex flex-col gap-3">
             {rows.map(({ student, latest, week }) => {
               const working = latest?.lesson_pieces.find((p) => p.activity === "started" || p.activity === "worked_on") ?? latest?.lesson_pieces[0];
-              const practiceTone = week.daysPracticed >= 5 ? "sage" : week.daysPracticed >= 3 ? "amber" : "danger";
               return (
                 <Card key={student.id} className="flex flex-col gap-3">
                   <div className="flex items-start gap-3">
@@ -140,8 +140,14 @@ async function Dashboard() {
                         </div>
                       )}
                       <div className="mt-2 flex flex-wrap gap-1.5">
-                        <Pill tone={practiceTone}>{week.daysPracticed}/7 days practiced</Pill>
-                        {week.daysListened > 0 && <Pill tone="plum">listened {week.daysListened}/7</Pill>}
+                        <Pill tone={practiceTone(week)}>
+                          {week.daysPracticed}/{week.days.length} days practiced {week.since ? "since lesson" : ""}
+                        </Pill>
+                        {week.daysListened > 0 && (
+                          <Pill tone="plum">
+                            listened {week.daysListened}/{week.days.length}
+                          </Pill>
+                        )}
                         {latest ? (
                           <Pill tone={latest.status === "draft" ? "amber" : "muted"}>
                             {latest.status === "draft" ? "draft " : "lesson "}

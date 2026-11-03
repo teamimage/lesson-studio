@@ -226,7 +226,11 @@ async function StudentPanel({ student }: { student: Student }) {
           pieces stand.
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Stat label="Practice this week" value={`${week.daysPracticed} of 7 days`} detail={`${week.totalMinutes} min · listened ${week.daysListened} of 7`} />
+          <Stat
+            label={week.since ? "Practice since last lesson" : "Practice, last 7 days"}
+            value={`${week.daysPracticed} of ${week.days.length} days`}
+            detail={`${week.totalMinutes} min · listened ${week.daysListened} of ${week.days.length}`}
+          />
           <Stat label="Practice, last 4 weeks" value={`${monthDays} of 28 days`} detail={`${month.reduce((n, l) => n + (l.minutes ?? 0), 0)} min logged`} />
           <Stat
             label="Last lesson"

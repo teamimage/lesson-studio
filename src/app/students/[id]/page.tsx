@@ -7,7 +7,7 @@ import { studentPhotoSrc } from "@/lib/constants";
 import { Shell } from "@/components/shell";
 import { Button, Card, EmptyState, LinkButton, Pill, SectionTitle } from "@/components/ui";
 import { requireTeacher } from "@/lib/auth";
-import { getPracticeWeek, getStudent, listLessons, listParentsForStudent, listRepertoire } from "@/lib/data";
+import { getPracticeWeek, getStudent, practiceSpanLabel, listLessons, listParentsForStudent, listRepertoire } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 import { TodayDate } from "@/components/today-date";
 import { WeekStrip } from "@/components/week-strip";
@@ -19,8 +19,8 @@ import { listScoreIndex } from "@/lib/scores";
 import { MusicPreviewLinks } from "@/components/music-preview-links";
 import { PracticeSessionList } from "@/components/practice-session-list";
 import { listPracticeSessions } from "@/lib/practice/data";
-import { listWeeks } from "@/lib/practice/week";
-import { WeeklyReviewList } from "@/components/weekly-review-list";
+import { listPeriods } from "@/lib/practice/period";
+import { PeriodReviewList } from "@/components/period-review-list";
 
 type Params = Promise<{ id: string }>;
 
@@ -37,14 +37,14 @@ async function Body({ params }: { params: Params }) {
   const { id } = await params;
   const student = await getStudent(id);
   if (!student) notFound();
-  const [lessons, week, repertoire, parents, music, sessions, weeks] = await Promise.all([
+  const [lessons, week, repertoire, parents, music, sessions, periods] = await Promise.all([
     listLessons(id),
     getPracticeWeek(id),
     listRepertoire(id),
     listParentsForStudent(id),
     listScoreIndex(id),
     listPracticeSessions(id, 5),
-    listWeeks(id),
+    listPeriods(id),
   ]);
 
   return (
@@ -140,11 +140,11 @@ async function Body({ params }: { params: Params }) {
           <SectionTitle
             action={
               <span className="text-sm text-muted">
-                {week.daysPracticed}/7 days · {week.totalMinutes} min
+                {week.daysPracticed} of {week.days.length} days · {week.totalMinutes} min
               </span>
             }
           >
-            Practice this week
+            Practice {practiceSpanLabel(week)}
           </SectionTitle>
           <Card>
             <WeekStrip week={week} />
@@ -171,8 +171,8 @@ async function Body({ params }: { params: Params }) {
         )}
 
         <section>
-          <SectionTitle>Weekly reviews</SectionTitle>
-          <WeeklyReviewList studentId={id} weeks={weeks} />
+          <SectionTitle>Reviews, lesson to lesson</SectionTitle>
+          <PeriodReviewList studentId={id} periods={periods} writeMissing />
         </section>
 
         {(student.goals || student.notes || student.lesson_day) && (

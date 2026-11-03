@@ -15,7 +15,6 @@ import { addDays, capitalize, formatDate, humanize, todayISO } from "@/lib/forma
 import { bookPosition, nextLesson } from "@/lib/teacher-data";
 import { PracticeSessionList } from "@/components/practice-session-list";
 import { listPracticeSessions } from "@/lib/practice/data";
-import { weekStartOf } from "@/lib/practice/week";
 
 type Params = Promise<{ id: string }>;
 
@@ -122,10 +121,10 @@ async function Body({ params }: { params: Params }) {
               <SectionTitle
                 action={
                   <Link
-                    href={`/family/${id}/week/${weekStartOf(addDays(todayISO(), -7))}`}
+                    href={`/family/${id}/review/${latest && latest.lesson_date <= today ? addDays(latest.lesson_date, -1) : today}`}
                     className="text-sm text-accent-ink underline"
                   >
-                    Last week&apos;s review
+                    Review up to the last lesson
                   </Link>
                 }
               >
