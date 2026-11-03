@@ -33,6 +33,7 @@ import {
   withClipInfo,
 } from "@/lib/lesson-moments";
 import { findSection, momentsKey, parseMusicLinks, viewerHref } from "@/lib/music-links";
+import { applyBarMap } from "@/lib/bar-map";
 import { pageRange } from "@/lib/score-analysis";
 
 type Params = Promise<{ id: string }>;
@@ -92,7 +93,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     scoreTitles: Object.fromEntries(scores.map((s) => [s.id, s.title])),
     scoreSections: Object.fromEntries(scores.map((s) => [s.id, s.sections])),
     ai: aiRecording ? { recordingId: aiRecording, moments: aiMoments } : null,
-    musicLinks: musicLinks?.links ?? [],
+    musicLinks: applyBarMap(musicLinks?.links ?? [], scores),
   });
   const { moments, jumps } = withClipInfo(
     allMoments,

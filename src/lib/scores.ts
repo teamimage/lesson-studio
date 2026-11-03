@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { SCORES_BUCKET } from "@/lib/constants";
 import { parseAnalysis, type AnalysisStatus } from "@/lib/score-analysis";
+import { parseBarMap } from "@/lib/bar-map";
 import { parsePages, parseRect, type StandEvent, type StandEventKind, type StandScore } from "@/lib/stand-timeline";
 
 // A lesson's worth of viewing, so pages don't vanish mid-lesson.
@@ -22,7 +23,7 @@ export async function listScores(
   let query = supabase.from("scores").select("*").eq("student_id", studentId);
   if (!includeArchived) query = query.eq("archived", false);
   const { data } = await query.order("sort_order").order("created_at");
-  const rows = (data ?? []).map((r) => ({ ...r, parsed: parsePages(r.pages) }));
+  const rows = (data ?? []).map((r) => ({ ...r, parsed: parsePages(r.pages), barMap: parseBarMap(r.pages) }));
   const paths = rows.flatMap((r) => r.parsed.map((p) => p.path));
   const urls = new Map<string, string>();
   if (paths.length > 0) {
@@ -56,7 +57,7 @@ export async function listScores(
       title: r.title,
       kind: r.kind,
       archived: r.archived,
-      pages: r.parsed.map((p) => ({ ...p, url: urls.get(p.path) ?? null })),
+      pages: r.parsed.map((p, i) => ({ ...p, url: urls.get(p.path) ?? null, bars: r.barMap[i] ?? null })),
       sections: analysis?.sections ?? [],
       analysis,
       analysisStatus: status,

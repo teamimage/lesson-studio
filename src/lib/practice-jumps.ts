@@ -9,6 +9,7 @@ import {
 } from "@/lib/recordings";
 import { listStandEvents, type listScores } from "@/lib/scores";
 import { parseMusicLinks } from "@/lib/music-links";
+import { applyBarMap } from "@/lib/bar-map";
 import {
   assignmentJumps,
   buildMoments,
@@ -126,7 +127,7 @@ async function lessonJumps(
           moments: lessonAiMoments(draft, lesson.teacher_notes),
         }
       : null,
-    musicLinks: parseMusicLinks(draft)?.links ?? [],
+    musicLinks: applyBarMap(parseMusicLinks(draft)?.links ?? [], scores),
   });
   const ai = aiRecording
     ? { recordingId: aiRecording, times: draftAssignmentTimes(draft) }

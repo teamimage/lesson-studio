@@ -8,6 +8,7 @@ import { SCORES_BUCKET } from "@/lib/constants";
 import { titleFromFileName } from "@/lib/score-analysis";
 import { findTodayLesson } from "@/lib/lesson-today";
 import { parsePages, type ScorePage } from "@/lib/stand-timeline";
+import { saveBarPages } from "@/lib/ai/number-bars";
 import { MUSIC_RIGHTS_STATEMENT, MUSIC_RIGHTS_VERSION, type RightsConfirmation } from "@/lib/music-rights";
 
 export type StartScoreResult = { id: string; prefix: string; rightsId: string } | { error: string };
@@ -258,4 +259,13 @@ export async function openMusicStand(fd: FormData) {
   const studentId = String(fd.get("student_id") ?? "");
   const lessonId = await findTodayLesson(studentId);
   redirect(lessonId ? `/lessons/${lessonId}/stand` : `/students/${studentId}/stand`);
+}
+
+/** The teacher's corrections to a score's bar map (one or more pages). */
+export async function saveBarMap(
+  scoreId: string,
+  changes: { page: number; bars: unknown }[],
+): Promise<{ ok: boolean; error?: string }> {
+  await requireTeacher();
+  return saveBarPages(String(scoreId), changes);
 }

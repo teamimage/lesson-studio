@@ -14,6 +14,7 @@ import {
   type StoredLink,
 } from "@/lib/music-links";
 import type { StandScore } from "@/lib/stand-timeline";
+import { boxForBars, parseBarRange } from "@/lib/bar-map";
 import { MissingKeyError } from "./assemblyai";
 import { anthropicClient, usageRows } from "./draft-lesson";
 import { musicModel } from "./read-music";
@@ -25,8 +26,9 @@ import { latestTranscript } from "./process-lesson";
 // Step 1 (text): Claude reads the transcript and the list of pieces in the
 // student's uploaded music, and says for each AI moment which piece it is
 // about and which bars, if any were named.
-// Step 2 (pages): for clips that name bars, Claude looks at the piece's pages
-// and draws a box around those bars, so the popup can show and highlight them.
+// Step 2 (pages): for clips that name bars, the box around those bars comes
+// from the piece's bar map when it has one (bar-map.ts). Otherwise Claude
+// looks at the piece's pages and draws a box, so the popup can highlight them.
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -309,14 +311,24 @@ export async function linkLessonMusic(teacherId: string, lessonId: string, force
       const piece = o && pieces.find((p) => p.n === o.piece);
       if (piece && o.bars.trim()) requests.push({ n: i + 1, piece, bars: o.bars.trim() });
     });
+    // Bars in a mapped piece are a lookup in its bar map; only the rest go to
+    // Claude to find on the page images.
     let boxes = new Map<number, BoxAnswer>();
+    const fromMap = new Map<number, BoxAnswer>();
+    const unmapped = requests.filter((r) => {
+      const range = parseBarRange(r.bars);
+      const found = range && boxForBars(r.piece.score, r.piece.section, range[0], range[1]);
+      if (found) fromMap.set(r.n, found);
+      return !found;
+    });
     try {
-      const s2 = await step2(requests);
+      const s2 = await step2(unmapped);
       boxes = s2.boxes;
       usage = [...usage, ...s2.usage];
     } catch (e) {
       console.error("linkLessonMusic boxes", lessonId, e);
     }
+    for (const [n, b] of fromMap) boxes.set(n, b);
 
     const links: StoredLink[] = moments.map((m, i) => {
       const o = byMoment.get(i + 1);
