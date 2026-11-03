@@ -10,6 +10,8 @@ import { claudeCost, TRANSCRIPTION_MODEL, transcriptionCost, type ClaudeUsage } 
 import { activityText, clock, parseActivity, tooQuiet } from "./activity";
 import { extractNotes } from "./notes";
 import { findScales, scaleLabel, summarizeScales, type ScaleSummary } from "./scales";
+import { addPieceGroups, intonationText, sessionIntonation, withPrevious } from "./intonation";
+import type { SessionIntonation } from "./review-types";
 
 // A practice session after Stop:
 //
@@ -224,6 +226,11 @@ async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
     const ctx = await contextFor(db, s);
     const out = await analyzePractice(ctx);
     analysis = { ...out.analysis, scales: ctx.scales };
+    if (ctx.intonation && out.analysis.counted) {
+      // Each piece Claude found in the timeline gets its own verdict too.
+      const withPieces = addPieceGroups(ctx.intonation, ctx.notes, out.analysis.timeline, ctx.knownTitles);
+      analysis.intonation = withPrevious(withPieces, ctx.earlierIntonation);
+    }
     usage = out.usage;
   } catch (e) {
     if (e instanceof DraftError) usage = e.usage;
@@ -294,17 +301,38 @@ export async function deleteRecording(db: Db, s: PracticeSession) {
 }
 
 async function contextFor(db: Db, s: PracticeSession) {
-  const [{ data: student }, { data: lesson }, { data: repertoire }] = await Promise.all([
+  const [{ data: student }, { data: lesson }, { data: repertoire }, { data: earlier }] = await Promise.all([
     db.from("students").select("*").eq("id", s.student_id).single(),
     s.lesson_id
       ? db.from("lessons").select("*, lesson_pieces(*), assignments(*)").eq("id", s.lesson_id).maybeSingle()
       : Promise.resolve({ data: null }),
     db.from("repertoire").select("title, status").eq("student_id", s.student_id),
+    db
+      .from("practice_sessions")
+      .select("practice_date, analysis")
+      .eq("student_id", s.student_id)
+      .eq("status", "done")
+      .neq("id", s.id)
+      .lt("started_at", s.started_at)
+      .order("started_at", { ascending: false })
+      .limit(20),
   ]);
   if (!student) throw new Error("That student wasn't found.");
   const activity = parseActivity(s.activity);
-  const scales = summarizeScales(findScales(extractNotes(activity)));
+  const notes = extractNotes(activity);
+  const scales = summarizeScales(findScales(notes));
   const assignments = (lesson?.assignments ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+  const earlierIntonation = (earlier ?? []).flatMap((e) => {
+    const i = (e.analysis as PracticeAnalysis | null)?.intonation;
+    return i ? [{ date: e.practice_date, intonation: i as SessionIntonation }] : [];
+  });
+  const base = sessionIntonation(notes, student.instrument, scales);
+  const intonation = base ? withPrevious(base, earlierIntonation) : null;
+  const knownTitles = [
+    ...assignments.map((a) => a.title),
+    ...(lesson?.lesson_pieces ?? []).map((p) => p.title),
+    ...(repertoire ?? []).map((r) => r.title),
+  ];
   return {
     studentName: student.name,
     instrument: student.instrument,
@@ -322,6 +350,12 @@ async function contextFor(db: Db, s: PracticeSession) {
     transcript: s.transcript ?? "",
     scales,
     scalesText: scalesText(scales),
+    intonationText: intonation ? intonationText(intonation, notes) : "",
+    // Used after the review, not sent to Claude.
+    notes,
+    intonation,
+    earlierIntonation,
+    knownTitles,
   };
 }
 

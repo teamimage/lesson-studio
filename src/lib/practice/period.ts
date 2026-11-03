@@ -10,6 +10,7 @@ import { claudeCost, type ClaudeUsage } from "@/lib/ai/pricing";
 import type { PracticeAnalysis, PeriodReview } from "./review-types";
 import type { PracticeSessionView } from "./data";
 import { scaleLine } from "./scales";
+import { tendencyText } from "./intonation";
 
 // Practice reviews from one lesson to the next.
 //
@@ -465,6 +466,10 @@ function periodInput(student: Tables<"students">, p: PeriodData, prev: PeriodRev
             `${day(s.practice_date)}, ${Math.round(s.duration_seconds / 60)} min${r.counted === false ? " (not counted)" : ""}: ${r.summary}`,
           ];
           if (r.scales?.length) parts.push(`  Scales and arpeggios found by code: ${r.scales.map(scaleLine).join("; ")}`);
+          if (r.intonation)
+            parts.push(
+              `  Intonation (code): overall ${r.intonation.score}% in tune${r.intonation.groups.map((g) => `; ${g.label} ${g.score}%${g.tendencies.length ? ` (${g.tendencies.map(tendencyText).join(", ")})` : ""}`).join("")}`,
+            );
           if (r.going_well?.length) parts.push(`  Going well: ${r.going_well.map((x) => x.text).join("; ")}`);
           const work = r.work_on?.length ? r.work_on.map((x) => x.text) : (r.tips ?? []);
           if (work.length) parts.push(`  Work on: ${work.join("; ")}`);
