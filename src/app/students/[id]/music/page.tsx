@@ -7,6 +7,8 @@ import { DeleteScoreButton, ReadMusicButton, RefreshWhileReading } from "@/compo
 import { requireTeacher } from "@/lib/auth";
 import { getStudent } from "@/lib/data";
 import { listScores } from "@/lib/scores";
+import { melodyProgressFor, type MelodyProgress } from "@/lib/ai/transcribe-melody";
+import { MelodyReader } from "@/components/melody-reader";
 import { SCORE_KINDS } from "@/lib/constants";
 import { formatBytes } from "@/lib/format";
 import { pageRange, sectionLabel, STATUS_LABELS, type SectionStatus } from "@/lib/score-analysis";
@@ -30,10 +32,13 @@ async function Body({ params }: { params: Params }) {
   const { id } = await params;
   const student = await getStudent(id);
   if (!student) notFound();
-  const scores = await listScores(id, {
-    includeArchived: true,
-    withSourceLinks: true,
-  });
+  const [scores, melody] = await Promise.all([
+    listScores(id, {
+      includeArchived: true,
+      withSourceLinks: true,
+    }),
+    melodyProgressFor(id),
+  ]);
   const active = scores.filter((s) => !s.archived);
   const archived = scores.filter((s) => s.archived);
 
@@ -74,6 +79,7 @@ async function Body({ params }: { params: Params }) {
                   studentId={id}
                   first={i === 0}
                   last={i === active.length - 1}
+                  melody={melody[s.id]}
                 />
               ))}
             </ul>
@@ -108,12 +114,15 @@ function ScoreRow({
   studentId,
   first,
   last,
+  melody,
 }: {
   score: StandScore;
   studentName: string;
   studentId: string;
   first: boolean;
   last: boolean;
+  /** Notes read for practice matching (active music only). */
+  melody?: MelodyProgress;
 }) {
   const cover = score.pages[0];
   const kind = SCORE_KINDS.find((k) => k.value === score.kind)?.label ?? score.kind;
@@ -172,6 +181,7 @@ function ScoreRow({
           </Link>
         )}
         <MusicReading score={score} studentName={studentName} studentId={studentId} />
+        {melody && score.analysisStatus === "done" && <MelodyReader scoreId={score.id} initial={melody} />}
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {!score.archived && !first && (
             <form action={moveScore}>

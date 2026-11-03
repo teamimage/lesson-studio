@@ -794,6 +794,7 @@ export type Database = {
       scores: {
         Row: {
           analysis: Json | null;
+          melody: Json | null;
           analysis_at: string | null;
           analysis_error: string | null;
           analysis_status: string;
@@ -818,6 +819,7 @@ export type Database = {
         };
         Insert: {
           analysis?: Json | null;
+          melody?: Json | null;
           analysis_at?: string | null;
           analysis_error?: string | null;
           analysis_status?: string;
@@ -842,6 +844,7 @@ export type Database = {
         };
         Update: {
           analysis?: Json | null;
+          melody?: Json | null;
           analysis_at?: string | null;
           analysis_error?: string | null;
           analysis_status?: string;

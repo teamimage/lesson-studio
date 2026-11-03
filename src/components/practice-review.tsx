@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { cx } from "@/components/ui";
 import { workOnTexts, type PracticeAnalysis } from "@/lib/practice/review-types";
 import { scaleLine } from "@/lib/practice/scales";
+import { musicByPiece } from "@/lib/melody";
 import { tendencyText, verdictText } from "@/lib/practice/intonation";
 import type { IntonationGroup, IntonationVerdict, SessionIntonation } from "@/lib/practice/review-types";
 
@@ -145,6 +146,19 @@ export function PracticeReviewBody({
                 title={g.off_notes.length ? `Notes outside the key: ${g.off_notes.join(", ")}` : undefined}
               >
                 {scaleLine(g)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!compact && (r.music?.length ?? 0) > 0 && (
+        <div>
+          <Label>Matched to the music</Label>
+          <ul className="mt-1 flex flex-wrap gap-1.5">
+            {musicByPiece(r.music!).map((m) => (
+              <li key={m.title} className="rounded-full bg-sage-soft px-2.5 py-0.5 text-sm">
+                {m.title} · bars {m.bars}
               </li>
             ))}
           </ul>

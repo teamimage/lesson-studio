@@ -12,6 +12,8 @@ import { extractNotes } from "./notes";
 import { findScales, scaleLabel, summarizeScales, type ScaleSummary } from "./scales";
 import { addPieceGroups, intonationText, sessionIntonation, withPrevious } from "./intonation";
 import type { SessionIntonation } from "./review-types";
+import { matchMusic, musicByPiece, type MusicMatch } from "@/lib/melody";
+import { studentMelodies } from "@/lib/ai/transcribe-melody";
 
 // A practice session after Stop:
 //
@@ -225,10 +227,15 @@ async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
   try {
     const ctx = await contextFor(db, s);
     const out = await analyzePractice(ctx);
-    analysis = { ...out.analysis, scales: ctx.scales };
+    analysis = { ...out.analysis, scales: ctx.scales, ...(ctx.music.length ? { music: ctx.music } : {}) };
     if (ctx.intonation && out.analysis.counted) {
-      // Each piece Claude found in the timeline gets its own verdict too.
-      const withPieces = addPieceGroups(ctx.intonation, ctx.notes, out.analysis.timeline, ctx.knownTitles);
+      // Each piece gets its own verdict too: where code matched it against the
+      // uploaded music, else where Claude's timeline puts it.
+      const timeline = [
+        ...ctx.music.map((m) => ({ start: clock(m.start), end: clock(m.end), label: m.title })),
+        ...out.analysis.timeline.filter((t) => !ctx.music.some((m) => t.label.toLowerCase().includes(m.title.toLowerCase()))),
+      ];
+      const withPieces = addPieceGroups(ctx.intonation, ctx.notes, timeline, [...ctx.knownTitles, ...ctx.music.map((m) => m.title)]);
       analysis.intonation = withPrevious(withPieces, ctx.earlierIntonation);
     }
     usage = out.usage;
@@ -301,7 +308,7 @@ export async function deleteRecording(db: Db, s: PracticeSession) {
 }
 
 async function contextFor(db: Db, s: PracticeSession) {
-  const [{ data: student }, { data: lesson }, { data: repertoire }, { data: earlier }] = await Promise.all([
+  const [{ data: student }, { data: lesson }, { data: repertoire }, { data: earlier }, melodies] = await Promise.all([
     db.from("students").select("*").eq("id", s.student_id).single(),
     s.lesson_id
       ? db.from("lessons").select("*, lesson_pieces(*), assignments(*)").eq("id", s.lesson_id).maybeSingle()
@@ -316,11 +323,17 @@ async function contextFor(db: Db, s: PracticeSession) {
       .lt("started_at", s.started_at)
       .order("started_at", { ascending: false })
       .limit(20),
+    studentMelodies(db, s.student_id),
   ]);
   if (!student) throw new Error("That student wasn't found.");
   const activity = parseActivity(s.activity);
   const notes = extractNotes(activity);
   const scales = summarizeScales(findScales(notes));
+  const music = matchMusic(
+    notes,
+    melodies,
+    scales.flatMap((g) => g.when),
+  );
   const assignments = (lesson?.assignments ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
   const earlierIntonation = (earlier ?? []).flatMap((e) => {
     const i = (e.analysis as PracticeAnalysis | null)?.intonation;
@@ -350,13 +363,27 @@ async function contextFor(db: Db, s: PracticeSession) {
     transcript: s.transcript ?? "",
     scales,
     scalesText: scalesText(scales),
+    musicText: musicText(music, melodies.length),
     intonationText: intonation ? intonationText(intonation, notes) : "",
     // Used after the review, not sent to Claude.
     notes,
+    music,
     intonation,
     earlierIntonation,
     knownTitles,
   };
+}
+
+/** The code's matches against the uploaded music, as lines for Claude. */
+function musicText(music: MusicMatch[], pieces: number): string {
+  if (!pieces) return "";
+  if (!music.length) return `None of the ${pieces} pieces with notes read from the student's uploaded music matched.`;
+  const lines = music.map(
+    (m) =>
+      `${clock(m.start)}-${clock(m.end)}: ${m.title} (${m.score_title}), bars ${m.bars} of ${m.bars_total}, ${m.hits >= 12 ? "strong" : m.hits >= 7 ? "good" : "possible"} match`,
+  );
+  const pieceLines = musicByPiece(music).map((p) => `${p.title}: bars ${p.bars}, about ${Math.max(1, Math.round(p.seconds / 60))} min`);
+  return `${lines.join("\n")}\nBy piece:\n${pieceLines.join("\n")}`;
 }
 
 /** The code-found scales as lines for Claude. */
