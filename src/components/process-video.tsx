@@ -20,16 +20,21 @@ export function ProcessVideo({
   recordings,
   initial,
   isDraft,
+  mainId = null,
 }: {
   lessonId: string;
   recordings: Rec[];
   initial: ProcessState;
   isDraft: boolean;
+  /** The lesson's main camera, which the AI notes should come from. */
+  mainId?: string | null;
 }) {
   const router = useRouter();
   const [state, setState] = useState<ProcessState>(initial);
   const [busy, setBusy] = useState(false);
-  const [recordingId, setRecordingId] = useState(initial.recordingId ?? recordings[0]?.id ?? "");
+  const [recordingId, setRecordingId] = useState(
+    initial.recordingId ?? (recordings.some((r) => r.id === mainId) ? mainId! : recordings[0]?.id) ?? "",
+  );
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [now, setNow] = useState(0); // 0 until mounted, so server and browser render the same
 
@@ -155,6 +160,24 @@ export function ProcessVideo({
           {busy ? "Working…" : "Try again"}
         </Button>
       )}
+
+      {(state.status === "done" || state.status === "error") &&
+        state.recordingId &&
+        mainId &&
+        state.recordingId !== mainId &&
+        recordings.length > 1 && (
+          <div className="flex flex-col gap-2 rounded-xl border border-amber/30 bg-amber-soft px-3 py-2 text-sm">
+            <p>
+              The AI notes were made from {recordings.find((r) => r.id === state.recordingId)?.name ?? "another video"}
+              , but the main camera is now {recordings.find((r) => r.id === mainId)?.name}. Process the main camera to
+              make the transcript and clip times from its sound (a new transcript costs about the same as the first).
+              {isDraft ? " Then press Draft again to rewrite the notes from it." : ""}
+            </p>
+            <Button variant="secondary" disabled={busy} onClick={() => void run({ action: "start", recordingId: mainId })}>
+              {busy ? "Starting…" : "Process the main camera"}
+            </Button>
+          </div>
+        )}
 
       {state.status === "done" && isDraft && (
         <Button

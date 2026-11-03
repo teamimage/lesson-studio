@@ -162,9 +162,12 @@ async function Body({
         }))}
         recordings={popupRecordings.map((r) => ({
           id: r.id,
+          lessonId: r.lesson_id,
           url: r.url,
           streamReady: r.streamReady,
           name: r.label || r.file_name,
+          startedAt: r.started_at,
+          isMain: r.isMain,
         }))}
       >
         <div className="flex flex-col gap-6">

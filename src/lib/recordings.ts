@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/types";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
 import { streamingEnabled } from "@/lib/stream";
+import { lessonMainId } from "@/lib/main-camera";
 
 export type Recording = Tables<"recordings">;
 /**
@@ -10,7 +11,12 @@ export type Recording = Tables<"recordings">;
  * uploaded), and whether a fast streaming copy can be played instead (the
  * player asks /api/recordings/[id]/stream for its address).
  */
-export type RecordingWithUrl = Recording & { url: string | null; streamReady: boolean };
+export type RecordingWithUrl = Recording & {
+  url: string | null;
+  streamReady: boolean;
+  /** The lesson's main camera (its sound plays on every angle). */
+  isMain: boolean;
+};
 
 /**
  * Teacher pages get a link to the original for every uploaded video. The
@@ -27,7 +33,7 @@ async function withUrls(rows: Recording[], original: OriginalAccess = "always"):
   const streamReady = (r: Recording) => streaming && r.status === "ready" && r.stream_status === "ready";
   const needsOriginal = (r: Recording) => r.status === "ready" && (original === "always" || !streamReady(r));
   const ready = rows.filter(needsOriginal);
-  if (ready.length === 0) return rows.map((r) => ({ ...r, url: null, streamReady: streamReady(r) }));
+  if (ready.length === 0) return rows.map((r) => ({ ...r, url: null, streamReady: streamReady(r), isMain: false }));
   const supabase = await createClient();
   const { data } = await supabase.storage
     .from(RECORDINGS_BUCKET)
@@ -40,6 +46,7 @@ async function withUrls(rows: Recording[], original: OriginalAccess = "always"):
     ...r,
     url: needsOriginal(r) ? (urls.get(r.storage_path) ?? null) : null,
     streamReady: streamReady(r),
+    isMain: false,
   }));
 }
 
@@ -58,7 +65,31 @@ export async function listRecordingsForLesson(
     .select("*")
     .eq("lesson_id", lessonId)
     .order("created_at");
-  return withUrls(active(data), original);
+  const rows = active(data);
+  const [withLinks, mainId] = await Promise.all([withUrls(rows, original), mainRecordingId(lessonId, rows)]);
+  return withLinks.map((r) => ({ ...r, isMain: r.id === mainId }));
+}
+
+/**
+ * Which of a lesson's videos is the main camera: the one the teacher chose,
+ * else the one the AI notes were made from, else the first one uploaded.
+ */
+async function mainRecordingId(lessonId: string, rows: Recording[]): Promise<string | null> {
+  if (rows.length === 0) return null;
+  const supabase = await createClient();
+  const ids = new Set(rows.map((r) => r.id));
+  const chosen = await lessonMainId(supabase, lessonId);
+  if (chosen && ids.has(chosen)) return chosen;
+  // Transcripts are teacher-only; on other screens this just finds nothing.
+  const { data: t } = await supabase
+    .from("lesson_transcripts")
+    .select("recording_id")
+    .eq("lesson_id", lessonId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (t?.recording_id && ids.has(t.recording_id)) return t.recording_id;
+  return (rows.find((r) => r.status === "ready") ?? rows[0]).id;
 }
 
 /** Videos removed from a lesson whose original is kept, for Restore video. */

@@ -9,16 +9,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { LessonVideo } from "@/components/lesson-video";
+import { AngleVideo, angleShift, openingAngle, type Angle } from "@/components/angle-video";
 import { cx } from "@/components/ui";
 import { MusicPanel, type ViewerScore } from "@/components/score-viewer";
 import { formatClock, type Jump } from "@/lib/lesson-moments";
 
-export type PopupRecording = {
-  id: string;
-  url: string | null;
-  streamReady: boolean;
-  name: string;
+export type PopupRecording = Angle & {
+  /** Videos of the same lesson are camera angles of each other. */
+  lessonId: string;
 };
 
 type Ctx = {
@@ -73,6 +71,7 @@ export function VideoPopupProvider({
         <Popup
           key={nonce}
           rec={rec}
+          angles={[...byId.values()].filter((r) => r.lessonId === rec.lessonId)}
           jump={jump}
           music={score && studentId && jump.music ? { score, studentId } : null}
           fullQuality={fullQuality}
@@ -121,22 +120,30 @@ export function JumpButton({
 // Each jump mounts a fresh popup (keyed by the jump), so clip state starts clean.
 function Popup({
   rec,
+  angles,
   jump,
   music,
   fullQuality,
   onClose,
 }: {
   rec: PopupRecording;
+  angles: PopupRecording[];
   jump: Jump;
   music: { score: ViewerScore; studentId: string } | null;
   fullQuality: boolean;
   onClose: () => void;
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const ready = useRef(false);
-  const [time, setTime] = useState(jump.seconds);
+  // Opens on the main camera when it lines up; the viewer can switch angle.
+  const [angleId, setAngleId] = useState(() => openingAngle(angles, rec.id, jump.seconds));
+  const angle = angles.find((a) => a.id === angleId) ?? rec;
+  // The clip's times are in the jump's own video; move them to the angle shown.
+  const shift = angleShift(rec, angle) ?? 0;
+  const clipStart = Math.max(0, jump.seconds + shift);
+  const [time, setTime] = useState(clipStart);
   // The clip stops at the next bookmark, unless the viewer chose to keep going.
-  const end = jump.endSeconds ?? null;
+  const end = jump.endSeconds == null ? null : jump.endSeconds + shift;
   const [free, setFree] = useState(false);
   const [ended, setEnded] = useState(false);
 
@@ -184,8 +191,8 @@ function Popup({
           <div className="min-w-0 flex-1">
             <div className="font-semibold">{jump.label}</div>
             <div className="text-xs text-white/60">
-              {formatClock(jump.seconds)}–
-              {end === null ? "end" : formatClock(end)} · {rec.name}
+              {formatClock(clipStart)}–
+              {end === null ? "end" : formatClock(end)} · {angle.name}
             </div>
           </div>
           <button
@@ -207,51 +214,48 @@ function Popup({
         )}
         <div className={cx("flex min-h-0 flex-col", music && "lg:flex-row")}>
           <div className={cx("flex min-w-0 flex-col", music && "lg:flex-[3]")}>
-            <div className="relative">
-              <LessonVideo
-                key={rec.id}
-                ref={videoRef}
-                recordingId={rec.id}
-                src={rec.url}
-                streamReady={rec.streamReady}
-                controls
-                autoPlay
-                playsInline
-                preload="auto"
-                className={cx(
-                  "aspect-video w-full bg-black",
-                  music ? "max-h-[34vh] lg:max-h-[60vh]" : "max-h-[60vh]",
-                )}
-                onLoadedMetadata={() => {
-                  if (!ready.current) {
-                    ready.current = true;
-                    playFrom(jump.seconds);
-                  }
-                }}
-                onTimeUpdate={(e) => {
-                  const v = e.currentTarget;
-                  setTime(v.currentTime);
-                  if (end !== null && !free && !ended && v.currentTime >= end) {
-                    v.pause();
-                    setEnded(true);
-                  }
-                }}
-                onSeeked={(e) => {
-                  // Seeking back inside the clip arms the stop again.
-                  if (
-                    ended &&
-                    end !== null &&
-                    e.currentTarget.currentTime < end - 0.5
-                  )
-                    setEnded(false);
-                }}
-              />
+            <AngleVideo
+              angles={angles}
+              current={angle.id}
+              onSwitch={setAngleId}
+              videoRef={videoRef}
+              tone="dark"
+              autoPlay
+              preload="auto"
+              className={cx(
+                "aspect-video w-full bg-black",
+                music ? "max-h-[34vh] lg:max-h-[60vh]" : "max-h-[60vh]",
+              )}
+              onLoadedMetadata={() => {
+                if (!ready.current) {
+                  ready.current = true;
+                  playFrom(clipStart);
+                }
+              }}
+              onTimeUpdate={(e) => {
+                const v = e.currentTarget;
+                setTime(v.currentTime);
+                if (end !== null && !free && !ended && v.currentTime >= end) {
+                  v.pause();
+                  setEnded(true);
+                }
+              }}
+              onSeeked={(e) => {
+                // Seeking back inside the clip arms the stop again.
+                if (
+                  ended &&
+                  end !== null &&
+                  e.currentTarget.currentTime < end - 0.5
+                )
+                  setEnded(false);
+              }}
+            >
               {ended && (
                 <div className="absolute inset-x-0 bottom-12 flex justify-center gap-2 px-3">
                   <button
                     onClick={() => {
                       setEnded(false);
-                      playFrom(jump.seconds);
+                      playFrom(clipStart);
                     }}
                     className="min-h-10 rounded-xl bg-white/90 px-4 text-sm font-semibold text-black"
                   >
@@ -269,7 +273,7 @@ function Popup({
                   </button>
                 </div>
               )}
-            </div>
+            </AngleVideo>
             <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
               <button
                 onClick={() => nudge(-10)}
@@ -280,11 +284,11 @@ function Popup({
               <button
                 onClick={() => {
                   setEnded(false);
-                  playFrom(jump.seconds);
+                  playFrom(clipStart);
                 }}
                 className="min-h-9 rounded-lg bg-white/10 px-3"
               >
-                Back to {formatClock(jump.seconds)}
+                Back to {formatClock(clipStart)}
               </button>
               <button
                 onClick={() => nudge(10)}
@@ -292,9 +296,9 @@ function Popup({
               >
                 10s ↻
               </button>
-              {fullQuality && rec.url && (
+              {fullQuality && angle.url && (
                 <a
-                  href={`/recordings/${rec.id}/full?t=${Math.floor(time)}`}
+                  href={`/recordings/${angle.id}/full?t=${Math.floor(time)}`}
                   target="_blank"
                   rel="noreferrer"
                   className="ml-auto text-white/80 underline"

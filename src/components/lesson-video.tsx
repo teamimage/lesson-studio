@@ -13,6 +13,8 @@ type Props = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src" | "ref"> & {
   /** True when a streaming copy is ready; its address is fetched on mount. */
   streamReady: boolean;
   ref?: Ref<HTMLVideoElement>;
+  /** Angles of one multi-angle player share a group and may play together. */
+  group?: string;
 };
 
 /**
@@ -21,9 +23,9 @@ type Props = Omit<VideoHTMLAttributes<HTMLVideoElement>, "src" | "ref"> & {
  * back to the original file if the stream can't be loaded. It's an ordinary
  * <video> either way, so seeking (music stand timeline) works the same.
  */
-export function LessonVideo({ recordingId, src, streamReady, ref, ...rest }: Props) {
+export function LessonVideo({ recordingId, src, streamReady, ref, group, ...rest }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  useContainedVideo(videoRef);
+  useContainedVideo(videoRef, group);
 
   const setRef = (el: HTMLVideoElement | null) => {
     videoRef.current = el;
@@ -84,5 +86,5 @@ export function LessonVideo({ recordingId, src, streamReady, ref, ...rest }: Pro
     };
   }, [recordingId, src, streamReady]);
 
-  return <video ref={setRef} {...rest} {...CONTAINED_VIDEO_PROPS} />;
+  return <video ref={setRef} data-angle-group={group} {...rest} {...CONTAINED_VIDEO_PROPS} />;
 }
