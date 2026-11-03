@@ -472,6 +472,7 @@ export type Database = {
           playing_seconds: number;
           practice_date: string;
           provider_job_id: string | null;
+          recording_missing: boolean;
           size_bytes: number | null;
           started_at: string;
           status: string;
@@ -498,6 +499,7 @@ export type Database = {
           playing_seconds?: number;
           practice_date?: string;
           provider_job_id?: string | null;
+          recording_missing?: boolean;
           size_bytes?: number | null;
           started_at: string;
           status?: string;
@@ -524,6 +526,7 @@ export type Database = {
           playing_seconds?: number;
           practice_date?: string;
           provider_job_id?: string | null;
+          recording_missing?: boolean;
           size_bytes?: number | null;
           started_at?: string;
           status?: string;

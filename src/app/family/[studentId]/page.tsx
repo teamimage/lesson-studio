@@ -336,7 +336,7 @@ async function Body({
           )}
 
           <section>
-            <SectionTitle>Reviews, lesson to lesson</SectionTitle>
+            <SectionTitle>Weekly practice reviews</SectionTitle>
             <PeriodReviewList
               studentId={studentId}
               periods={periods}
@@ -345,8 +345,11 @@ async function Body({
           </section>
 
           <section>
-            <SectionTitle>{capitalize(practiceSpanLabel(week))}</SectionTitle>
+            <SectionTitle>Practice record</SectionTitle>
             <Card>
+              <div className="mb-2 text-sm font-medium text-muted">
+                {capitalize(practiceSpanLabel(week))}
+              </div>
               <WeekStrip week={week} large days={practiceDays} teacherView={isTeacher} />
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <Pill

@@ -77,12 +77,13 @@ export function PracticeGrid({
             const did = practiced(log);
             const short = did && (log?.minutes ?? 0) > 0 && (log?.minutes ?? 0) < 10;
             const sessions = days?.[d]?.sessions.length ?? 0;
+            const noRecording = !!days?.[d]?.noRecording;
             return (
               <PracticeDayCell
                 key={d}
                 day={days?.[d]}
                 teacherView={teacherView}
-                title={`${formatDate(d, "weekday")}${log?.minutes ? ` · ${log.minutes} min` : ""}${log?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}`}
+                title={`${formatDate(d, "weekday")}${log?.minutes ? ` · ${log.minutes} min` : ""}${log?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}${noRecording ? " · no recording" : ""}`}
                 className={cx(
                   "relative flex h-11 flex-col items-center justify-center rounded-lg",
                   did ? (short ? "bg-sage/40 text-ink" : "bg-sage text-white") : "bg-rule/50 text-muted",
@@ -94,7 +95,16 @@ export function PracticeGrid({
                 </span>
                 <span className="mt-1 text-[13px] font-semibold leading-none">{log?.minutes ? log.minutes : ""}</span>
                 {log?.listened && <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-plum" />}
-                {sessions > 0 && <span className="absolute top-0.5 right-1 text-[9px] leading-none" aria-hidden>●</span>}
+                {noRecording ? (
+                  <span
+                    className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger text-[9px] font-bold leading-none text-white ring-2 ring-paper"
+                    aria-label="logged without a recording"
+                  >
+                    !
+                  </span>
+                ) : (
+                  sessions > 0 && <span className="absolute top-0.5 right-1 text-[9px] leading-none" aria-hidden>●</span>
+                )}
               </PracticeDayCell>
             );
           })}

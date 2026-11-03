@@ -8,7 +8,7 @@ import { PRACTICE_BUCKET } from "@/lib/constants";
 import { toISODate } from "@/lib/format";
 import { clock, QUIET_DB, type ActivitySecond } from "@/lib/practice/activity";
 import { detectPitch, levelDb } from "@/lib/practice/pitch";
-import { createPracticeSession, deletePracticeSession, finishPracticeUpload } from "@/app/family/practice-actions";
+import { attachPracticeRecording, createPracticeSession, finishPracticeUpload } from "@/app/family/practice-actions";
 import { Button, Card, cx } from "@/components/ui";
 
 // Start practice / Stop practice. Records audio (or video with audio) in the
@@ -280,7 +280,7 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
     if (previewRef.current) previewRef.current.srcObject = null;
     const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
     chunksRef.current = [];
-    if (!t0 || blob.size === 0) {
+    if (!t0) {
       setPhase({ name: "error", message: "Nothing was recorded. Try again." });
       return;
     }
@@ -299,57 +299,80 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
     await upload(blob, input);
   }
 
-  async function upload(blob: Blob, input: Parameters<typeof createPracticeSession>[0]) {
+  async function upload(
+    blob: Blob,
+    input: Parameters<typeof createPracticeSession>[0],
+    existing?: { id: string; path: string },
+  ) {
     setPhase({ name: "uploading", progress: 0 });
-    const created = await createPracticeSession(input).catch(() => ({ error: "Couldn't reach the server." }));
-    if ("error" in created) {
-      setPhase({ name: "error", message: created.error, retry: () => void upload(blob, input) });
-      return;
+    let created = existing;
+    if (!created) {
+      const made = await createPracticeSession(input).catch(() => ({ error: "Couldn't reach the server." }));
+      if ("error" in made) {
+        setPhase({ name: "error", message: made.error, retry: () => void upload(blob, input) });
+        return;
+      }
+      created = made;
     }
+    const session = created;
     const supabase = createClient();
     let failStatus: number | undefined;
-    const ok = await new Promise<boolean>((resolve) => {
-      const up = new tus.Upload(blob, {
-        endpoint: resumableEndpoint(),
-        retryDelays: [0, 2000, 5000, 10000, 20000, 30000, 60000],
-        chunkSize: CHUNK_SIZE,
-        uploadDataDuringCreation: true,
-        removeFingerprintOnSuccess: true,
-        headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, "x-upsert": "true" },
-        metadata: {
-          bucketName: PRACTICE_BUCKET,
-          objectName: created.path,
-          contentType: blob.type.split(";")[0] || "application/octet-stream",
-          cacheControl: "3600",
-        },
-        onBeforeRequest: async (req) => {
-          const { data } = await supabase.auth.getSession();
-          if (data.session) req.setHeader("authorization", `Bearer ${data.session.access_token}`);
-        },
-        onProgress: (sent, total) => setPhase({ name: "uploading", progress: total ? sent / total : 0 }),
-        onError: (err) => {
-          failStatus = (err as tus.DetailedError).originalResponse?.getStatus();
-          resolve(false);
-        },
-        onSuccess: () => resolve(true),
-      });
-      up.start();
-    });
+    const ok =
+      blob.size > 0 &&
+      (await new Promise<boolean>((resolve) => {
+        const up = new tus.Upload(blob, {
+          endpoint: resumableEndpoint(),
+          retryDelays: [0, 2000, 5000, 10000, 20000, 30000, 60000],
+          chunkSize: CHUNK_SIZE,
+          uploadDataDuringCreation: true,
+          removeFingerprintOnSuccess: true,
+          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, "x-upsert": "true" },
+          metadata: {
+            bucketName: PRACTICE_BUCKET,
+            objectName: session.path,
+            contentType: blob.type.split(";")[0] || "application/octet-stream",
+            cacheControl: "3600",
+          },
+          onBeforeRequest: async (req) => {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) req.setHeader("authorization", `Bearer ${data.session.access_token}`);
+          },
+          onProgress: (sent, total) => setPhase({ name: "uploading", progress: total ? sent / total : 0 }),
+          onError: (err) => {
+            failStatus = (err as tus.DetailedError).originalResponse?.getStatus();
+            resolve(false);
+          },
+          onSuccess: () => resolve(true),
+        });
+        up.start();
+      }));
+
     if (!ok) {
-      await deletePracticeSession(created.id).catch(() => {});
+      // The practice still happened: log it for the day and send it to the
+      // teacher, reviewed from the sound timeline, marked "no recording".
+      if (!existing) await finishPracticeUpload(session.id, true).catch(() => null);
+      const why =
+        blob.size === 0
+          ? "the phone didn't capture any audio"
+          : failStatus === 401 || failStatus === 403
+            ? "storage refused the file"
+            : failStatus === 413
+              ? "the file is larger than the storage limit"
+              : "the connection dropped";
       setPhase({
         name: "error",
         message:
-          failStatus === 401 || failStatus === 403
-            ? "The upload wasn't allowed by the storage settings. Press Try again; if it keeps happening, tell your teacher. The recording is still on this page."
-            : failStatus === 413
-              ? "This recording is larger than the storage limit allows."
-              : "The upload didn't finish. Check the Wi-Fi and press Try again; the recording is still on this page.",
-        retry: () => void upload(blob, input),
+          `Practice logged and sent to the teacher, but the recording didn't upload (${why}), so it's marked "no recording".` +
+          (blob.size > 0 ? " Press Try again to add it; the recording is still on this page." : ""),
+        retry: blob.size > 0 ? () => void upload(blob, input, session) : undefined,
       });
+      router.refresh();
       return;
     }
-    const finished = await finishPracticeUpload(created.id).catch(() => null);
+    const finished = await (existing
+      ? attachPracticeRecording(session.id, session.path)
+      : finishPracticeUpload(session.id)
+    ).catch(() => null);
     if (!finished) {
       setPhase({ name: "error", message: "Couldn't start the review. It will try again when this page is opened." });
       router.refresh();
@@ -362,7 +385,7 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
       setPhase({ name: "error", message: finished.error || "The review didn't finish." });
       router.refresh();
     } else {
-      setPhase({ name: "reviewing", sessionId: created.id });
+      setPhase({ name: "reviewing", sessionId: session.id });
       router.refresh();
     }
   }

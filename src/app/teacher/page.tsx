@@ -337,6 +337,10 @@ async function StudentPanel({ student }: { student: Student }) {
               <span className="flex items-center gap-1.5">
                 <span className="text-[9px] leading-none">●</span> recorded session (tap for grade)
               </span>
+              <span className="flex items-center gap-1.5">
+                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white">!</span>
+                Start/Stop logged, no recording
+              </span>
             </div>
             {month.some((l) => l.parent_note?.trim()) && (
               <ul className="flex flex-col gap-1.5 text-sm">

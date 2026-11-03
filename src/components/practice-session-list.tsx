@@ -69,6 +69,9 @@ function SessionCard({
                 {formatDate(s.practice_date, "weekday")}, <LocalTime iso={s.started_at} />
               </span>
               {s.media === "video" && <Pill>video</Pill>}
+              {(s as { recording_missing?: boolean }).recording_missing && (
+                <Pill tone="danger">! no recording</Pill>
+              )}
               {s.status === "done" && s.counted === false && <Pill tone="amber">not counted</Pill>}
               {working && <Pill tone="plum">listening…</Pill>}
               {s.status === "uploading" && <Pill>{stuckUpload ? "upload didn't finish" : "sending…"}</Pill>}

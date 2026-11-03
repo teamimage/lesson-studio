@@ -58,13 +58,52 @@ function messageOf(e: unknown): string {
   return "Something went wrong.";
 }
 
-export async function finishUpload(id: string): Promise<PracticeState> {
+/**
+ * Flags a session whose recording never reached storage. Kept separate from
+ * other updates so it does nothing (rather than breaking the update) before
+ * practice-upload-fix.sql has added the column.
+ */
+async function setRecordingMissing(db: Db, id: string, missing: boolean) {
+  await db.from("practice_sessions").update({ recording_missing: missing }).eq("id", id);
+}
+
+/**
+ * The recording finished uploading (or, with `noRecording`, never made it).
+ * Without a recording the session is still logged and reviewed from the
+ * sound timeline the phone wrote down while recording; only the
+ * transcript of any talking is missing.
+ */
+export async function finishUpload(id: string, opts: { noRecording?: boolean } = {}): Promise<PracticeState> {
   const db = await createClient();
-  const s = await load(db, id);
+  let s = await load(db, id);
   if (!s) return { status: "error", error: SETUP_ERROR, counted: null };
   if (s.status !== "uploading") return stateOf(s);
+  if (opts.noRecording) {
+    await setRecordingMissing(db, id, true);
+    s = (await patch(db, id, { storage_path: null }, ["uploading"])) ?? s;
+  }
 
   const activity = parseActivity(s.activity);
+  if (opts.noRecording && tooQuiet(activity, s.duration_seconds)) {
+    // Start and Stop were pressed but neither a recording nor the sound
+    // timeline came through. Log the time anyway; there's nothing to review.
+    const analysis: PracticeAnalysis = {
+      counted: true,
+      not_counted_reason: "",
+      summary: "Practice logged with Start and Stop. No sound came through from the phone, so there's no review or grade for this one.",
+      items: [],
+      repertoire: [],
+      other: [],
+      timeline: [],
+      encouragement: "",
+      going_well: [],
+      work_on: [],
+      teacher_note: "Logged by Start/Stop only: no audio recording or sound timeline reached the app.",
+    };
+    const done = await patch(db, id, { status: "done", counted: true, analysis: analysis as unknown as Json }, ["uploading"]);
+    if (done && !done.applied) await applyToLog(db, done, analysis);
+    return stateOf(done ?? s);
+  }
   if (tooQuiet(activity, s.duration_seconds)) {
     const analysis: PracticeAnalysis = {
       counted: false,
@@ -107,6 +146,24 @@ export async function finishUpload(id: string): Promise<PracticeState> {
   const claimed = await patch(db, id, { status: "analyzing", error: null }, ["uploading"]);
   if (!claimed) return stateOf((await load(db, id)) ?? s);
   return review(db, claimed);
+}
+
+/**
+ * A recording that failed to upload at Stop has now uploaded: clear the
+ * warning and review the session again with the transcript. Minutes and
+ * ticks were already added to the log the first time (`applied`), so they
+ * aren't added twice.
+ */
+export async function attachRecording(id: string, path: string): Promise<PracticeState | null> {
+  const db = await createClient();
+  const s = await load(db, id);
+  if (!s) return null;
+  if (path !== `${s.student_id}/${s.id}.${path.split(".").pop()}`) return stateOf(s);
+  if (s.status === "transcribing" || s.status === "analyzing") return stateOf(s);
+  const reopened = await patch(db, id, { status: "uploading", storage_path: path, error: null }, ["done", "error"]);
+  if (!reopened) return stateOf(s);
+  await setRecordingMissing(db, id, false);
+  return finishUpload(id);
 }
 
 export async function advance(id: string): Promise<PracticeState | null> {

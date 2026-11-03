@@ -39,6 +39,8 @@ export type DaySession = {
   status: string;
   counted: boolean | null;
   review: PracticeAnalysis | null;
+  /** Start/Stop was pressed but the recording never uploaded. */
+  recording_missing: boolean;
 };
 
 /** Everything the practice chart's popup shows for one day. */
@@ -50,6 +52,8 @@ export type PracticeDay = {
   ticked: string[];
   parentNote: string | null;
   sessions: DaySession[];
+  /** Some session that day was logged without its recording. */
+  noRecording: boolean;
   /** Assignment titles by id, for the items in the reviews. */
   titles: Record<string, string>;
 };
@@ -69,7 +73,9 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
       .lte("practice_date", to),
     db
       .from("practice_sessions")
-      .select("id, practice_date, started_at, duration_seconds, playing_seconds, media, status, counted, analysis")
+      // "*" rather than a column list, so this still works before
+      // practice-upload-fix.sql adds recording_missing.
+      .select("*")
       .eq("student_id", studentId)
       .gte("practice_date", from)
       .lte("practice_date", to)
@@ -86,7 +92,7 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
 
   const days: Record<string, PracticeDay> = {};
   const day = (date: string) =>
-    (days[date] ??= { date, minutes: 0, listened: false, ticked: [], parentNote: null, sessions: [], titles });
+    (days[date] ??= { date, minutes: 0, listened: false, ticked: [], parentNote: null, sessions: [], noRecording: false, titles });
   for (const l of logs ?? []) {
     const d = day(l.practice_date);
     d.minutes = l.minutes ?? 0;
@@ -97,6 +103,8 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
   for (const s of sessions ?? []) {
     // Uploads that never finished have nothing to show.
     if (s.status === "uploading") continue;
+    const missing = !!(s as { recording_missing?: boolean }).recording_missing;
+    if (missing) day(s.practice_date).noRecording = true;
     day(s.practice_date).sessions.push({
       id: s.id,
       started_at: s.started_at,
@@ -106,6 +114,7 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
       status: s.status,
       counted: s.counted,
       review: (s.analysis as PracticeAnalysis | null) ?? null,
+      recording_missing: missing,
     });
   }
   return days;

@@ -27,13 +27,14 @@ export function WeekStrip({
         const d = parseISODate(day);
         const letter = d.toLocaleDateString("en-US", { weekday: "narrow" });
         const recorded = (days?.[day]?.sessions.length ?? 0) > 0;
+        const noRecording = !!days?.[day]?.noRecording;
         return (
           <div key={day} className="flex flex-col items-center gap-1">
             <span className="text-[11px] leading-none text-muted">{letter}</span>
             <PracticeDayCell
               day={days?.[day]}
               teacherView={teacherView}
-              title={`${day}${log?.minutes ? ` · ${log.minutes} min` : ""}${recorded ? " · recorded" : ""}`}
+              title={`${day}${log?.minutes ? ` · ${log.minutes} min` : ""}${recorded ? " · recorded" : ""}${noRecording ? " · no recording" : ""}`}
               className={cx(
                 "relative flex items-center justify-center rounded-full border text-xs font-semibold",
                 large ? "h-10 w-10 text-sm" : "h-8 w-8",
@@ -46,6 +47,14 @@ export function WeekStrip({
               )}
             >
               {d.getDate()}
+              {noRecording && (
+                <span
+                  className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-bold leading-none text-white ring-2 ring-paper"
+                  aria-label="logged without a recording"
+                >
+                  !
+                </span>
+              )}
             </PracticeDayCell>
             {log?.listened && <span className="h-1.5 w-1.5 rounded-full bg-plum" title="listened" />}
           </div>

@@ -49,3 +49,8 @@ create policy "family deletes practice" on storage.objects for delete to authent
         and (public.teaches_student(s.id) or public.parents_student(s.id))
     )
   );
+
+-- Sessions where Start/Stop was pressed but the recording never uploaded.
+-- They are still logged and sent to the teacher, with a red "!" warning.
+alter table public.practice_sessions
+  add column if not exists recording_missing boolean not null default false;

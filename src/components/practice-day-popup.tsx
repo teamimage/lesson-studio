@@ -227,6 +227,17 @@ function SessionBlock({
           <GradeBlock session={s} small />
         </div>
       )}
+      {s.recording_missing && (
+        <div className="flex items-start gap-2 rounded-xl bg-danger-soft px-3 py-2 text-sm">
+          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white">
+            !
+          </span>
+          <span>
+            Logged by Start/Stop, no audio recording. The recording didn&apos;t upload, so nothing was transcribed;
+            {s.review?.items.length ? " the review is from the sound levels and notes the phone noted while recording." : " there is no review."}
+          </span>
+        </div>
+      )}
       <div className="text-sm text-muted">
         Started <LocalTime iso={s.started_at} /> · {minutesText(s.duration_seconds)} session ·{" "}
         {minutesText(s.playing_seconds)} playing{s.media === "video" ? " · video" : ""}

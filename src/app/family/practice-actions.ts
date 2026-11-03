@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PRACTICE_BUCKET } from "@/lib/constants";
 import type { Json } from "@/lib/supabase/types";
 import { parseActivity, playingSeconds } from "@/lib/practice/activity";
-import { deleteRecording, finishUpload, retry, type PracticeState } from "@/lib/practice/process";
+import { attachRecording, deleteRecording, finishUpload, retry, type PracticeState } from "@/lib/practice/process";
 
 export type NewPracticeInput = {
   studentId: string;
@@ -78,9 +78,21 @@ export async function createPracticeSession(input: NewPracticeInput): Promise<{ 
   return { id: row.id, path };
 }
 
-/** Called once the recording is uploaded; starts the review. */
-export async function finishPracticeUpload(id: string): Promise<PracticeState> {
-  const out = await finishUpload(id);
+/**
+ * Called once the recording is uploaded, or with `noRecording` when it
+ * couldn't be: the practice is logged and reviewed either way.
+ */
+export async function finishPracticeUpload(id: string, noRecording = false): Promise<PracticeState> {
+  const out = await finishUpload(id, { noRecording });
+  const db = await createClient();
+  const { data } = await db.from("practice_sessions").select("student_id").eq("id", id).maybeSingle();
+  if (data) revalidate(data.student_id);
+  return out;
+}
+
+/** A recording that failed at Stop uploaded on a later try. */
+export async function attachPracticeRecording(id: string, path: string): Promise<PracticeState | null> {
+  const out = await attachRecording(id, path);
   const db = await createClient();
   const { data } = await db.from("practice_sessions").select("student_id").eq("id", id).maybeSingle();
   if (data) revalidate(data.student_id);

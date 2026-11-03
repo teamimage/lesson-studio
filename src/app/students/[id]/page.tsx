@@ -145,9 +145,12 @@ async function Body({ params }: { params: Params }) {
               </span>
             }
           >
-            Practice {practiceSpanLabel(week)}
+            Practice record
           </SectionTitle>
           <Card>
+            <div className="mb-2 text-sm font-medium text-muted">
+              {practiceSpanLabel(week).replace(/^./, (c) => c.toUpperCase())}
+            </div>
             <WeekStrip week={week} days={practiceDays} teacherView />
             {week.notes.length > 0 && (
               <ul className="mt-3 flex flex-col gap-1.5 text-sm">
@@ -172,7 +175,7 @@ async function Body({ params }: { params: Params }) {
         )}
 
         <section>
-          <SectionTitle>Reviews, lesson to lesson</SectionTitle>
+          <SectionTitle>Weekly practice reviews</SectionTitle>
           <PeriodReviewList studentId={id} periods={periods} writeMissing />
         </section>
 
