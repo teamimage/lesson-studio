@@ -17,6 +17,9 @@ import { practiceJumps } from "@/lib/practice-jumps";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { listScores } from "@/lib/scores";
 import { listPracticeDays } from "@/lib/practice/data";
+import { listenTracksFor } from "@/lib/reference-data";
+import { parsePlays } from "@/lib/reference-recordings";
+import { ListenPlayer } from "@/components/listen-player";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ saved?: string; error?: string }>;
@@ -49,6 +52,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const watch = plan ? await practiceJumps(plan, scores) : { jumps: {}, recordings: [] };
   const first = student.name.split(" ")[0];
   const done = new Set(log?.completed_assignment_ids ?? []);
+  const listenTracks = plan ? await listenTracksFor(plan.assignments.map((a) => a.reference_recording_id)) : {};
+  const plays = parsePlays(log?.listen_plays);
   const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
   const practiceDays = week.days.length
     ? await listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1])
@@ -115,6 +120,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 <ol className="flex flex-col gap-3">
                   {plan.assignments.map((a, i) => {
                     const j = watch.jumps[a.id];
+                    const track = a.reference_recording_id ? listenTracks[a.reference_recording_id] : undefined;
                     return (
                       <li key={a.id}>
                         <label
@@ -124,6 +130,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                           )}
                         >
                           <input
+                            key={`${a.id}-${done.has(a.id)}`}
                             type="checkbox"
                             name="done"
                             value={a.id}
@@ -145,6 +152,19 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                             )}
                           </span>
                         </label>
+                        {track && (
+                          <div className="mt-2 px-1">
+                            <ListenPlayer
+                              key={`${a.id}-${today}`}
+                              track={track}
+                              assignmentId={a.id}
+                              studentId={studentId}
+                              date={today}
+                              times={Math.max(1, a.listen_times ?? 1)}
+                              initialPlays={plays[a.id] ?? 0}
+                            />
+                          </div>
+                        )}
                       </li>
                     );
                   })}

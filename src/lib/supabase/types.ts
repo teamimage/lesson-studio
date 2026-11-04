@@ -158,6 +158,8 @@ export type Database = {
       };
       assignments: {
         Row: {
+          listen_times: number | null;
+          reference_recording_id: string | null;
           created_at: string;
           every_day: boolean;
           how: string | null;
@@ -169,6 +171,8 @@ export type Database = {
           title: string;
         };
         Insert: {
+          listen_times?: number | null;
+          reference_recording_id?: string | null;
           created_at?: string;
           every_day?: boolean;
           how?: string | null;
@@ -180,6 +184,8 @@ export type Database = {
           title: string;
         };
         Update: {
+          listen_times?: number | null;
+          reference_recording_id?: string | null;
           created_at?: string;
           every_day?: boolean;
           how?: string | null;
@@ -614,6 +620,7 @@ export type Database = {
       };
       practice_logs: {
         Row: {
+          listen_plays: Json;
           completed_assignment_ids: string[];
           created_at: string;
           id: string;
@@ -626,6 +633,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          listen_plays?: Json;
           completed_assignment_ids?: string[];
           created_at?: string;
           id?: string;
@@ -638,6 +646,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          listen_plays?: Json;
           completed_assignment_ids?: string[];
           created_at?: string;
           id?: string;
@@ -658,6 +667,108 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      reference_recordings: {
+        Row: {
+          book: string | null;
+          created_at: string;
+          duration_seconds: number | null;
+          file_name: string | null;
+          id: string;
+          instrument: string | null;
+          link_url: string | null;
+          mime_type: string | null;
+          rights_confirmation_id: string | null;
+          rights_confirmed_at: string | null;
+          rights_confirmed_email: string | null;
+          rights_version: string | null;
+          score_id: string | null;
+          size_bytes: number | null;
+          source: string;
+          status: string;
+          storage_path: string | null;
+          teacher_id: string;
+          title: string;
+          track_no: number | null;
+        };
+        Insert: {
+          book?: string | null;
+          created_at?: string;
+          duration_seconds?: number | null;
+          file_name?: string | null;
+          id?: string;
+          instrument?: string | null;
+          link_url?: string | null;
+          mime_type?: string | null;
+          rights_confirmation_id?: string | null;
+          rights_confirmed_at?: string | null;
+          rights_confirmed_email?: string | null;
+          rights_version?: string | null;
+          score_id?: string | null;
+          size_bytes?: number | null;
+          source?: string;
+          status?: string;
+          storage_path?: string | null;
+          teacher_id: string;
+          title: string;
+          track_no?: number | null;
+        };
+        Update: {
+          book?: string | null;
+          created_at?: string;
+          duration_seconds?: number | null;
+          file_name?: string | null;
+          id?: string;
+          instrument?: string | null;
+          link_url?: string | null;
+          mime_type?: string | null;
+          rights_confirmation_id?: string | null;
+          rights_confirmed_at?: string | null;
+          rights_confirmed_email?: string | null;
+          rights_version?: string | null;
+          score_id?: string | null;
+          size_bytes?: number | null;
+          source?: string;
+          status?: string;
+          storage_path?: string | null;
+          teacher_id?: string;
+          title?: string;
+          track_no?: number | null;
+        };
+        Relationships: [];
+      };
+      reference_rights_confirmations: {
+        Row: {
+          confirmed_at: string;
+          confirmed_by: string;
+          confirmed_email: string;
+          file_names: string[];
+          id: string;
+          statement: string;
+          statement_version: string;
+          teacher_id: string;
+        };
+        Insert: {
+          confirmed_at?: string;
+          confirmed_by?: string;
+          confirmed_email?: string;
+          file_names?: string[];
+          id?: string;
+          statement: string;
+          statement_version: string;
+          teacher_id: string;
+        };
+        Update: {
+          confirmed_at?: string;
+          confirmed_by?: string;
+          confirmed_email?: string;
+          file_names?: string[];
+          id?: string;
+          statement?: string;
+          statement_version?: string;
+          teacher_id?: string;
+        };
+        Relationships: [];
       };
       recordings: {
         Row: {

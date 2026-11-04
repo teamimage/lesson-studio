@@ -54,6 +54,11 @@ export function AssignmentList({
                 <div className="flex flex-wrap items-center gap-1.5">
                   <Pill tone={KIND_TONE[a.kind]}>{a.kind}</Pill>
                   <Pill>{a.every_day ? "every day" : "not daily"}</Pill>
+                  {a.reference_recording_id && (
+                    <Pill tone="plum">
+                      ♪ recording{a.listen_times && a.listen_times > 1 ? ` · ${a.listen_times}×` : ""}
+                    </Pill>
+                  )}
                   {jump && (
                     <JumpButton jump={jump} className="font-medium">
                       ▶ Watch this in the lesson ({formatClock(jump.seconds)})

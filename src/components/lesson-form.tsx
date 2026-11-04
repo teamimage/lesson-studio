@@ -19,6 +19,8 @@ type Props = {
   previousAssignments: AssignmentInput[];
   action: (fd: FormData) => Promise<void>;
   isApproved?: boolean;
+  /** The studio's reference recordings, for Listening items. */
+  recordings?: { id: string; title: string; label: string; book: string | null }[];
 };
 
 const emptyPiece: PieceInput = { title: "", activity: "worked_on", notes: "" };
@@ -34,6 +36,7 @@ export function LessonForm({
   previousAssignments,
   action,
   isApproved,
+  recordings = [],
 }: Props) {
   const [basics, setBasics] = useState({
     lesson_date: initial.lesson_date,
@@ -73,6 +76,21 @@ export function LessonForm({
   }
   function updateAssignment(i: number, patch: Partial<AssignmentInput>) {
     setAssignments((as) => as.map((a, j) => (j === i ? { ...a, ...patch } : a)));
+  }
+  function pickRecording(i: number, recordingId: string) {
+    const r = recordings.find((x) => x.id === recordingId);
+    setAssignments((as) =>
+      as.map((a, j) => {
+        if (j !== i) return a;
+        const autoTitle = !a.title.trim() || /^listen to /i.test(a.title);
+        return {
+          ...a,
+          reference_recording_id: r ? r.id : null,
+          listen_times: r ? (a.listen_times ?? 1) : a.listen_times,
+          title: r && autoTitle ? `Listen to ${r.title}` : a.title,
+        };
+      }),
+    );
   }
   function addPieceAsAssignment(p: PieceInput) {
     if (!p.title) return;
@@ -273,6 +291,16 @@ export function LessonForm({
                 />
                 <RemoveButton onClick={() => setAssignments((as) => as.filter((_, j) => j !== i))} />
               </div>
+              {a.kind === "listening" && (
+                <ListeningFields
+                  recordings={recordings}
+                  recordingId={a.reference_recording_id ?? ""}
+                  times={a.listen_times ?? null}
+                  musicHref={`/students/${studentId}/music#recordings`}
+                  onRecording={(id) => pickRecording(i, id)}
+                  onTimes={(n) => updateAssignment(i, { listen_times: n })}
+                />
+              )}
               <label className="flex items-center gap-2 text-sm text-muted">
                 <input
                   type="checkbox"
@@ -374,5 +402,72 @@ function RemoveButton({ onClick }: { onClick: () => void }) {
     >
       ✕
     </button>
+  );
+}
+
+/** A Listening item's recording (from the studio's reference recordings) and plays a day. */
+function ListeningFields({
+  recordings,
+  recordingId,
+  times,
+  musicHref,
+  onRecording,
+  onTimes,
+}: {
+  recordings: { id: string; title: string; label: string; book: string | null }[];
+  recordingId: string;
+  times: number | null;
+  musicHref: string;
+  onRecording: (id: string) => void;
+  onTimes: (n: number | null) => void;
+}) {
+  if (!recordings.length) {
+    return (
+      <p className="text-sm text-muted">
+        To give the family a player for this, add the recording under{" "}
+        <a href={musicHref} className="text-accent-ink underline">
+          Music → Reference recordings
+        </a>
+        .
+      </p>
+    );
+  }
+  const groups = new Map<string, typeof recordings>();
+  for (const r of recordings) groups.set(r.book ?? "", [...(groups.get(r.book ?? "") ?? []), r]);
+  return (
+    <div className="flex gap-2">
+      <Select
+        className="min-w-0 flex-1"
+        aria-label="Recording to listen to"
+        value={recordingId}
+        onChange={(e) => onRecording(e.target.value)}
+      >
+        <option value="">No recording (just a reminder)</option>
+        {[...groups.entries()].map(([book, rows]) => (
+          <optgroup key={book || "none"} label={book || "Not in a book"}>
+            {rows.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </Select>
+      {recordingId && (
+        <label className="flex shrink-0 items-center gap-1.5 text-sm text-muted">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={20}
+            aria-label="Times a day"
+            className={cx(inputClass, "w-16 px-2 text-center")}
+            value={times ?? 1}
+            onChange={(e) => onTimes(e.target.value ? Math.max(1, Math.min(20, Number(e.target.value))) : null)}
+          />
+          × each day
+        </label>
+      )}
+    </div>
   );
 }
