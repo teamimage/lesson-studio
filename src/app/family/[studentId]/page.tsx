@@ -54,6 +54,9 @@ import { parsePlays } from "@/lib/reference-recordings";
 import { ListenPlayer } from "@/components/listen-player";
 import { ReminderList } from "@/components/reminder-editor";
 import { listActiveReminders } from "@/lib/reminders";
+import { getUiVersion } from "@/lib/ui-version-server";
+import { getPracticeView } from "@/lib/practice-view-server";
+import { PracticeViewToggle } from "@/components/practice-view-toggle";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ date?: string; saved?: string; error?: string }>;
@@ -87,7 +90,7 @@ async function Body({
   params: Params;
   searchParams: SP;
 }) {
-  const viewer = await getViewer();
+  const [viewer, ui, view] = await Promise.all([getViewer(), getUiVersion(), getPracticeView()]);
   const { studentId } = await params;
   const sp = await searchParams;
   const student = await getStudent(studentId);
@@ -137,8 +140,12 @@ async function Body({
     ? await listenTracksFor(plan.assignments.map((a) => a.reference_recording_id))
     : {};
   const plays = parsePlays(log?.listen_plays);
-  const isTeacher =
+  const ownTeacher =
     !!viewer.teacher && viewer.teacher.id === student.teacher_id;
+  // Proposed version: the teacher can switch to Family and see the page
+  // exactly as the parent does (no teacher notes, family grade wording).
+  const toggle = ui === "proposed" && ownTeacher;
+  const isTeacher = ownTeacher && !(toggle && view === "family");
   const firstName = student.name.split(" ")[0];
   const completed = new Set(log?.completed_assignment_ids ?? []);
 
@@ -183,6 +190,7 @@ async function Body({
         }))}
       >
         <div className="flex flex-col gap-6">
+          {toggle && <PracticeViewToggle view={view} />}
           {sp.saved && <Notice tone="sage">Saved. Nice work.</Notice>}
           {sp.error && (
             <Notice tone="danger">Couldn&apos;t save that. Try again.</Notice>
