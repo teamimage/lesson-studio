@@ -4,7 +4,9 @@ import { getViewer } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
-import { setPassword, updateTeacher } from "@/app/settings/actions";
+import { setPassword, updateReviewTone, updateTeacher } from "@/app/settings/actions";
+import { PROFILE_SECTIONS, QUESTIONS, REVIEW_TONES, TONE_LABELS, parseProfile, toneOf } from "@/lib/assistant/profile";
+import type { Json, Tables } from "@/lib/supabase/types";
 import { getUsageSummary } from "@/lib/ai/usage";
 import { formatUsd } from "@/lib/ai/pricing";
 import { formatDate } from "@/lib/format";
@@ -19,12 +21,12 @@ const PASSWORD_NOTICES: Record<string, { tone: "sage" | "danger" | "plum"; text:
   failed: { tone: "danger", text: "We couldn't save the password. Sign out and back in, then try again." },
 };
 
-export type SettingsSP = Promise<{ saved?: string; password?: string }>;
+export type SettingsSP = Promise<{ saved?: string; password?: string; assistant?: string }>;
 
 /** The Settings page body; also folded into the version 3 Setup page. */
 export async function SettingsBody({ searchParams, adminLink = true }: { searchParams: SettingsSP; adminLink?: boolean }) {
   const viewer = await getViewer();
-  const { saved, password } = await searchParams;
+  const { saved, password, assistant } = await searchParams;
   const admin = await isAdmin();
   const passwordNotice = password ? PASSWORD_NOTICES[password] : undefined;
   return (
@@ -53,6 +55,8 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
           </form>
         </section>
       )}
+
+      {viewer.teacher && <TeachingAssistant teacher={viewer.teacher} notice={assistant} />}
 
       {viewer.teacher && <AiCosts teacherId={viewer.teacher.id} />}
 
@@ -152,7 +156,9 @@ async function AiCosts({ teacherId }: { teacherId: string }) {
                     className="flex items-baseline justify-between gap-3 py-1.5"
                   >
                     <span className="min-w-0">
-                      {l.practice ? (
+                      {l.assistant ? (
+                        <span className="font-medium">Teaching assistant</span>
+                      ) : l.practice ? (
                         <span className="font-medium">
                           Practice reviews{l.studentName ? `: ${l.studentName}` : " (deleted sessions)"}
                         </span>
@@ -185,6 +191,57 @@ async function AiCosts({ teacherId }: { teacherId: string }) {
             </div>
           </>
         )}
+      </Card>
+    </section>
+  );
+}
+
+// The teacher's own teaching assistant: review tone, and a way into the chat
+// that builds their teaching profile.
+function TeachingAssistant({ teacher, notice }: { teacher: Tables<"teachers">; notice?: string }) {
+  const tone = toneOf(teacher.review_tone);
+  const profile = parseProfile(teacher.teaching_profile as Json | null | undefined);
+  const filled = PROFILE_SECTIONS.filter((s) => profile.sections[s.id]).length;
+  const answered = QUESTIONS.filter((q) => profile.answered.includes(q.id)).length;
+  return (
+    <section id="assistant" className="scroll-mt-6">
+      <SectionTitle>Your teaching assistant</SectionTitle>
+      <Card className="flex flex-col gap-4">
+        <p className="text-sm text-muted">
+          Bring your teaching style. Your assistant interviews you about how you teach and what good practice looks like
+          to you, and every practice review, grade and lesson draft then follows your standards and your words.
+        </p>
+        {notice === "saved" && <Notice tone="sage">Review tone saved.</Notice>}
+        {notice === "setup" && (
+          <Notice tone="danger">Run teaching-assistant.sql in the Supabase SQL Editor first, then save again.</Notice>
+        )}
+        <form action={updateReviewTone} className="flex flex-col gap-2">
+          <div className="text-sm font-semibold">How strict should reviews be?</div>
+          {REVIEW_TONES.map((t) => (
+            <label key={t} className="flex items-start gap-2.5 rounded-xl border border-rule px-3 py-2">
+              <input type="radio" name="review_tone" value={t} defaultChecked={tone === t} className="mt-1.5" />
+              <span>
+                <span className="font-medium">{TONE_LABELS[t].label}</span>
+                <span className="block text-sm text-muted">{TONE_LABELS[t].hint}</span>
+              </span>
+            </label>
+          ))}
+          <Button variant="secondary">Save review tone</Button>
+        </form>
+        <Link
+          href="/settings/assistant"
+          className="flex min-h-12 items-center justify-between rounded-2xl border border-accent/30 bg-accent-soft px-4 font-semibold text-accent-ink"
+        >
+          <span>
+            {answered === 0 ? "Start the interview" : "Talk to your assistant"}
+            <span className="block text-sm font-normal text-muted">
+              {answered === 0
+                ? "About 20 minutes, in as many sittings as you like"
+                : `${answered} of ${QUESTIONS.length} questions covered · ${filled} profile sections`}
+            </span>
+          </span>
+          <span aria-hidden>›</span>
+        </Link>
       </Card>
     </section>
   );

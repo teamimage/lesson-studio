@@ -16,6 +16,7 @@ import type { SessionIntonation } from "./review-types";
 import { matchMusic, musicByPiece, type MusicMatch } from "@/lib/melody";
 import { studentMelodies } from "@/lib/ai/transcribe-melody";
 import { methodText, practiceMethod } from "./method";
+import { teachingStyleFor } from "@/lib/ai/teaching-style";
 
 // A practice session after Stop:
 //
@@ -334,6 +335,7 @@ async function contextFor(db: Db, s: PracticeSession) {
       .limit(20),
     studentMelodies(db, s.student_id),
   ]);
+  const style = await teachingStyleFor(db, s.teacher_id);
   if (!student) throw new Error("That student wasn't found.");
   const activity = parseActivity(s.activity);
   const notes = extractNotes(activity);
@@ -372,6 +374,7 @@ async function contextFor(db: Db, s: PracticeSession) {
     scalesText: scalesText(scales),
     musicText: musicText(music, melodies.length),
     methodText: methodText(method),
+    style,
     intonationText: intonation ? intonationText(intonation, notes) : "",
     // Used after the review, not sent to Claude.
     notes,

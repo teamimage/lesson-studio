@@ -4,6 +4,7 @@ import type { LessonFull, Student } from "@/lib/data";
 import { SECTION_LABELS, isTextSection, type NoteSection, type SectionProposal } from "@/lib/note-sections";
 import type { ClaudeUsage } from "./pricing";
 import { DraftError, anthropicClient, lessonModel, usageRows } from "./draft-lesson";
+import { systemWithStyle, type TeachingStyle } from "./teaching-style";
 
 // The teacher holds one section of the lesson record and says (or types)
 // what should change. Claude rewrites only that section and returns it for
@@ -113,6 +114,7 @@ export async function reviseSection(
   student: Student,
   section: NoteSection,
   instruction: string,
+  style?: TeachingStyle,
 ): Promise<{ proposal: SectionProposal; usage: ClaudeUsage[] }> {
   const schema = section === "pieces" ? PIECES_SCHEMA : section === "assignments" ? ASSIGNMENTS_SCHEMA : TEXT_SCHEMA;
   const label = SECTION_LABELS[section];
@@ -130,7 +132,7 @@ export async function reviseSection(
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "low", format: { type: "json_schema", schema } },
-    system: SYSTEM,
+    system: systemWithStyle(SYSTEM, style, "lesson"),
     messages: [{ role: "user", content: prompt }],
   });
   const message = await stream.finalMessage();

@@ -3,6 +3,7 @@ import { anthropicClient, DraftError, lessonModel, usageRows } from "./draft-les
 import type { ClaudeUsage } from "./pricing";
 import { POINT_TOPICS, PRACTICE_GRADES, type PracticeAnalysis } from "@/lib/practice/review-types";
 import type { ScaleSummary } from "@/lib/practice/scales";
+import { systemWithStyle, type TeachingStyle } from "./teaching-style";
 
 // Claude reads a home practice session (the sound timeline the phone wrote
 // down while recording, plus any talking AssemblyAI transcribed) and works
@@ -35,6 +36,8 @@ export type PracticeContext = {
   methodText: string;
   /** Code's intonation summary; empty for piano or too few held notes. */
   intonationText: string;
+  /** The teacher's review tone and teaching profile. */
+  style?: TeachingStyle;
 };
 
 const POINT = {
@@ -152,7 +155,7 @@ grade: a letter grade, A, B, C, D or F, for the quality of the practice in this 
 A means focused practice that covered most of the list with real work on hard spots. B is good practice with one thing missing (a skipped assignment, little slow work). C is some useful practice but much left out or mostly playing through. D is a little real practice in a lot of wandering. F is reserved for a session that was counted but barely practice. Grade fairly and without inflation, but remember a parent and child will read it. Empty only when the session wasn't counted.
 grade_reason: one short, plain sentence (under 15 words) on the main reason for the grade, naming what would raise it when it isn't an A ("Covered everything with careful slow work on the shift." or "Lovely Gavotte; add the D major scale for an A.").
 
-Write for the parent and child in a plain, kind, factual voice, as a good teacher talks to a child: never scold, shame or sound suspicious, and never flatter. Praise has to be earned by the evidence: no "great job", "amazing" or "well done" for simply playing, for playing a lot, or for repeating things. These are children and practising at all counts for something, so say what was done, but say honestly how it was done. Keep everything short: these are a checklist and bullet points, not explanations.
+Write for the parent and child in a plain, kind, factual voice, as a good teacher talks to a child: never scold, shame or sound suspicious, and never flatter. Praise has to be earned by the evidence: no "great job", "amazing" or "well done" for simply playing, for playing a lot, or for repeating things. These are children and practising at all counts for something, so say what was done, but say honestly how it was done. How warm or firm to be is set by the teacher's review tone at the end of these instructions. Keep everything short: these are a checklist and bullet points, not explanations.
 - summary: a short paragraph of 2 to 4 sentences (at most about five lines on a phone) on what the session covered: what was played, in what order, and anything that stood out. Plain and warm, no lists.
 - encouragement: one short, specific line for the child about something that really was good ("Steady bow on the long notes in Gavotte."). When nothing in the session earned praise, make it a plain, kind nudge toward the one change that matters most instead ("Tomorrow, try the hard bar slowly five times before the whole piece."). Empty only when the session wasn't counted.
 - going_well: up to 4 bullets, each under 10 words, on what really went well, as specific as the evidence allows ("Looped bars 8-10 slowly, then played through", "Steady D major scale, two octaves"). Only what earned it: fewer bullets, even one or none, is better than padding. Restarting from the top many times is never a going_well bullet.
@@ -202,7 +205,7 @@ export async function analyzePractice(ctx: PracticeContext): Promise<{ analysis:
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
-    system: SYSTEM,
+    system: systemWithStyle(SYSTEM, ctx.style, "practice"),
     messages: [
       {
         role: "user",

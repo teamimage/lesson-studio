@@ -1,6 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { Constants, type Enums } from "@/lib/supabase/types";
+import { systemWithStyle, type TeachingStyle } from "./teaching-style";
 import type { ClaudeUsage } from "./pricing";
 import { MissingKeyError } from "./assemblyai";
 
@@ -41,6 +42,8 @@ export type DraftContext = {
   repertoire: { title: string; status: string }[];
   lastLesson: { date: string; summary: string | null; assignments: string[] } | null;
   transcript: string;
+  /** The teacher's review tone and teaching profile. */
+  style?: TeachingStyle;
 };
 
 const SCHEMA = {
@@ -103,7 +106,7 @@ const SYSTEM = `You help a private music teacher turn a recorded lesson into the
 
 The input is a machine transcript of a lesson video. Speakers are labelled A, B, C in order of first appearance; work out from context who is the teacher, the student and any parent. Long stretches of playing produce no words or garbled words; skip them. Timestamps are minutes:seconds from the start of the video. A line like "[12:40–13:25] (no talking: probably playing)" marks a stretch with no speech, usually the student playing.
 
-Most students follow the Suzuki method, where a parent supervises daily home practice. Write for that parent: warm, concrete, plain words, no jargon they would not know.
+Most students follow the Suzuki method, where a parent supervises daily home practice. Write for that parent: concrete, plain words, no jargon they would not know (but use the teacher's own terms from their teaching profile, explained once if needed). How warm or direct is set by the teacher's tone at the end of these instructions; never praise what the lesson did not show.
 
 Fill the fields like this:
 - summary: "Today we..." in 2-4 sentences. What was worked on, in lesson order.
@@ -154,7 +157,7 @@ export async function draftLesson(ctx: DraftContext): Promise<{ draft: LessonDra
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
-    system: SYSTEM,
+    system: systemWithStyle(SYSTEM, ctx.style, "lesson"),
     messages: [
       {
         role: "user",
