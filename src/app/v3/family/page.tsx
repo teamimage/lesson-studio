@@ -10,20 +10,24 @@ import { studentPhotoSrc } from "@/lib/constants";
 import { listStudents } from "@/lib/data";
 
 // Version 3 Family mode: pick a child (skipped when there is only one).
-export default function V3Family() {
+type SP = Promise<{ pick?: string }>;
+
+export default function V3Family({ searchParams }: { searchParams: SP }) {
   return (
     <Shell title="Who's practising?" v3Tab="family" me={<Me />} large>
       <Suspense fallback={<div className="h-40 animate-pulse rounded-2xl bg-sheet" />}>
-        <Body />
+        <Body searchParams={searchParams} />
       </Suspense>
     </Shell>
   );
 }
 
-async function Body() {
+async function Body({ searchParams }: { searchParams: SP }) {
   await getViewer();
+  const { pick } = await searchParams;
   const students = (await listStudents()).filter((s) => s.active);
-  if (students.length === 1) redirect(`/v3/family/${students[0].id}`);
+  // Skip the picker for a single student, unless they came back here on purpose.
+  if (students.length === 1 && !pick) redirect(`/v3/family/${students[0].id}`);
   if (students.length === 0) return <EmptyState title="No students yet">Add a student first.</EmptyState>;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
