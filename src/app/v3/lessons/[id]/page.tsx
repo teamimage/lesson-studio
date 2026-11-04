@@ -26,6 +26,8 @@ import { formatUsd } from "@/lib/ai/pricing";
 import { LinkMusic } from "@/components/link-music";
 import { VoiceEditSection } from "@/components/voice-edit";
 import { Fold } from "@/components/fold";
+import { ReminderEditor } from "@/components/reminder-editor";
+import { listReminders } from "@/lib/reminders";
 import {
   assignmentJumps,
   buildMoments,
@@ -65,11 +67,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   ]);
   if (!lesson) notFound();
   const fresh = lesson.status === "draft" && Math.abs(daysBetween(lesson.lesson_date, todayISO())) <= 1;
-  const [student, scores, periods, consent] = await Promise.all([
+  const [student, scores, periods, consent, reminders] = await Promise.all([
     getStudent(lesson.student_id),
     listScores(lesson.student_id, { includeArchived: true }),
     fresh ? listPeriods(lesson.student_id, 2) : Promise.resolve([]),
     getConsentStatus(lesson.student_id),
+    listReminders(lesson.student_id),
   ]);
   if (!student) notFound();
   const isDraft = lesson.status === "draft";
@@ -282,6 +285,11 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               <AssignmentList assignments={lesson.assignments} jumps={jumps} />
             )}
           </VoiceEditSection>
+        </section>
+
+        <section id="reminders" className="scroll-mt-4">
+          <SectionTitle>Technique &amp; posture reminders</SectionTitle>
+          <ReminderEditor studentId={student.id} reminders={reminders} back={`/v3/lessons/${id}#reminders`} lessonId={id} />
         </section>
 
         {(lesson.suggestions || lesson.teacher_notes || lesson.duration_minutes || lesson.next_lesson_date) && (
