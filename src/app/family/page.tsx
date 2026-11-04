@@ -10,6 +10,8 @@ import { getViewer } from "@/lib/auth";
 import { getCurrentPlan, getPracticeWeek, listStudents } from "@/lib/data";
 import { daysBetween, formatDate, todayISO } from "@/lib/format";
 import { getUiVersion } from "@/lib/ui-version-server";
+import { getPracticeView } from "@/lib/practice-view-server";
+import { PracticeViewToggle } from "@/components/practice-view-toggle";
 
 // The family side: one card per child with today's plan.
 export default function FamilyPage() {
@@ -23,7 +25,7 @@ export default function FamilyPage() {
 }
 
 async function Body() {
-  const [viewer, ui] = await Promise.all([getViewer(), getUiVersion()]);
+  const [viewer, ui, view] = await Promise.all([getViewer(), getUiVersion(), getPracticeView()]);
   const students = (await listStudents()).filter((s) => s.active);
   const today = todayISO();
   const rows = await Promise.all(
@@ -43,10 +45,21 @@ async function Body() {
     );
   }
 
-  if (ui === "proposed" && viewer.teacher) return <Overview rows={rows} today={today} />;
+  // Proposed version: the teacher flips between their overview and the
+  // family's own page with the Teacher / Family switch.
+  const toggle = ui === "proposed" && !!viewer.teacher;
+  if (toggle && view === "teacher") {
+    return (
+      <div className="flex flex-col gap-4">
+        <PracticeViewToggle view={view} />
+        <Overview rows={rows} today={today} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
+      {toggle && <PracticeViewToggle view={view} />}
       <p className="text-sm text-muted">{formatDate(today, "long")}</p>
       {rows.map(({ student, plan, week }) => {
         const todayLog = week.logs.find((l) => l.practice_date === today);
@@ -78,7 +91,7 @@ async function Body() {
           </Link>
         );
       })}
-      {viewer.teacher && (
+      {viewer.teacher && !toggle && (
         <p className="text-center text-xs text-muted">
           You&apos;re seeing the parent view as the teacher. Parents see only their own children.
         </p>
@@ -91,7 +104,7 @@ type Row = { student: Awaited<ReturnType<typeof listStudents>>[number]; week: Aw
 
 // Proposed version, teacher only: every student's practice since their last
 // lesson on one screen, most in need of a nudge first. Each row opens that
-// child's page, which is exactly what their parent sees.
+// child's page; the Family side of the switch shows it as their parent does.
 function Overview({ rows, today }: { rows: Row[]; today: string }) {
   const items = rows
     .map(({ student, week }) => {
@@ -139,7 +152,7 @@ function Overview({ rows, today }: { rows: Row[]; today: string }) {
                 <Figure value={last ? formatDate(last, "short") : "–"} label="last practice" />
               </div>
               <WeekStrip week={week} />
-              <span className="text-sm font-medium text-plum">Preview as parent ›</span>
+              <span className="text-sm font-medium text-accent-ink">Open practice page ›</span>
             </Card>
           </Link>
         ))}
