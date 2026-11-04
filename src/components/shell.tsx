@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import { cx } from "./ui";
 import { VersionSwitch } from "./version-switch";
 
-type Tab = "studio" | "desk" | "family" | "settings";
+type Tab = "downbeat" | "studio" | "desk" | "family" | "settings";
 /** Version 3 sections. Family is a mode picked from the header, not a tab. */
-export type V3Tab = "today" | "students" | "family" | "setup";
-const V3_OF: Record<Tab, V3Tab> = { desk: "today", studio: "students", family: "family", settings: "setup" };
+export type V3Tab = "downbeat" | "today" | "students" | "family" | "setup";
+const V3_OF: Record<Tab, V3Tab> = { downbeat: "downbeat", desk: "today", studio: "students", family: "family", settings: "setup" };
 
 // Page frame: header with the back link (or app name) top left, page actions
 // such as date and Edit top right, and the section tabs on a row beneath.
@@ -59,7 +59,7 @@ export function Shell({
                 <span className="text-sm font-medium">{back.label}</span>
               </Link>
             ) : (
-              <Link href="/" className="flex min-h-9 items-center font-display text-lg font-semibold">
+              <Link href="/downbeat" className="flex min-h-9 items-center font-display text-lg font-semibold">
                 Lesson Studio
               </Link>
             )}
@@ -84,6 +84,7 @@ export function Shell({
           <nav aria-label="Sections" className="-mx-1 hidden items-center gap-1 overflow-x-auto pb-1.5 pt-0.5 v3:flex">
             {!familyMode && (
               <>
+                <V3TabLink href="/downbeat" on={v3 === "downbeat"} label="Downbeat" icon="♩" />
                 <V3TabLink href="/v3" on={v3 === "today"} label="Today" icon="☀" />
                 <V3TabLink href="/v3/students" on={v3 === "students"} label="Students" icon="♪" />
               </>
@@ -113,6 +114,7 @@ export function Shell({
             </div>
           </nav>
           <nav aria-label="Sections" className="-mx-1 flex gap-1 overflow-x-auto pb-1.5 pt-0.5 v3:hidden sm:justify-center">
+            <TabLink href="/downbeat" tab="downbeat" current={tab} proposed={proposedTab ?? tab} label="Downbeat" icon="♩" />
             <TabLink href="/teacher" tab="desk" current={tab} proposed={proposedTab ?? tab} label="Desk" icon="▦" />
             <TabLink href="/" tab="studio" current={tab} proposed={proposedTab ?? tab} label="Studio" proposedLabel="Students" icon="♪" />
             <TabLink href="/family" tab="family" current={tab} proposed={proposedTab ?? tab} label="Home practice" icon="⌂" />
