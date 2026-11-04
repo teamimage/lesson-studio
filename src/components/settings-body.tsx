@@ -5,7 +5,16 @@ import { isAdmin } from "@/lib/admin";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import { setPassword, updateReviewTone, updateTeacher } from "@/app/settings/actions";
-import { PROFILE_SECTIONS, QUESTIONS, REVIEW_TONES, TONE_LABELS, parseProfile, toneOf } from "@/lib/assistant/profile";
+import {
+  PROFILE_SECTIONS,
+  QUESTIONS,
+  REVIEW_TONES,
+  TONE_LABELS,
+  answeredCount,
+  levelProgress,
+  parseProfile,
+  toneOf,
+} from "@/lib/assistant/profile";
 import type { Json, Tables } from "@/lib/supabase/types";
 import { getUsageSummary } from "@/lib/ai/usage";
 import { formatUsd } from "@/lib/ai/pricing";
@@ -202,7 +211,10 @@ function TeachingAssistant({ teacher, notice }: { teacher: Tables<"teachers">; n
   const tone = toneOf(teacher.review_tone);
   const profile = parseProfile(teacher.teaching_profile as Json | null | undefined);
   const filled = PROFILE_SECTIONS.filter((s) => profile.sections[s.id]).length;
-  const answered = QUESTIONS.filter((q) => profile.answered.includes(q.id)).length;
+  const answered = answeredCount(profile);
+  const progress = levelProgress(profile);
+  const basics = progress[0];
+  const setsDone = progress.slice(1).filter((l) => l.complete).length;
   return (
     <section id="assistant" className="scroll-mt-6">
       <SectionTitle>Your teaching assistant</SectionTitle>
@@ -236,8 +248,10 @@ function TeachingAssistant({ teacher, notice }: { teacher: Tables<"teachers">; n
             {answered === 0 ? "Start the interview" : "Talk to your assistant"}
             <span className="block text-sm font-normal text-muted">
               {answered === 0
-                ? "About 20 minutes, in as many sittings as you like"
-                : `${answered} of ${QUESTIONS.length} questions covered · ${filled} profile sections`}
+                ? `${basics.total} basic questions, about 15 minutes; more sets on topics you choose later`
+                : !basics.complete
+                  ? `Basics ${basics.done} of ${basics.total} · ${filled} profile sections`
+                  : `Basics done · ${setsDone} of ${progress.length - 1} more sets · ${answered} of ${QUESTIONS.length} questions`}
             </span>
           </span>
           <span aria-hidden>›</span>
