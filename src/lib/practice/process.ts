@@ -7,7 +7,8 @@ import { analyzePractice, type PracticeAnalysis } from "@/lib/ai/analyze-practic
 import { DraftError } from "@/lib/ai/draft-lesson";
 import { bookPieces } from "@/lib/ai/process-lesson";
 import { claudeCost, TRANSCRIPTION_MODEL, transcriptionCost, type ClaudeUsage } from "@/lib/ai/pricing";
-import { activityText, clock, parseActivity, tooQuiet } from "./activity";
+import { activityText, clock, parseActivity, tooQuiet, tuningChecksOf } from "./activity";
+import { tunedWithTuner } from "./tuner";
 import { extractNotes } from "./notes";
 import { findScales, scaleLabel, summarizeScales, type ScaleSummary } from "./scales";
 import { addPieceGroups, intonationText, sessionIntonation, withPrevious } from "./intonation";
@@ -341,7 +342,7 @@ async function contextFor(db: Db, s: PracticeSession) {
     const i = (e.analysis as PracticeAnalysis | null)?.intonation;
     return i ? [{ date: e.practice_date, intonation: i as SessionIntonation }] : [];
   });
-  const base = sessionIntonation(notes, student.instrument, scales);
+  const base = sessionIntonation(notes, student.instrument, scales, tunedWithTuner(tuningChecksOf(s.activity)));
   const intonation = base ? withPrevious(base, earlierIntonation) : null;
   const knownTitles = [
     ...assignments.map((a) => a.title),

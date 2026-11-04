@@ -5,7 +5,8 @@ import { getViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PRACTICE_BUCKET } from "@/lib/constants";
 import type { Json } from "@/lib/supabase/types";
-import { parseActivity, playingSeconds } from "@/lib/practice/activity";
+import { parseActivity, playingSeconds, withTuningChecks } from "@/lib/practice/activity";
+import { parseTuningChecks } from "@/lib/practice/tuner";
 import { attachRecording, deleteRecording, finishUpload, retry, type PracticeState } from "@/lib/practice/process";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { CONSENT_SETUP_MESSAGE, consentNeededMessage } from "@/lib/recording-consent";
@@ -22,6 +23,8 @@ export type NewPracticeInput = {
   /** The phone's local date, so a late-evening session lands on the right day. */
   practiceDate: string;
   activity: unknown;
+  /** Tuner checks done before Start or during the session. */
+  tuning?: unknown;
 };
 
 const SETUP_ERROR = "Practice sessions aren't set up yet. Run practice-sessions.sql in the Supabase SQL Editor.";
@@ -71,7 +74,7 @@ export async function createPracticeSession(input: NewPracticeInput): Promise<{ 
       media: input.media === "video" ? "video" : "audio",
       mime_type: input.mimeType.split(";")[0] || null,
       size_bytes: Math.round(input.sizeBytes) || null,
-      activity: activity as unknown as Json,
+      activity: withTuningChecks(activity, parseTuningChecks(input.tuning)) as unknown as Json,
       created_by: viewer.userId,
     })
     .select("id")

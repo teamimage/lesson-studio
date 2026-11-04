@@ -140,7 +140,9 @@ export type SessionIntonation = {
   /** The instrument's tuning against A=440, in cents. */
   offset: number;
   /** Where the offset came from. */
-  offset_from?: "open strings" | "A=440";
+  offset_from?: "tuner" | "open strings" | "A=440";
+  /** Tuned with the tuner: where the open strings sat while playing, in cents from 440. */
+  drift?: number;
   score: number;
   notes: number;
   verdict: IntonationVerdict;

@@ -346,9 +346,15 @@ function IntonationBlock({ i, compact, teacherView }: { i: SessionIntonation; co
         <div className="mt-1 text-xs text-muted">
           In tune means within {IN_TUNE_CENTS} cents; {IN_TUNE_CENTS + 1}–{SLIGHT_CENTS} is slightly off, {SLIGHT_CENTS + 1}–{CLEAR_CENTS} clearly off.
           Judged on notes held a quarter second or more,{" "}
-          {i.offset_from === "open strings"
-            ? `against the open strings (${Math.abs(i.offset)} cents ${i.offset >= 0 ? "above" : "below"} A=440).`
-            : "against A=440 (too few open strings to read the tuning)."}
+          {i.offset_from === "tuner"
+            ? `against A=440 (tuned with the tuner${
+                i.drift !== undefined && Math.abs(i.drift) > IN_TUNE_CENTS
+                  ? `; the open strings drifted ${Math.abs(i.drift)} cents ${i.drift > 0 ? "sharp" : "flat"} while playing`
+                  : ""
+              }).`
+            : i.offset_from === "open strings"
+              ? `against the open strings (${Math.abs(i.offset)} cents ${i.offset >= 0 ? "above" : "below"} A=440; not tuned with the tuner).`
+              : "against A=440 (not tuned with the tuner, and too few open strings to read the tuning)."}
         </div>
       )}
       {teacherView && !old && (i.by_note?.length ?? 0) > 0 && (

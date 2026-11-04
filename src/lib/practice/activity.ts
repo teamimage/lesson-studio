@@ -1,3 +1,5 @@
+import { parseTuningChecks, type TuningCheck } from "./tuner";
+
 // The sound timeline of a practice session. While recording, the browser
 // listens ten times a second and keeps, for each second: how loud it was
 // and which notes it heard. It is small (a few KB a minute) and is what the
@@ -19,6 +21,23 @@ export type ActivitySecond = {
    */
   p?: number[];
 };
+
+/**
+ * Tuning checks ride along in the same column as one extra entry at the
+ * front, `{ t: -1, db: -100, n: [], tu: [...] }`, so no new column is
+ * needed. parseActivity leaves it out; tuningChecksOf reads it.
+ */
+const TUNING_ENTRY_T = -1;
+
+export function withTuningChecks(activity: ActivitySecond[], checks: TuningCheck[]): unknown[] {
+  return checks.length ? [{ t: TUNING_ENTRY_T, db: -100, n: [], tu: checks }, ...activity] : activity;
+}
+
+export function tuningChecksOf(raw: unknown): TuningCheck[] {
+  if (!Array.isArray(raw)) return [];
+  const entry = raw.find((x) => !!x && typeof x === "object" && (x as { t?: unknown }).t === TUNING_ENTRY_T);
+  return entry ? parseTuningChecks((entry as { tu?: unknown }).tu) : [];
+}
 
 /** Below this level a second counts as quiet. */
 export const QUIET_DB = -50;
@@ -82,7 +101,10 @@ export function activityText(activity: ActivitySecond[]): string {
 export function parseActivity(raw: unknown): ActivitySecond[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .filter((x): x is ActivitySecond => !!x && typeof x === "object" && typeof (x as ActivitySecond).t === "number")
+    .filter(
+      (x): x is ActivitySecond =>
+        !!x && typeof x === "object" && typeof (x as ActivitySecond).t === "number" && (x as ActivitySecond).t >= 0,
+    )
     .map((x) => ({
       t: Number(x.t),
       db: Number(x.db) || -100,
