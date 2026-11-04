@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { WeekStrip } from "@/components/week-strip";
+import { listLessonMarks } from "@/lib/lesson-marks";
 import {
   Button,
   Card,
@@ -113,9 +114,12 @@ async function Body({
       getConsentStatus(studentId),
       listActiveReminders(studentId),
     ]);
-  const practiceDays = week.days.length
-    ? await listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1])
-    : {};
+  const [practiceDays, lessonDays] = week.days.length
+    ? await Promise.all([
+        listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1]),
+        listLessonMarks(studentId, week.days[0], week.days[week.days.length - 1]),
+      ])
+    : [{}, {}];
   // Families watch the fast streaming copy; the original is only offered
   // while that copy is still being made.
   const [recordings, scores] = plan
@@ -429,7 +433,7 @@ async function Body({
               <div className="mb-2 text-sm font-medium text-muted">
                 {capitalize(practiceSpanLabel(week))}
               </div>
-              <WeekStrip week={week} large days={practiceDays} teacherView={isTeacher} />
+              <WeekStrip week={week} large days={practiceDays} lessons={lessonDays} teacherView={isTeacher} />
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <Pill
                   tone={

@@ -8,19 +8,28 @@ import { GRADE_TONE, GradeLegend } from "@/components/grade-legend";
 import { formatDate } from "@/lib/format";
 import type { DaySession, PracticeDay } from "@/lib/practice/data";
 import { useBackToClose } from "@/lib/use-back-to-close";
+import type { LessonMark } from "@/lib/lesson-mark-types";
+import { formatTime } from "@/lib/schedule";
+import Link from "next/link";
 
 // A practice chart square. When the day has practice on record, tapping it
 // opens a popup over the page with that day's sessions: a letter grade at
-// the top, then the details and breakdown of each session.
+// the top, then the details and breakdown of each session. A lesson day
+// opens the same popup with the lesson at the top (a link for the teacher).
 
 export function PracticeDayCell({
   day,
+  date,
+  lessons,
   teacherView = false,
   className,
   title,
   children,
 }: {
   day?: PracticeDay;
+  /** The cell's date; needed when a lesson day has no practice. */
+  date?: string;
+  lessons?: LessonMark[];
   teacherView?: boolean;
   className?: string;
   title?: string;
@@ -28,7 +37,9 @@ export function PracticeDayCell({
 }) {
   const [open, setOpen] = useState(false);
   const hasRecord = !!day && (day.minutes > 0 || day.ticked.length > 0 || day.listened || day.sessions.length > 0);
-  if (!hasRecord) {
+  const hasLesson = !!lessons?.length;
+  const when = day?.date ?? date ?? lessons?.[0]?.date;
+  if ((!hasRecord && !hasLesson) || !when) {
     return (
       <div className={className} title={title}>
         {children}
@@ -42,16 +53,36 @@ export function PracticeDayCell({
         onClick={() => setOpen(true)}
         className={cx(className, "cursor-pointer transition active:scale-95")}
         title={title}
-        aria-label={`Practice on ${formatDate(day.date, "weekday")}`}
+        aria-label={`${hasLesson ? (hasRecord ? "Lesson and practice" : "Lesson") : "Practice"} on ${formatDate(when, "weekday")}`}
       >
         {children}
       </button>
-      {open && <DayPopup day={day} teacherView={teacherView} onClose={() => setOpen(false)} />}
+      {open && (
+        <DayPopup
+          date={when}
+          day={hasRecord ? day : undefined}
+          lessons={lessons ?? []}
+          teacherView={teacherView}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }
 
-function DayPopup({ day, teacherView, onClose }: { day: PracticeDay; teacherView: boolean; onClose: () => void }) {
+function DayPopup({
+  date,
+  day,
+  lessons,
+  teacherView,
+  onClose,
+}: {
+  date: string;
+  day?: PracticeDay;
+  lessons: LessonMark[];
+  teacherView: boolean;
+  onClose: () => void;
+}) {
   useBackToClose(true, onClose);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -64,7 +95,7 @@ function DayPopup({ day, teacherView, onClose }: { day: PracticeDay; teacherView
     };
   }, [onClose]);
 
-  const sessions = day.sessions;
+  const sessions = day?.sessions ?? [];
   const graded = sessions.filter((s) => s.review?.grade);
   const dayGrade = graded.length ? bestGrade(graded.map((s) => s.review!.grade!)) : null;
 
@@ -74,7 +105,7 @@ function DayPopup({ day, teacherView, onClose }: { day: PracticeDay; teacherView
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={`Practice on ${formatDate(day.date, "long")}`}
+      aria-label={`${day ? "Practice" : "Lesson"} on ${formatDate(date, "long")}`}
     >
       <div
         className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-y-auto rounded-t-2xl bg-paper text-ink shadow-2xl sm:rounded-2xl"
@@ -82,8 +113,10 @@ function DayPopup({ day, teacherView, onClose }: { day: PracticeDay; teacherView
       >
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-rule bg-paper px-4 pt-3 pb-2.5">
           <div className="min-w-0 flex-1">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-accent-ink">Practice</div>
-            <div className="font-semibold">{formatDate(day.date, "long")}</div>
+            <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-accent-ink">
+              {lessons.length ? (day ? "Lesson and practice" : "Lesson") : "Practice"}
+            </div>
+            <div className="font-semibold">{formatDate(date, "long")}</div>
           </div>
           <button onClick={onClose} className="min-h-9 rounded-lg px-3 text-lg leading-none text-muted" aria-label="Close">
             ✕
@@ -91,6 +124,34 @@ function DayPopup({ day, teacherView, onClose }: { day: PracticeDay; teacherView
         </div>
 
         <div className="flex flex-col gap-4 px-4 py-4 text-[16px]">
+          {lessons.map((l, i) => (
+            <LessonRow key={l.lessonId ?? `${l.date}-${i}`} lesson={l} teacherView={teacherView} />
+          ))}
+          {!day && lessons.some((l) => !l.upcoming) && (
+            <div className="text-sm text-muted">No practice logged this day.</div>
+          )}
+          {day && (
+            <DayBody day={day} sessions={sessions} dayGrade={dayGrade} teacherView={teacherView} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DayBody({
+  day,
+  sessions,
+  dayGrade,
+  teacherView,
+}: {
+  day: PracticeDay;
+  sessions: DaySession[];
+  dayGrade: string | null;
+  teacherView: boolean;
+}) {
+  return (
+    <>
           {sessions.length === 1 ? (
             <GradeBlock session={sessions[0]} />
           ) : dayGrade ? (
@@ -122,9 +183,41 @@ function DayPopup({ day, teacherView, onClose }: { day: PracticeDay; teacherView
               {day.parentNote}
             </div>
           )}
-        </div>
-      </div>
+    </>
+  );
+}
+
+/** The lesson line at the top of a day popup. */
+function LessonRow({ lesson, teacherView }: { lesson: LessonMark; teacherView: boolean }) {
+  const line = lesson.upcoming
+    ? `Lesson scheduled${lesson.time ? ` at ${formatTime(lesson.time)}` : ""}${lesson.minutes ? `, ${lesson.minutes} min` : ""}.`
+    : `Lesson${lesson.minutes ? `, ${lesson.minutes} min` : ""}${lesson.status === "draft" ? " (write-up still a draft)" : ""}.`;
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-accent/40 bg-accent-soft px-3 py-2">
+      <LessonNote upcoming={lesson.upcoming} />
+      <span className="min-w-0 flex-1">{line}</span>
+      {teacherView && lesson.lessonId && (
+        <Link href={`/lessons/${lesson.lessonId}`} className="shrink-0 text-sm font-medium text-accent-ink underline">
+          Open lesson
+        </Link>
+      )}
     </div>
+  );
+}
+
+/** The lesson marker used on the calendars and their legends: filled for a lesson taught, outlined for one coming up. */
+export function LessonNote({ upcoming = false, small = false }: { upcoming?: boolean; small?: boolean }) {
+  return (
+    <span
+      className={cx(
+        "inline-flex shrink-0 items-center justify-center rounded-full font-bold leading-none",
+        small ? "h-3.5 w-3.5 text-[9px]" : "h-5 w-5 text-[12px]",
+        upcoming ? "border border-accent bg-paper text-accent-ink" : "bg-accent text-white",
+      )}
+      aria-hidden
+    >
+      ♪
+    </span>
   );
 }
 

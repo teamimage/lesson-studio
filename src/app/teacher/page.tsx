@@ -7,7 +7,8 @@ import { Avatar } from "@/components/avatar";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { studentPhotoSrc } from "@/lib/constants";
 import { DeskLink, Stat } from "@/components/desk";
-import { PracticeMonthCalendar } from "@/components/practice-month-calendar";
+import { PracticeCalendarLegend, PracticeMonthCalendar } from "@/components/practice-month-calendar";
+import { listLessonMarks } from "@/lib/lesson-marks";
 import { monthOf, monthRange } from "@/lib/practice/month";
 import { DeskPanels } from "@/components/desk-panels";
 import { LessonSheet } from "@/components/lesson-sheet";
@@ -90,7 +91,7 @@ async function Desk({ searchParams }: { searchParams: SearchParams }) {
 async function StudentPanel({ student }: { student: Student }) {
   const id = student.id;
   const today = todayISO();
-  const [lessons, week, month, repertoire, recordings, music, teacher, practiceDays, consent, ui, reminders] = await Promise.all([
+  const [lessons, week, month, repertoire, recordings, music, teacher, practiceDays, consent, ui, reminders, lessonDays] = await Promise.all([
     listLessons(id, 20),
     getPracticeWeek(id),
     listPracticeRange(id, 28),
@@ -102,6 +103,7 @@ async function StudentPanel({ student }: { student: Student }) {
     getConsentStatus(id),
     getUiVersion(),
     listActiveReminders(id),
+    listLessonMarks(id, ...monthRange(monthOf(today)), today),
   ]);
   const proposed = ui === "proposed";
 
@@ -336,29 +338,13 @@ async function StudentPanel({ student }: { student: Student }) {
           <p className="-mt-1 mb-2 text-sm text-muted">
             The practice the parent checks off at home each day, from the Home practice tab. Each box is one day, with
             its date in the corner: green means they practiced (the number is minutes), a purple dot means they listened
-            to the recording, and a small dot top right means a recorded session. Tap a day to see its practice and grade.
+            to the recording, a small dot top right means a recorded session, and a terracotta note means a lesson day
+            (outlined when the lesson is still to come). Tap a day to see its practice and grade, or the lesson.
             Use the arrows or swipe to see other months.
           </p>
           <Card className="flex flex-col gap-3">
-            <PracticeMonthCalendar studentId={id} today={today} initialDays={practiceDays} teacherView />
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-              <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded bg-sage" /> practiced
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded bg-sage/40" /> under 10 min
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-plum" /> listened
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="text-[9px] leading-none">●</span> recorded session (tap for grade)
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white">!</span>
-                Start/Stop logged, no recording
-              </span>
-            </div>
+            <PracticeMonthCalendar studentId={id} today={today} initialDays={practiceDays} initialLessons={lessonDays} teacherView />
+            <PracticeCalendarLegend />
             <GradeLegend />
             {month.some((l) => l.parent_note?.trim()) && (
               <ul className="flex flex-col gap-1.5 text-sm">

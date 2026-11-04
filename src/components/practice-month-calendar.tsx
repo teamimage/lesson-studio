@@ -4,8 +4,9 @@ import { useRef, useState, useTransition } from "react";
 import { parseISODate } from "@/lib/format";
 import type { PracticeDay } from "@/lib/practice/data";
 import { monthLabel, monthOf, monthWeeks, shiftMonth } from "@/lib/practice/month";
-import { loadPracticeMonth } from "@/app/students/practice-month-actions";
-import { PracticeDayCell } from "./practice-day-popup";
+import { type PracticeMonth, loadPracticeMonth } from "@/app/students/practice-month-actions";
+import type { LessonMark } from "@/lib/lesson-mark-types";
+import { LessonNote, PracticeDayCell } from "./practice-day-popup";
 import { cx } from "./ui";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -14,32 +15,42 @@ const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
  * The practice calendar, one month at a time (Sunday first). Arrows or a
  * left/right swipe change month; other months load when first shown. Days
  * from the months either side are faded. Tap a day with practice for its popup.
+ * Lesson days carry a terracotta note: filled for a lesson on record, outlined
+ * for one still to come from the schedule.
  */
 export function PracticeMonthCalendar({
   studentId,
   today,
   initialDays,
+  initialLessons = {},
   teacherView = false,
 }: {
   studentId: string;
   today: string;
   /** This month's grid, loaded with the page. */
   initialDays: Record<string, PracticeDay>;
+  /** This month's lesson days, loaded with the page. */
+  initialLessons?: Record<string, LessonMark[]>;
   teacherView?: boolean;
 }) {
   const thisMonth = monthOf(today);
+  // One month ahead is allowed so the next scheduled lessons show.
+  const lastMonth = shiftMonth(thisMonth, 1);
   const [month, setMonth] = useState(thisMonth);
-  const [cache, setCache] = useState<Record<string, Record<string, PracticeDay>>>({ [thisMonth]: initialDays });
+  const [cache, setCache] = useState<Record<string, PracticeMonth>>({
+    [thisMonth]: { days: initialDays, lessons: initialLessons },
+  });
   const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
   const touch = useRef<{ x: number; y: number } | null>(null);
 
-  const days = cache[month];
-  const canNext = month < thisMonth;
+  const days = cache[month]?.days;
+  const lessonDays = cache[month]?.lessons;
+  const canNext = month < lastMonth;
 
   function go(n: number) {
     const next = shiftMonth(month, n);
-    if (next > thisMonth) return;
+    if (next > lastMonth) return;
     setMonth(next);
     setFailed(false);
     if (cache[next]) return;
@@ -119,12 +130,16 @@ export function PracticeMonthCalendar({
               const sessions = day?.sessions.length ?? 0;
               const noRecording = !!day?.noRecording;
               const outside = monthOf(d) !== month;
+              const lessons = lessonDays?.[d];
+              const lesson = lessons?.[0];
               return (
                 <PracticeDayCell
                   key={d}
                   day={day}
+                  date={d}
+                  lessons={lessons}
                   teacherView={teacherView}
-                  title={`${parseISODate(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}${minutes ? ` · ${minutes} min` : ""}${day?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}${noRecording ? " · no recording" : ""}`}
+                  title={`${parseISODate(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${minutes ? ` · ${minutes} min` : ""}${day?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}${noRecording ? " · no recording" : ""}`}
                   className={cx(
                     "relative flex h-11 flex-col items-center justify-center rounded-lg",
                     did ? (short ? "bg-sage/40 text-ink" : "bg-sage text-white") : "bg-rule/50 text-muted",
@@ -137,6 +152,11 @@ export function PracticeMonthCalendar({
                   </span>
                   <span className="mt-1 text-[13px] font-semibold leading-none">{minutes ? minutes : ""}</span>
                   {day?.listened && <span className="absolute bottom-0.5 h-1 w-1 rounded-full bg-plum" />}
+                  {lesson && (
+                    <span className="absolute right-0.5 bottom-0.5 flex">
+                      <LessonNote small upcoming={lesson.upcoming} />
+                    </span>
+                  )}
                   {noRecording ? (
                     <span
                       className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger text-[9px] font-bold leading-none text-white ring-2 ring-paper"
@@ -165,4 +185,34 @@ function monthDiff(from: string, to: string): number {
   const [fy, fm] = from.split("-").map(Number);
   const [ty, tm] = to.split("-").map(Number);
   return (ty - fy) * 12 + (tm - fm);
+}
+
+/** The key under a practice calendar. */
+export function PracticeCalendarLegend() {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+      <span className="flex items-center gap-1.5">
+        <span className="h-3 w-3 rounded bg-sage" /> practiced
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="h-3 w-3 rounded bg-sage/40" /> under 10 min
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-plum" /> listened
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="text-[9px] leading-none">●</span> recorded session (tap for grade)
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white">!</span>
+        Start/Stop logged, no recording
+      </span>
+      <span className="flex items-center gap-1.5">
+        <LessonNote small /> lesson
+      </span>
+      <span className="flex items-center gap-1.5">
+        <LessonNote small upcoming /> lesson coming up
+      </span>
+    </div>
+  );
 }

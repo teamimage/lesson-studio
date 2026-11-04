@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { Me } from "@/components/v3/me";
 import { WeekStrip } from "@/components/week-strip";
+import { listLessonMarks } from "@/lib/lesson-marks";
 import { PracticeRecorder } from "@/components/practice-recorder";
 import { ConsentNeeded } from "@/components/consent-needed";
 import { JumpButton, VideoPopupProvider } from "@/components/video-popup";
@@ -62,9 +63,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const listenTracks = plan ? await listenTracksFor(plan.assignments.map((a) => a.reference_recording_id)) : {};
   const plays = parsePlays(log?.listen_plays);
   const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
-  const practiceDays = week.days.length
-    ? await listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1])
-    : {};
+  const [practiceDays, lessonDays] = week.days.length
+    ? await Promise.all([
+        listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1]),
+        listLessonMarks(studentId, week.days[0], week.days[week.days.length - 1]),
+      ])
+    : [{}, {}];
 
   return (
     <Shell title={`${first}'s practice`} back={PICKER} eyebrow={formatDate(today, "long")} v3Tab="family" me={<Me />} large>
@@ -194,7 +198,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <section className="flex flex-col gap-2">
             <h2 className="font-display text-[22px] font-semibold">Since the last lesson</h2>
             <Card>
-              <WeekStrip week={week} large days={practiceDays} />
+              <WeekStrip week={week} large days={practiceDays} lessons={lessonDays} />
               <p className="mt-3 text-[18px]">
                 {week.daysPracticed} of {week.days.length} days practised
                 {week.totalMinutes > 0 ? ` · ${week.totalMinutes} min` : ""}

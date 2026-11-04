@@ -7,6 +7,7 @@ import { Avatar } from "@/components/avatar";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { PreLessonBrief } from "@/components/pre-lesson-brief";
 import { WeekStrip } from "@/components/week-strip";
+import { listLessonMarks } from "@/lib/lesson-marks";
 import { PracticeSessionList } from "@/components/practice-session-list";
 import { ConsentNeeded } from "@/components/consent-needed";
 import { Fold } from "@/components/fold";
@@ -132,9 +133,12 @@ async function LessonDay({
   const next = list.find((r) => !r.hadLessonToday) ?? list[list.length - 1];
   const others = list.filter((r) => r !== next);
   const s = next.student;
-  const days = next.week.days.length
-    ? await listPracticeDays(s.id, next.week.days[0], next.week.days[next.week.days.length - 1])
-    : {};
+  const [days, lessonDays] = next.week.days.length
+    ? await Promise.all([
+        listPracticeDays(s.id, next.week.days[0], next.week.days[next.week.days.length - 1]),
+        listLessonMarks(s.id, next.week.days[0], next.week.days[next.week.days.length - 1]),
+      ])
+    : [{}, {}];
 
   return (
     <div className="flex flex-col gap-6">
@@ -234,7 +238,7 @@ async function LessonDay({
             <div className="flex flex-col gap-3">
               <Card>
                 <div className="mb-2 text-sm font-medium text-muted">{capitalize(practiceSpanLabel(next.week))}</div>
-                <WeekStrip week={next.week} days={days} teacherView />
+                <WeekStrip week={next.week} days={days} lessons={lessonDays} teacherView />
                 <GradeLegend className="mt-2" />
                 <div className="mt-2 text-sm text-muted">
                   {next.week.totalMinutes} min · listened {next.week.daysListened} of {next.week.days.length} days

@@ -15,6 +15,7 @@ import { PracticeSessionList } from "@/components/practice-session-list";
 import { PeriodReviewWriter } from "@/components/period-review-writer";
 import { RepertoireMap } from "@/components/repertoire-map";
 import { WeekStrip } from "@/components/week-strip";
+import { listLessonMarks } from "@/lib/lesson-marks";
 import { LocalDateTime } from "@/components/local-time";
 import { Button, Card, LinkButton, Notice, Pill } from "@/components/ui";
 import { startLesson } from "@/app/lessons/live-actions";
@@ -72,7 +73,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     getConsentStatus(id),
     listRecordingsForStudent(id, 100),
   ]);
-  const practiceDays = week.days.length ? await listPracticeDays(id, week.days[0], week.days[week.days.length - 1]) : {};
+  const [practiceDays, lessonDays] = week.days.length
+    ? await Promise.all([
+        listPracticeDays(id, week.days[0], week.days[week.days.length - 1]),
+        listLessonMarks(id, week.days[0], week.days[week.days.length - 1]),
+      ])
+    : [{}, {}];
   const first = student.name.split(" ")[0];
   const drafts = lessons.filter((l) => l.status === "draft");
   const entries = buildEntries({ studentId: id, lessons, sessions, logs, periods, recordings });
@@ -257,7 +263,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             </div>
             <Card className="flex flex-col gap-2">
               <div className="text-sm font-medium text-muted">{capitalize(practiceSpanLabel(week))}</div>
-              <WeekStrip week={week} days={practiceDays} teacherView />
+              <WeekStrip week={week} days={practiceDays} lessons={lessonDays} teacherView />
               <GradeLegend />
             </Card>
             <Timeline entries={entries} initial={sp.show} />
