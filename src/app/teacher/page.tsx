@@ -6,7 +6,9 @@ import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { studentPhotoSrc } from "@/lib/constants";
-import { DeskLink, PracticeGrid, Stat } from "@/components/desk";
+import { DeskLink, Stat } from "@/components/desk";
+import { PracticeMonthCalendar } from "@/components/practice-month-calendar";
+import { monthOf, monthRange } from "@/lib/practice/month";
 import { DeskPanels } from "@/components/desk-panels";
 import { LessonSheet } from "@/components/lesson-sheet";
 import { PreLessonBrief } from "@/components/pre-lesson-brief";
@@ -25,7 +27,7 @@ import {
   listStudents,
   staleReview,
 } from "@/lib/data";
-import { addDays, capitalize, formatDate, humanize, parseISODate, relativeDay, todayISO } from "@/lib/format";
+import { capitalize, formatDate, humanize, parseISODate, relativeDay, todayISO } from "@/lib/format";
 import { listRecordingsForStudent } from "@/lib/recordings";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { consentPath } from "@/lib/recording-consent";
@@ -95,7 +97,7 @@ async function StudentPanel({ student }: { student: Student }) {
     listRecordingsForStudent(id, 50),
     listScoreIndex(id),
     getTeacherForStudent(student),
-    listPracticeDays(id, addDays(today, -27), today),
+    listPracticeDays(id, ...monthRange(monthOf(today))),
     getConsentStatus(id),
     getUiVersion(),
   ]);
@@ -333,9 +335,10 @@ async function StudentPanel({ student }: { student: Student }) {
             The practice the parent checks off at home each day, from the Home practice tab. Each box is one day, with
             its date in the corner: green means they practiced (the number is minutes), a purple dot means they listened
             to the recording, and a small dot top right means a recorded session. Tap a day to see its practice and grade.
+            Use the arrows or swipe to see other months.
           </p>
           <Card className="flex flex-col gap-3">
-            <PracticeGrid logs={month} today={today} days={practiceDays} teacherView />
+            <PracticeMonthCalendar studentId={id} today={today} initialDays={practiceDays} teacherView />
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
               <span className="flex items-center gap-1.5">
                 <span className="h-3 w-3 rounded bg-sage" /> practiced
