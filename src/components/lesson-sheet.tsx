@@ -10,10 +10,13 @@ export function LessonSheet({
   lesson,
   student,
   teacher,
+  reminders = [],
 }: {
   lesson: LessonFull;
   student: Student;
   teacher: Tables<"teachers"> | null;
+  /** Standing technique and posture reminders (active only). */
+  reminders?: Tables<"student_reminders">[];
 }) {
   // One box per day from the day after this lesson up to the next one (a week
   // or two); a week when the next lesson date isn't set.
@@ -58,6 +61,24 @@ export function LessonSheet({
             <>
               <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Focus point</dt>
               <dd className="whitespace-pre-line rounded-lg bg-[#f6e3d7] px-3 py-2 font-medium">{lesson.focus_points}</dd>
+            </>
+          )}
+          {reminders.length > 0 && (
+            <>
+              <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Remember</dt>
+              <dd>
+                <ul className="flex flex-col gap-1">
+                  {reminders.map((r) => (
+                    <li key={r.id}>
+                      <span className="mr-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#8f4a2a]">
+                        {r.kind === "posture" ? "Posture" : "Technique"}
+                      </span>
+                      {r.text}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-1 text-xs text-[#5d524a]">Every time {firstName} plays, not just this week.</div>
+              </dd>
             </>
           )}
           {lesson.assignments.length > 0 && (

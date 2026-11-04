@@ -1274,6 +1274,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      student_reminders: {
+        Row: {
+          id: string;
+          student_id: string;
+          kind: string;
+          text: string;
+          status: string;
+          lesson_id: string | null;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+          cleared_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          student_id: string;
+          kind?: string;
+          text: string;
+          status?: string;
+          lesson_id?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+          cleared_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          student_id?: string;
+          kind?: string;
+          text?: string;
+          status?: string;
+          lesson_id?: string | null;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+          cleared_at?: string | null;
+        };
+        Relationships: [];
+      };
       teaching_assistant_messages: {
         Row: {
           id: string;

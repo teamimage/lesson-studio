@@ -19,6 +19,8 @@ export type DraftAssignment = {
   /** Where in the video it was worked on, "m:ss" (or "" if nowhere). */
   video_time?: string;
 };
+/** A standing technique or posture point for the family to keep in mind. */
+export type DraftReminder = { kind: "technique" | "posture"; text: string };
 /** A moment in the video worth jumping back to, "m:ss" from the start. */
 export type DraftMoment = { time: string; label: string };
 export type LessonDraft = {
@@ -30,6 +32,7 @@ export type LessonDraft = {
   pieces: DraftPiece[];
   assignments: DraftAssignment[];
   moments?: DraftMoment[];
+  reminders?: DraftReminder[];
 };
 
 export type DraftContext = {
@@ -41,6 +44,8 @@ export type DraftContext = {
   bookPieces: string[];
   repertoire: { title: string; status: string }[];
   lastLesson: { date: string; summary: string | null; assignments: string[] } | null;
+  /** Technique and posture reminders already on the family's page. */
+  reminders?: DraftReminder[];
   transcript: string;
   /** The teacher's review tone and teaching profile. */
   style?: TeachingStyle;
@@ -49,7 +54,17 @@ export type DraftContext = {
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "focus_points", "parent_message", "suggestions", "teacher_notes", "pieces", "assignments", "moments"],
+  required: [
+    "summary",
+    "focus_points",
+    "parent_message",
+    "suggestions",
+    "teacher_notes",
+    "pieces",
+    "assignments",
+    "moments",
+    "reminders",
+  ],
   properties: {
     summary: { type: "string" },
     focus_points: { type: "string" },
@@ -96,6 +111,18 @@ const SCHEMA = {
         },
       },
     },
+    reminders: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["kind", "text"],
+        properties: {
+          kind: { type: "string", enum: ["technique", "posture"] },
+          text: { type: "string" },
+        },
+      },
+    },
   },
 } as const;
 
@@ -117,6 +144,7 @@ Fill the fields like this:
 - suggestions: teacher-only ideas for next lesson.
 - teacher_notes: teacher-only. Observations on posture, tone, attention and progress.
 - moments: the lesson's timeline, so the teacher can jump to each part of the video: every change of piece or activity and every important teaching point, in order. label is a few words ("Perpetual Motion, shifting"). Usually 6 to 20 entries.
+- reminders: standing technique and posture points the teacher corrected or stressed that the child should keep in mind every time they play, in every piece, not just this week (bow hold, bent thumb, left-hand shape, wrist, instrument and bow position, sitting or standing tall, feet, endpin height, relaxed shoulders, breathing). kind is posture (how the body and instrument are set up) or technique (how the hands and bow move). text is one short sentence of at most twelve words that a child and parent understand, said plainly as what to do ("Thumb bent on the bow, not locked straight."), not as praise or blame. Only points the teacher actually made in this lesson; skip piece-specific fixes (those belong in assignments) and skip anything already in the student's current reminders. Usually zero to three; an empty list is fine. The teacher keeps or drops each one before the family sees it.
 
 ${TIME_RULES}
 
@@ -144,6 +172,13 @@ function contextText(c: DraftContext): string {
     lines.push(
       `Previous lesson (${c.lastLesson.date}): ${c.lastLesson.summary || "no summary"}` +
         (c.lastLesson.assignments.length ? `\nIts assignments:\n${c.lastLesson.assignments.join("\n")}` : ""),
+    );
+  }
+  if (c.reminders?.length) {
+    lines.push(
+      `Technique and posture reminders the family already has (don't repeat these):\n${c.reminders
+        .map((r) => `${r.kind}: ${r.text}`)
+        .join("\n")}`,
     );
   }
   return lines.join("\n\n");

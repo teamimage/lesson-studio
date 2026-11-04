@@ -20,6 +20,8 @@ import { listPracticeDays } from "@/lib/practice/data";
 import { listenTracksFor } from "@/lib/reference-data";
 import { parsePlays } from "@/lib/reference-recordings";
 import { ListenPlayer } from "@/components/listen-player";
+import { ReminderList } from "@/components/reminder-editor";
+import { listActiveReminders } from "@/lib/reminders";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ saved?: string; error?: string }>;
@@ -42,11 +44,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const student = await getStudent(studentId);
   if (!student) notFound();
   const today = todayISO();
-  const [plan, week, log, consent] = await Promise.all([
+  const [plan, week, log, consent, reminders] = await Promise.all([
     getCurrentPlan(studentId),
     getPracticeWeek(studentId),
     getPracticeLog(studentId, today),
     getConsentStatus(studentId),
+    listActiveReminders(studentId),
   ]);
   const scores = plan ? await listScores(studentId, { includeArchived: true }) : [];
   const watch = plan ? await practiceJumps(plan, scores) : { jumps: {}, recordings: [] };
@@ -108,6 +111,14 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 <Card tone="plum" className="text-[19px] leading-relaxed">
                   <span className="font-semibold">Focus: </span>
                   {plan.focus_points}
+                </Card>
+              )}
+              {reminders.length > 0 && (
+                <Card className="flex flex-col gap-2">
+                  <div className="text-[15px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
+                    Remember every time
+                  </div>
+                  <ReminderList reminders={reminders} large />
                 </Card>
               )}
               {plan.parent_message && <p className="px-1 text-[18px] italic text-muted">“{plan.parent_message}”</p>}

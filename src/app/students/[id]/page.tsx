@@ -30,6 +30,8 @@ import { getUiVersion } from "@/lib/ui-version-server";
 import { listRecordingsForStudent } from "@/lib/recordings";
 import { StudentVideos } from "@/components/student-videos";
 import { Fold } from "@/components/fold";
+import { ReminderEditor } from "@/components/reminder-editor";
+import { listReminders } from "@/lib/reminders";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ consent?: string; open?: string }>;
@@ -50,7 +52,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   if (!student) notFound();
   const ui = await getUiVersion();
   const proposed = ui === "proposed";
-  const [lessons, week, repertoire, parents, music, sessions, periods, consent, recordings] = await Promise.all([
+  const [lessons, week, repertoire, parents, music, sessions, periods, consent, recordings, reminders] = await Promise.all([
     listLessons(id, proposed ? 50 : undefined),
     getPracticeWeek(id),
     listRepertoire(id),
@@ -60,6 +62,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     listPeriods(id),
     getConsentStatus(id),
     proposed ? listRecordingsForStudent(id, 100) : Promise.resolve([]),
+    listReminders(id),
   ]);
   const practiceDays = week.days.length ? await listPracticeDays(id, week.days[0], week.days[week.days.length - 1]) : {};
 
@@ -176,6 +179,11 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               meta={`${week.daysPracticed} of ${week.days.length} days · ${week.totalMinutes} min`}
               open
             >
+        <section id="reminders" className="scroll-mt-4">
+          <SectionTitle>Technique &amp; posture reminders</SectionTitle>
+          <ReminderEditor studentId={id} reminders={reminders} back={`/students/${id}#reminders`} />
+        </section>
+
         <section>
           <SectionTitle
             action={
@@ -342,6 +350,11 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               ))}
             </div>
           )}
+        </section>
+
+        <section id="reminders" className="scroll-mt-4">
+          <SectionTitle>Technique &amp; posture reminders</SectionTitle>
+          <ReminderEditor studentId={id} reminders={reminders} back={`/students/${id}#reminders`} />
         </section>
 
         <section>

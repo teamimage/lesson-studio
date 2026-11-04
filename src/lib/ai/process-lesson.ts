@@ -304,6 +304,7 @@ async function runDraft(db: Db, teacherId: string, row: Transcript, replace: boo
   await logClaude(db, teacherId, row, usage);
 
   const applied = await applyDraft(db, row.lesson_id, draft, replace, Number(row.audio_seconds) || 0);
+  await suggestReminders(db, row.lesson_id, draft, replace);
   const { data } = await db
     .from("lesson_transcripts")
     .update({ status: "done", draft: { ...draft, applied } as unknown as Json, updated_at: now() })
@@ -400,10 +401,52 @@ async function applyDraft(
   return true;
 }
 
+/**
+ * Technique and posture points from the draft become teacher-only
+ * suggestions on the student's reminders; the family sees one only after the
+ * teacher keeps it. "Draft again" replaces this lesson's open suggestions.
+ * Quietly does nothing until student-reminders.sql has been run.
+ */
+async function suggestReminders(db: Db, lessonId: string, d: LessonDraft, replace: boolean) {
+  const wanted = (d.reminders ?? [])
+    .map((r) => ({ kind: r.kind === "posture" ? "posture" : "technique", text: r.text.replace(/\s+/g, " ").trim().slice(0, 240) }))
+    .filter((r) => r.text);
+  const { data: lesson } = await db.from("lessons").select("student_id").eq("id", lessonId).maybeSingle();
+  if (!lesson) return;
+  const { data: existing, error } = await db
+    .from("student_reminders")
+    .select("id, text, status, lesson_id")
+    .eq("student_id", lesson.student_id)
+    .in("status", ["active", "suggested"]);
+  if (error) return;
+  const mine = (existing ?? []).filter((r) => r.status === "suggested" && r.lesson_id === lessonId);
+  if (mine.length && !replace) return;
+  if (mine.length) await db.from("student_reminders").delete().in("id", mine.map((r) => r.id));
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const taken = new Set((existing ?? []).filter((r) => !mine.includes(r)).map((r) => norm(r.text)));
+  const fresh = wanted.filter((r) => {
+    const k = norm(r.text);
+    if (taken.has(k)) return false;
+    taken.add(k);
+    return true;
+  });
+  if (!fresh.length) return;
+  await db.from("student_reminders").insert(
+    fresh.slice(0, 5).map((r, i) => ({
+      student_id: lesson.student_id,
+      kind: r.kind,
+      text: r.text,
+      status: "suggested",
+      lesson_id: lessonId,
+      sort_order: 1000 + i,
+    })),
+  );
+}
+
 async function draftContext(db: Db, row: Transcript) {
   const { data: lesson } = await db.from("lessons").select("*").eq("id", row.lesson_id).single();
   if (!lesson) throw new Error("That lesson wasn't found.");
-  const [{ data: student }, { data: rep }, { data: prev }] = await Promise.all([
+  const [{ data: student }, { data: rep }, { data: prev }, { data: reminders }] = await Promise.all([
     db.from("students").select("*").eq("id", lesson.student_id).single(),
     db.from("repertoire").select("title, status").eq("student_id", lesson.student_id).order("started_on"),
     db
@@ -415,6 +458,12 @@ async function draftContext(db: Db, row: Transcript) {
       .order("lesson_date", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Errors (table not made yet) just mean no reminders.
+    db
+      .from("student_reminders")
+      .select("kind, text")
+      .eq("student_id", lesson.student_id)
+      .in("status", ["active", "suggested"]),
   ]);
   if (!student) throw new Error("That student wasn't found.");
   const style = await teachingStyleFor(db, student.teacher_id);
@@ -434,6 +483,10 @@ async function draftContext(db: Db, row: Transcript) {
           assignments: prev.assignments.map((a) => (a.how ? `${a.title}: ${a.how}` : a.title)),
         }
       : null,
+    reminders: (reminders ?? []).map((r) => ({
+      kind: r.kind === "posture" ? ("posture" as const) : ("technique" as const),
+      text: r.text,
+    })),
     transcript: row.transcript ?? "",
   };
 }
