@@ -76,9 +76,9 @@ const GRAM = 5;
 const CLUSTER_GAP = 20;
 const MIN_HITS = 4;
 
-type Seq = { pc: number; bar: number }[];
+export type Seq = { pc: number; bar: number }[];
 
-function melodySeq(s: MelodySection): Seq {
+export function melodySeq(s: MelodySection): Seq {
   const out: Seq = [];
   for (const b of s.bars) {
     for (const name of b.notes.split(/\s+/)) {

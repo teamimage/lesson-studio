@@ -3,6 +3,7 @@
 
 import type { ScaleSummary } from "./scales";
 import type { MusicMatch } from "@/lib/melody";
+import type { PieceMethod } from "./method";
 
 /**
  * What a "going well" or "work on" bullet is about. Kept as data so later
@@ -79,6 +80,13 @@ export type PracticeAnalysis = {
    * student's uploaded music. Missing when no music has its notes read.
    */
   music?: MusicMatch[];
+  /**
+   * How each matched piece was practised (attempts, stops, spot work,
+   * tempo), worked out by code. Nov 4 2026 on; needs uploaded music.
+   */
+  method?: PieceMethod[];
+  /** Claude's one plain sentence for the family on how the practising was done. */
+  method_note?: string;
   /** Older reviews only. */
   flow?: string;
   tips?: string[];
