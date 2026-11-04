@@ -23,6 +23,10 @@ import { ListenPlayer } from "@/components/listen-player";
 import { ReminderList } from "@/components/reminder-editor";
 import { listActiveReminders } from "@/lib/reminders";
 
+// Back to the "Who's practising?" picker. ?pick=1 keeps it from jumping
+// straight back here when the studio has only one student.
+const PICKER = { href: "/v3/family?pick=1", label: "Who's practising?" };
+
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ saved?: string; error?: string }>;
 
@@ -31,7 +35,7 @@ type SP = Promise<{ saved?: string; error?: string }>;
 // and the week. No teacher tools. The basis for parent logins later.
 export default function V3FamilyStudent({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
-    <Suspense fallback={<Shell title=" " v3Tab="family" me={<Me />} large>{null}</Shell>}>
+    <Suspense fallback={<Shell title=" " back={PICKER} v3Tab="family" me={<Me />} large>{null}</Shell>}>
       <Body params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -63,7 +67,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     : {};
 
   return (
-    <Shell title={`${first}'s practice`} eyebrow={formatDate(today, "long")} v3Tab="family" me={<Me />} large>
+    <Shell title={`${first}'s practice`} back={PICKER} eyebrow={formatDate(today, "long")} v3Tab="family" me={<Me />} large>
       <VideoPopupProvider
         fullQuality={false}
         studentId={studentId}
