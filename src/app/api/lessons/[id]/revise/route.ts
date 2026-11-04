@@ -6,6 +6,7 @@ import { MissingKeyError } from "@/lib/ai/assemblyai";
 import { DraftError } from "@/lib/ai/draft-lesson";
 import { claudeCost, type ClaudeUsage } from "@/lib/ai/pricing";
 import { reviseSection } from "@/lib/ai/revise-section";
+import { teachingStyleFor } from "@/lib/ai/teaching-style";
 import { isNoteSection } from "@/lib/note-sections";
 
 // Claude rewrites one section of the lesson notes with the teacher's
@@ -29,7 +30,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   let usage: ClaudeUsage[] = [];
   try {
-    const out = await reviseSection(lesson, student, body.section, instruction);
+    const style = await teachingStyleFor(await createClient(), teacher.id);
+    const out = await reviseSection(lesson, student, body.section, instruction, style);
     usage = out.usage;
     return NextResponse.json({ proposal: out.proposal });
   } catch (e) {

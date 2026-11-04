@@ -5,6 +5,7 @@ import { booksFor } from "@/lib/suzuki";
 import { lessonMainId, setLessonMain } from "@/lib/main-camera";
 import type { Json, Tables } from "@/lib/supabase/types";
 import { getTranscription, MissingKeyError, submitTranscription } from "./assemblyai";
+import { teachingStyleFor } from "./teaching-style";
 import { DraftError, draftLesson, timeLesson, type LessonDraft } from "./draft-lesson";
 import { claudeCost, TRANSCRIPTION_MODEL, transcriptionCost, type ClaudeUsage } from "./pricing";
 import { lessonConsentBlock } from "@/lib/recording-consent-data";
@@ -416,7 +417,9 @@ async function draftContext(db: Db, row: Transcript) {
       .maybeSingle(),
   ]);
   if (!student) throw new Error("That student wasn't found.");
+  const style = await teachingStyleFor(db, student.teacher_id);
   return {
+    style,
     studentName: student.name,
     instrument: student.instrument,
     age: student.age,

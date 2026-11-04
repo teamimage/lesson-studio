@@ -4,6 +4,8 @@ import { addDays, daysBetween, formatDate, parseISODate, todayISO } from "@/lib/
 import type { Json, Tables } from "@/lib/supabase/types";
 import { listLessonDates } from "@/lib/data";
 import { analyzePeriod } from "@/lib/ai/analyze-period";
+import { teachingStyleFor } from "@/lib/ai/teaching-style";
+import { VERDICT_WORDS } from "./method";
 import { DraftError } from "@/lib/ai/draft-lesson";
 import { MissingKeyError } from "@/lib/ai/assemblyai";
 import { claudeCost, type ClaudeUsage } from "@/lib/ai/pricing";
@@ -396,7 +398,8 @@ export async function writePeriodReview(studentId: string, day: string): Promise
 
   let usage: ClaudeUsage[] = [];
   try {
-    const out = await analyzePeriod(periodInput(student, period, prevReview));
+    const style = await teachingStyleFor(db, student.teacher_id);
+    const out = await analyzePeriod(periodInput(student, period, prevReview), style);
     usage = out.usage;
     await logUsage(db, claimed, usage);
     await db
@@ -471,6 +474,11 @@ function periodInput(student: Tables<"students">, p: PeriodData, prev: PeriodRev
             parts.push(
               `  Intonation (code${(r.intonation.v ?? 1) < INTONATION_VERSION ? ", old scale" : ""}): overall ${verdictText(r.intonation.verdict)}, ${r.intonation.score}% in tune${r.intonation.typical !== undefined ? `, typical miss ${r.intonation.typical} cents` : ""}${r.intonation.tendencies.length ? ` (${r.intonation.tendencies.map(tendencyText).join(", ")})` : ""}${r.intonation.groups.map((g) => `; ${g.label} ${verdictText(g.verdict)}, ${g.score}% in tune${g.right_notes !== undefined ? `, right notes ${g.right_notes}%` : ""}${g.tendencies.length ? ` (${g.tendencies.map(tendencyText).join(", ")})` : ""}`).join("")}`,
             );
+          if (r.method?.length)
+            parts.push(
+              `  Practice method (code): ${r.method.map((m) => `${m.title}: ${m.attempts.length} attempts, ${m.completed} start to end${m.stall_bars.length ? `, stopped at ${m.stall_bars.map((x) => `bar ${x.bar} ${x.times}x`).join(", ")}` : ""}${m.drills.length ? `, spot loops on ${m.drills.map((d) => `bars ${d.from_bar}-${d.to_bar}`).join(", ")}` : ", no spot loops"}${m.slowed ? ", slowed down" : ""}; ${VERDICT_WORDS[m.verdict]}`).join("; ")}`,
+            );
+          if (r.method_note) parts.push(`  How it was practised: ${r.method_note}`);
           if (r.going_well?.length) parts.push(`  Going well: ${r.going_well.map((x) => x.text).join("; ")}`);
           const work = r.work_on?.length ? r.work_on.map((x) => x.text) : (r.tips ?? []);
           if (work.length) parts.push(`  Work on: ${work.join("; ")}`);

@@ -1,6 +1,7 @@
 import "server-only";
 import { anthropicClient, DraftError, lessonModel, usageRows } from "./draft-lesson";
 import type { ClaudeUsage } from "./pricing";
+import { systemWithStyle, type TeachingStyle } from "./teaching-style";
 import { POINT_TOPICS, type PeriodReview } from "@/lib/practice/review-types";
 
 // Claude writes the short part of a practice review covering the time from
@@ -37,10 +38,10 @@ const SYSTEM = `You write a child's music practice review for their family and t
 
 You get the period's numbers (days practised, minutes, which assignments were ticked on which days), the reviews already written for each recorded practice session (a summary, what went well, what to work on), any notes the parent wrote, and the previous period's numbers and "work on" points for comparison.
 
-Write in a warm, encouraging, plain voice. Never scold or sound suspicious. Keep it short: bullet points, not explanations.
+Write in a plain, kind, factual voice; how warm or firm is set by the teacher's review tone at the end of these instructions. Never scold, shame or sound suspicious, and never flatter: praise must be earned by the evidence. How the student practised matters as much as how much: when the sessions show restarting from the top and stalling at the same bar, or only playing through without fixing hard spots, say so plainly with the numbers and give the better way (loop the spot slowly, then play through); praise method only when it was good (slowed down, isolated the spot, then got through). Keep it short: bullet points, not explanations.
 - summary: one or two short sentences on what the period covered.
-- encouragement: one short, specific, encouraging line for the child.
-- going_well: 3 or 4 bullets, each under 10 words, on what went well across the period. Prefer things that came up more than once.
+- encouragement: one short, specific line for the child about something that really was good, or, when nothing earned praise, a kind nudge toward the one change that matters most.
+- going_well: up to 4 bullets (fewer is better than padding), each under 10 words, on what went well across the period. Prefer things that came up more than once.
 - work_on: 3 or 4 bullets, each under 10 words, for the time until the next lesson, concrete and tied to the assignments ("Intonation on the F# in Gavotte", "Try not to rush bar 12", "Practise the Minuet on more days"). Merge repeats from the session reviews into one bullet. Each bullet has a topic (intonation, rhythm, tempo, tone, notes, technique, memory, focus, routine or other) and piece (or empty).
 - trends: up to 3 short lines comparing with the previous period or across this one ("10 of 14 days, up from 4 of 7", "Gavotte got steadier over the two weeks", "Still working on the F#"). Only what the data supports. Empty if there is nothing to compare.
 - teacher_note: one or two factual sentences for the teacher only (assignments not touched, anything that may need attention in the next lesson). Empty if nothing to add.
@@ -49,7 +50,7 @@ Intonation is the exception to the warm voice: report it honestly and exactly, a
 
 If the next lesson hasn't happened yet, write about the period so far.`;
 
-export async function analyzePeriod(input: string): Promise<{ review: PeriodReview; usage: ClaudeUsage[] }> {
+export async function analyzePeriod(input: string, style?: TeachingStyle): Promise<{ review: PeriodReview; usage: ClaudeUsage[] }> {
   const anthropic = anthropicClient();
   const stream = anthropic.beta.messages.stream({
     model: lessonModel(),
@@ -57,7 +58,7 @@ export async function analyzePeriod(input: string): Promise<{ review: PeriodRevi
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "low", format: { type: "json_schema", schema: SCHEMA } },
-    system: SYSTEM,
+    system: systemWithStyle(SYSTEM, style, "period"),
     messages: [{ role: "user", content: `${input}\n\nWrite the practice review.` }],
   });
   const message = await stream.finalMessage();

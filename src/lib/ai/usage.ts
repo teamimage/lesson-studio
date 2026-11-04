@@ -33,6 +33,8 @@ export type LessonTotal = {
   music: boolean;
   /** Reviewing home practice sessions, one total per student. */
   practice: boolean;
+  /** Talking to the teaching assistant. */
+  assistant?: boolean;
   scoreTitle: string | null;
   lessonDate: string | null;
   studentName: string | null;
@@ -73,10 +75,13 @@ export async function getUsageSummary(teacherId: string): Promise<UsageSummary> 
     m.calls += 1;
     months.set(month, m);
 
+    const assistant = r.kind === "assistant";
     const music = r.kind === "music";
     const practice = !!r.practice_session_id || !!r.practice_week_id || r.kind === "practice" || r.kind === "weekly";
     const practiceStudent = r.practice_sessions?.students?.name ?? r.practice_weeks?.students?.name ?? null;
-    const key = practice
+    const key = assistant
+      ? "assistant"
+      : practice
       ? `practice-${practiceStudent ?? "deleted"}`
       : music
         ? `music-${r.score_id ?? "deleted"}`
@@ -84,8 +89,9 @@ export async function getUsageSummary(teacherId: string): Promise<UsageSummary> 
     const l =
       lessons.get(key) ??
       ({
-        lessonId: music || practice ? null : r.lesson_id,
+        lessonId: music || practice || assistant ? null : r.lesson_id,
         key,
+        assistant,
         music,
         practice,
         scoreTitle: music ? (r.scores?.title ?? null) : null,

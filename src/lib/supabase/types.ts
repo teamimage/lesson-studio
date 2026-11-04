@@ -1250,6 +1250,9 @@ export type Database = {
           name: string;
           studio_name: string;
           user_id: string;
+          /** Missing until teaching-assistant.sql has run. */
+          review_tone?: string;
+          teaching_profile?: Json | null;
         };
         Insert: {
           created_at?: string;
@@ -1257,6 +1260,8 @@ export type Database = {
           name?: string;
           studio_name?: string;
           user_id: string;
+          review_tone?: string;
+          teaching_profile?: Json | null;
         };
         Update: {
           created_at?: string;
@@ -1264,6 +1269,32 @@ export type Database = {
           name?: string;
           studio_name?: string;
           user_id?: string;
+          review_tone?: string;
+          teaching_profile?: Json | null;
+        };
+        Relationships: [];
+      };
+      teaching_assistant_messages: {
+        Row: {
+          id: string;
+          teacher_id: string;
+          role: string;
+          content: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          teacher_id: string;
+          role: string;
+          content: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          teacher_id?: string;
+          role?: string;
+          content?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
