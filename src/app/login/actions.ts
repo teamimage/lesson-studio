@@ -36,7 +36,7 @@ export async function verifyCode(formData: FormData) {
   });
 
   if (error) redirect(`${back}&error=code`);
-  redirect("/");
+  redirect("/downbeat");
 }
 
 // Email + password sign-in. Accounts are still created by the email code;
@@ -50,7 +50,7 @@ export async function signInWithPassword(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect(`/login?error=password&for=${encodeURIComponent(email)}`);
-  redirect("/");
+  redirect("/downbeat");
 }
 
 // Emails a link that signs the user in and opens Settings to choose a

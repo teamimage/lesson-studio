@@ -30,7 +30,7 @@ export function EmailLinkHandler({ children }: { children: React.ReactNode }) {
       .auth.setSession({ access_token, refresh_token })
       .then(({ error }) => {
         if (error) setSessionError(error.message);
-        else window.location.replace(type === "recovery" ? "/settings?password=reset" : "/");
+        else window.location.replace(type === "recovery" ? "/settings?password=reset" : "/downbeat");
       });
   }, [access_token, refresh_token, type]);
 

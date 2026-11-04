@@ -473,6 +473,84 @@ export type Database = {
         };
         Relationships: [];
       };
+      lesson_slots: {
+        Row: {
+          id: string;
+          teacher_id: string;
+          student_id: string;
+          weekday: number;
+          start_time: string;
+          minutes: number;
+          starts_on: string | null;
+          ends_on: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          teacher_id: string;
+          student_id: string;
+          weekday: number;
+          start_time: string;
+          minutes?: number;
+          starts_on?: string | null;
+          ends_on?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          teacher_id?: string;
+          student_id?: string;
+          weekday?: number;
+          start_time?: string;
+          minutes?: number;
+          starts_on?: string | null;
+          ends_on?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      lesson_slot_changes: {
+        Row: {
+          id: string;
+          teacher_id: string;
+          student_id: string;
+          slot_id: string | null;
+          kind: "cancel" | "move" | "extra";
+          on_date: string;
+          new_date: string | null;
+          new_time: string | null;
+          minutes: number | null;
+          note: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          teacher_id: string;
+          student_id: string;
+          slot_id?: string | null;
+          kind: "cancel" | "move" | "extra";
+          on_date: string;
+          new_date?: string | null;
+          new_time?: string | null;
+          minutes?: number | null;
+          note?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          teacher_id?: string;
+          student_id?: string;
+          slot_id?: string | null;
+          kind?: "cancel" | "move" | "extra";
+          on_date?: string;
+          new_date?: string | null;
+          new_time?: string | null;
+          minutes?: number | null;
+          note?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       practice_weeks: {
         Row: {
           created_at: string;
