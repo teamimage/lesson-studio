@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { cx, Pill } from "@/components/ui";
 import { LocalTime } from "@/components/local-time";
 import { PracticeReviewBody } from "@/components/practice-review";
+import { GRADE_TONE, GradeLegend } from "@/components/grade-legend";
 import { formatDate } from "@/lib/format";
 import type { DaySession, PracticeDay } from "@/lib/practice/data";
 import { useBackToClose } from "@/lib/use-back-to-close";
@@ -95,6 +96,7 @@ function DayPopup({ day, teacherView, onClose }: { day: PracticeDay; teacherView
           ) : dayGrade ? (
             <GradeBadgeRow grade={dayGrade} line={`Best of ${sessions.length} sessions today.`} />
           ) : null}
+          {sessions.length > 0 && <GradeLegend family={!teacherView} className="-mt-2" />}
 
           <DayTotals day={day} />
 
@@ -131,14 +133,6 @@ const GRADE_ORDER = ["A", "B", "C", "D", "F"];
 function bestGrade(grades: string[]): string {
   return [...grades].sort((a, b) => GRADE_ORDER.indexOf(a) - GRADE_ORDER.indexOf(b))[0];
 }
-
-const GRADE_TONE: Record<string, string> = {
-  A: "bg-sage text-white",
-  B: "bg-sage/70 text-white",
-  C: "bg-amber text-white",
-  D: "bg-accent text-white",
-  F: "bg-danger text-white",
-};
 
 function GradeBadge({ grade, small }: { grade: string | null; small?: boolean }) {
   return (

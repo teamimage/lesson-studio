@@ -1,3 +1,4 @@
+import { GradeLegend } from "@/components/grade-legend";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -190,6 +191,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               {practiceSpanLabel(week).replace(/^./, (c) => c.toUpperCase())}
             </div>
             <WeekStrip week={week} days={practiceDays} teacherView />
+            <GradeLegend className="mt-2" />
             {week.notes.length > 0 && (
               <ul className="mt-3 flex flex-col gap-1.5 text-sm">
                 {week.notes.map((n) => (
@@ -357,6 +359,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               {practiceSpanLabel(week).replace(/^./, (c) => c.toUpperCase())}
             </div>
             <WeekStrip week={week} days={practiceDays} teacherView />
+            <GradeLegend className="mt-2" />
             {week.notes.length > 0 && (
               <ul className="mt-3 flex flex-col gap-1.5 text-sm">
                 {week.notes.map((n) => (

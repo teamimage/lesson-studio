@@ -1,3 +1,4 @@
+import { GradeLegend } from "@/components/grade-legend";
 import { listScoreIndex } from "@/lib/scores";
 import { viewerHref } from "@/lib/music-links";
 import Link from "next/link";
@@ -353,6 +354,7 @@ async function StudentPanel({ student }: { student: Student }) {
                 Start/Stop logged, no recording
               </span>
             </div>
+            <GradeLegend />
             {month.some((l) => l.parent_note?.trim()) && (
               <ul className="flex flex-col gap-1.5 text-sm">
                 {month

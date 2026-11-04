@@ -1,3 +1,4 @@
+import { GradeLegend } from "@/components/grade-legend";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -257,6 +258,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             <Card className="flex flex-col gap-2">
               <div className="text-sm font-medium text-muted">{capitalize(practiceSpanLabel(week))}</div>
               <WeekStrip week={week} days={practiceDays} teacherView />
+              <GradeLegend />
             </Card>
             <Timeline entries={entries} initial={sp.show} />
             <AddLesson studentId={id} />

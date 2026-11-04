@@ -1,3 +1,4 @@
+import { GradeLegend } from "@/components/grade-legend";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -384,6 +385,7 @@ async function Body({
                 </Pill>
                 {week.totalMinutes > 0 && <Pill>{week.totalMinutes} min</Pill>}
               </div>
+              <GradeLegend family={!isTeacher} className="mt-2" />
             </Card>
           </section>
 
