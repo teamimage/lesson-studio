@@ -2,7 +2,8 @@ import "server-only";
 import type { createClient } from "@/lib/supabase/server";
 import type { Json, Tables } from "@/lib/supabase/types";
 import type { PracticeAnalysis } from "@/lib/ai/analyze-practice";
-import { clock, parseActivity } from "./activity";
+import { clock, parseActivity, tuningChecksOf } from "./activity";
+import { tunedWithTuner } from "./tuner";
 import { extractNotes, hasFineReadings } from "./notes";
 import { INTONATION_VERSION, addPieceGroups, sessionIntonation } from "./intonation";
 import type { SessionIntonation } from "./review-types";
@@ -35,7 +36,7 @@ export async function regradeIntonation<T extends Row>(db: Db, rows: T[]): Promi
     const activity = parseActivity(s.activity);
     if (!instrument || !hasFineReadings(activity)) continue;
     const notes = extractNotes(activity);
-    const base = sessionIntonation(notes, instrument, analysis.scales ?? []);
+    const base = sessionIntonation(notes, instrument, analysis.scales ?? [], tunedWithTuner(tuningChecksOf(s.activity)));
     let intonation: SessionIntonation | undefined;
     if (base) {
       const music = analysis.music ?? [];

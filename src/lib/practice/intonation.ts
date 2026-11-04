@@ -12,7 +12,9 @@
 // Pitches are measured against equal temperament at A=440, then shifted by
 // the instrument's own tuning, taken from the open-string notes (they ring
 // true to however the instrument is tuned). Without enough open strings
-// the notes are judged against A=440 as they are; the player's own notes
+// the notes are judged against A=440 as they are. When the student tuned
+// with the app's tuner (src/lib/practice/tuner.ts), A=440 itself is the
+// reference and the open strings only report drift. The player's own notes
 // are never used for this, so playing sharp all session can't hide itself.
 
 import { clock } from "./activity";
@@ -69,12 +71,23 @@ function held(notes: Note[]): (Note & { cents: number })[] {
   return notes.filter((n): n is Note & { cents: number } => n.cents !== undefined && n.frames >= MIN_FRAMES);
 }
 
-/** How far the instrument's tuning sits from A=440, in cents, and from what. */
-export function tuning(notes: Note[], instrument: string): { offset: number; from: "open strings" | "A=440" } {
+/**
+ * How far the instrument's tuning sits from A=440, in cents, and from what.
+ * Tuned with the app's tuner: A=440 itself is the reference, and how far
+ * the open strings drifted while playing is reported as `drift`. Otherwise
+ * the open strings set it, or plain A=440 when there are too few.
+ */
+export function tuning(
+  notes: Note[],
+  instrument: string,
+  tuned = false,
+): { offset: number; from: "tuner" | "open strings" | "A=440"; drift?: number } {
   const open = OPEN_STRINGS[instrument];
   const openNotes = open ? held(notes).filter((n) => open.includes(n.midi)) : [];
-  if (openNotes.length < 6) return { offset: 0, from: "A=440" };
-  return { offset: Math.max(-30, Math.min(30, Math.round(median(openNotes.map((n) => n.cents))))), from: "open strings" };
+  const fromOpen = openNotes.length >= 6 ? Math.max(-30, Math.min(30, Math.round(median(openNotes.map((n) => n.cents))))) : null;
+  if (tuned) return { offset: 0, from: "tuner", ...(fromOpen !== null ? { drift: fromOpen } : {}) };
+  if (fromOpen === null) return { offset: 0, from: "A=440" };
+  return { offset: fromOpen, from: "open strings" };
 }
 
 /** Kept for callers that only want the number. */
@@ -246,9 +259,15 @@ const TONICS: Record<string, number> = {
 };
 
 /** Intonation for the session overall and for each scale or arpeggio found. */
-export function sessionIntonation(notes: Note[], instrument: string, scales: ScaleSummary[]): SessionIntonation | null {
+export function sessionIntonation(
+  notes: Note[],
+  instrument: string,
+  scales: ScaleSummary[],
+  /** Tuned to A=440 with the app's tuner before or during the session. */
+  tuned = false,
+): SessionIntonation | null {
   if (!checksIntonation(instrument)) return null;
-  const { offset, from } = tuning(notes, instrument);
+  const { offset, from, drift } = tuning(notes, instrument, tuned);
   const overall = groupOf("Whole session", "session", notes, offset);
   if (!overall) return null;
   const groups: IntonationGroup[] = [];
@@ -262,6 +281,7 @@ export function sessionIntonation(notes: Note[], instrument: string, scales: Sca
     v: INTONATION_VERSION,
     offset,
     offset_from: from,
+    ...(drift !== undefined ? { drift } : {}),
     score: overall.score,
     notes: overall.notes,
     verdict: overall.verdict,
@@ -366,12 +386,23 @@ function groupLine(g: Pick<IntonationGroup, "notes" | "score" | "close" | "off" 
   return parts.join(", ") + lean + notes;
 }
 
+function tuningLine(i: SessionIntonation): string {
+  if (i.offset_from === "tuner")
+    return (
+      "Tuning: the student tuned to A=440 with the app's tuner, so notes are judged against A=440 itself." +
+      (i.drift !== undefined && Math.abs(i.drift) > IN_TUNE_CENTS
+        ? ` While playing, the open strings sat ${Math.abs(i.drift)} cents ${i.drift > 0 ? "sharp" : "flat"} of 440 (the strings slipped, or open strings were played ${i.drift > 0 ? "sharp" : "flat"}).`
+        : "")
+    );
+  if (i.offset_from === "open strings")
+    return `Tuning: not tuned with the app's tuner; the open strings sit ${Math.abs(i.offset)} cents ${i.offset >= 0 ? "above" : "below"} A=440, and notes are judged against that tuning.`;
+  return "Tuning: not tuned with the app's tuner and too few open strings to read the instrument's tuning, so notes are judged against A=440 as they are.";
+}
+
 /** The intonation summary as text for Claude. */
 export function intonationText(i: SessionIntonation, notes: Note[]): string {
   const lines = [
-    i.offset_from === "open strings"
-      ? `Tuning: the open strings sit ${Math.abs(i.offset)} cents ${i.offset >= 0 ? "above" : "below"} A=440; notes are judged against that tuning.`
-      : `Tuning: too few open strings to read the instrument's tuning, so notes are judged against A=440 as they are.`,
+    tuningLine(i),
     `Scale (strict, a teacher's ear): within ${IN_TUNE_CENTS} cents = in tune, ${IN_TUNE_CENTS + 1}-${SLIGHT_CENTS} slightly off, ${SLIGHT_CENTS + 1}-${CLEAR_CENTS} clearly off, beyond ${CLEAR_CENTS} out of tune. Only notes held a quarter second or more are judged. "Right notes" (the note named is the one in the key) is separate from "in tune".`,
     `Whole session: ${groupLine(i as unknown as IntonationGroup)}${i.prev_score !== undefined ? `; last time (${i.prev_date}) ${i.prev_score}% in tune` : ""}.`,
   ];

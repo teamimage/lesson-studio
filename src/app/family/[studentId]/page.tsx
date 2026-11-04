@@ -181,6 +181,7 @@ async function Body({
               studentId={studentId}
               firstName={firstName}
               hasPlan={!!plan}
+              instrument={student.instrument}
             />
           ) : (
             <ConsentNeeded

@@ -1,6 +1,7 @@
 // Small pitch detector for the practice recorder (YIN, de Cheveigné &
-// Kawahara 2002). Good enough to tell which note is sounding on a cello,
-// violin or piano melody; not a tuner.
+// Kawahara 2002). Tells which note is sounding on a cello, violin or piano
+// melody; with a longer buffer (4096 samples) it is steady enough for the
+// tuner too.
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const MIN_HZ = 60; // below cello C2 (65 Hz)
@@ -19,10 +20,10 @@ export function levelDb(buf: Float32Array): number {
   return peak > 0 ? 20 * Math.log10(peak) : -100;
 }
 
-export function detectPitch(buf: Float32Array, sampleRate: number): Pitch | null {
+export function detectPitch(buf: Float32Array, sampleRate: number, minHz = MIN_HZ): Pitch | null {
   const W = Math.floor(buf.length / 2);
   const minTau = Math.max(2, Math.floor(sampleRate / MAX_HZ));
-  const maxTau = Math.min(W - 1, Math.floor(sampleRate / MIN_HZ));
+  const maxTau = Math.min(W - 1, Math.floor(sampleRate / minHz));
   if (maxTau <= minTau) return null;
 
   const d = new Float32Array(maxTau + 1);
@@ -63,7 +64,7 @@ export function detectPitch(buf: Float32Array, sampleRate: number): Pitch | null
     if (denom) better = t + (a - c) / (2 * denom);
   }
   const hz = sampleRate / better;
-  if (!Number.isFinite(hz) || hz < MIN_HZ || hz > MAX_HZ) return null;
+  if (!Number.isFinite(hz) || hz < minHz || hz > MAX_HZ) return null;
   const midi = 69 + 12 * Math.log2(hz / 440);
   const nearest = Math.round(midi);
   return {

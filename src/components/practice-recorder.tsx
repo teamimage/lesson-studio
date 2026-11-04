@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as tus from "tus-js-client";
 import { createClient } from "@/lib/supabase/client";
@@ -9,12 +9,19 @@ import { toISODate } from "@/lib/format";
 import { clock, QUIET_DB, type ActivitySecond } from "@/lib/practice/activity";
 import { detectPitch, levelDb } from "@/lib/practice/pitch";
 import { attachPracticeRecording, createPracticeSession, finishPracticeUpload } from "@/app/family/practice-actions";
+import { TUNED_CENTS, TUNING_VALID_SECONDS, tuneNotesFor, type TuningCheck } from "@/lib/practice/tuner";
 import { Button, Card, cx } from "@/components/ui";
+import { Tuner, type TunerReadings } from "@/components/tuner";
 
 // Start practice / Stop practice. Records audio (or video with audio) in the
 // browser, writes down a once-a-second sound timeline while it records, and
 // at Stop uploads the file for the AI to review. The recording is deleted
 // after the review; only the review is kept.
+//
+// The tuner sits on the same card: before Start (with its own microphone)
+// and during practice (listening through the recording's microphone). Each
+// time it is closed, the strings' readings are kept as a tuning check and
+// sent with the session, so the review judges notes against A = 440.
 
 const CHUNK_SIZE = 6 * 1024 * 1024;
 const MAX_SECONDS = 2 * 60 * 60;
@@ -53,7 +60,42 @@ function resumableEndpoint(): string {
   return `${direct}/storage/v1/upload/resumable`;
 }
 
-export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId: string; firstName: string; hasPlan: boolean }) {
+type TunerAudio = { ctx: AudioContext; analyser: AnalyserNode; own: MediaStream | null };
+
+type StoredCheck = { wall: number; s: TunerReadings; ok: boolean };
+
+function storageKey(studentId: string) {
+  return `ls-tuning:${studentId}`;
+}
+
+/** Tuning checks from the last half hour, kept in this browser so a reload doesn't lose them. */
+function loadChecks(studentId: string): StoredCheck[] {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(storageKey(studentId)) ?? "[]") as StoredCheck[];
+    const since = Date.now() - TUNING_VALID_SECONDS * 1000;
+    return Array.isArray(raw) ? raw.filter((c) => c && typeof c.wall === "number" && c.wall >= since) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveChecks(studentId: string, checks: StoredCheck[]) {
+  try {
+    window.localStorage.setItem(storageKey(studentId), JSON.stringify(checks.slice(-10)));
+  } catch {}
+}
+
+export function PracticeRecorder({
+  studentId,
+  firstName,
+  hasPlan,
+  instrument,
+}: {
+  studentId: string;
+  firstName: string;
+  hasPlan: boolean;
+  instrument: string;
+}) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
   const [withVideo, setWithVideo] = useState(false);
@@ -73,6 +115,39 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
   const previewRef = useRef<HTMLVideoElement>(null);
   const stoppingRef = useRef(false);
   const stopFlushRef = useRef<(() => void) | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+
+  // Tuner.
+  const tuneNotes = useMemo(() => tuneNotesFor(instrument), [instrument]);
+  const [tuner, setTunerState] = useState<TunerAudio | null>(null);
+  const tunerRef = useRef<TunerAudio | null>(null);
+  const setTuner = (t: TunerAudio | null) => {
+    tunerRef.current = t;
+    setTunerState(t);
+  };
+  const [tunerError, setTunerError] = useState<string | null>(null);
+  const [readings, setReadings] = useState<TunerReadings>({});
+  const [checks, setChecks] = useState<StoredCheck[]>([]);
+  const checksRef = useRef<StoredCheck[]>([]);
+  const readingsRef = useRef<TunerReadings>({});
+
+  // Checks from earlier on this device (a page reload, or tuned then came back).
+  useEffect(() => {
+    const stored = loadChecks(studentId);
+    checksRef.current = stored;
+    const latest = stored[stored.length - 1];
+    readingsRef.current = latest?.s ?? {};
+    // Reading browser storage has to wait until after the first render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setChecks(stored);
+    setReadings(readingsRef.current);
+  }, [studentId]);
+
+  const onReading = useCallback((name: string, cents: number) => {
+    if (readingsRef.current[name] === cents) return;
+    readingsRef.current = { ...readingsRef.current, [name]: cents };
+    setReadings(readingsRef.current);
+  }, []);
 
   const recording = phase.name === "recording";
   const busy = recording || phase.name === "uploading" || phase.name === "starting";
@@ -100,7 +175,9 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
     };
   }, [busy]);
 
-  // Release the microphone/camera if the page goes away.
+  // Release the microphone/camera (and the tuner's) if the page goes away.
+  // teardown only reads refs, so the first render's copy is enough.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => teardown(), []);
 
   // Poll the review until it's done.
@@ -134,6 +211,8 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
   }, [phase, router]);
 
   function teardown() {
+    closeTuner();
+    sourceRef.current = null;
     if (tickRef.current) window.clearInterval(tickRef.current);
     tickRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -142,8 +221,67 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
     audioCtxRef.current = null;
   }
 
+  async function openTuner() {
+    setTunerError(null);
+    const ctx = audioCtxRef.current;
+    const source = sourceRef.current;
+    if (recording && ctx && source) {
+      // Listen through the recording's microphone.
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 4096;
+      source.connect(analyser);
+      setTuner({ ctx, analyser, own: null });
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setTunerError("This browser can't use the microphone. Try Safari on an iPhone or iPad, or Chrome on Android.");
+      return;
+    }
+    // Made inside the tap, for iPhone and iPad.
+    const own = new AudioContext();
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+      });
+    } catch {
+      own.close().catch(() => {});
+      setTunerError("The microphone wasn't allowed. Allow it for this site in the browser settings, then try again.");
+      return;
+    }
+    await own.resume().catch(() => {});
+    const analyser = own.createAnalyser();
+    analyser.fftSize = 4096;
+    own.createMediaStreamSource(stream).connect(analyser);
+    setTuner({ ctx: own, analyser, own: stream });
+  }
+
+  /** Closes the tuner and keeps what it read as a tuning check. */
+  function closeTuner() {
+    const t = tunerRef.current;
+    if (!t) return;
+    if (t.own) {
+      t.own.getTracks().forEach((tr) => tr.stop());
+      t.ctx.close().catch(() => {});
+    } else {
+      try {
+        t.analyser.disconnect();
+      } catch {}
+    }
+    setTuner(null);
+    const s = readingsRef.current;
+    if (!tuneNotes || !Object.keys(s).length) return;
+    const ok = tuneNotes.every((n) => s[n.name] !== undefined && Math.abs(s[n.name]) <= TUNED_CENTS);
+    const last = checksRef.current[checksRef.current.length - 1];
+    if (last && JSON.stringify(last.s) === JSON.stringify(s) && Date.now() - last.wall < 5000) return;
+    checksRef.current = [...checksRef.current, { wall: Date.now(), s: { ...s }, ok }].slice(-10);
+    setChecks(checksRef.current);
+    saveChecks(studentId, checksRef.current);
+  }
+
   async function start() {
     setStoppedEarly(false);
+    if (tuner) closeTuner();
     if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       setPhase({ name: "error", message: "This browser can't record. Try Safari on an iPhone or iPad, or Chrome on Android." });
       return;
@@ -209,6 +347,7 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
     // The sound timeline: level and notes, ten looks a second.
     await ctx.resume().catch(() => {});
     const source = ctx.createMediaStreamSource(stream);
+    sourceRef.current = source;
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
     source.connect(analyser);
@@ -300,6 +439,9 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
       durationSeconds: duration,
       practiceDate: toISODate(t0.wall),
       activity: activityRef.current,
+      tuning: checksRef.current
+        .map((c): TuningCheck => ({ t: Math.round((c.wall - t0.wall.getTime()) / 1000), s: c.s, ok: c.ok }))
+        .filter((c) => c.t >= -TUNING_VALID_SECONDS),
     };
     await upload(blob, input);
   }
@@ -396,6 +538,21 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
   }
 
   const meter = Math.max(0, Math.min(1, (level + 60) / 55));
+  const lastTuned = [...checks].reverse().find((c) => c.ok);
+  const lastCheck = checks[checks.length - 1];
+  const tunedAt = (c: StoredCheck) => new Date(c.wall).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+  const tunerView = tuner && tuneNotes && (
+    <Tuner
+      ctx={tuner.ctx}
+      analyser={tuner.analyser}
+      notes={tuneNotes}
+      readings={readings}
+      onReading={onReading}
+      onDone={closeTuner}
+      doneLabel={recording ? "Back to practice" : "Done tuning"}
+    />
+  );
 
   return (
     <Card tone="plum" className="flex flex-col gap-3">
@@ -432,6 +589,41 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
               )}
             </div>
           )}
+          {tuneNotes &&
+            (tunerView ?? (
+              <div
+                className={cx(
+                  "flex flex-col gap-2 rounded-2xl border px-4 py-3",
+                  lastTuned ? "border-sage/40 bg-sage-soft" : "border-plum/30 bg-sheet",
+                )}
+              >
+                {lastTuned ? (
+                  <div className="text-lg font-semibold text-sage">✓ Tuned to A = 440 at {tunedAt(lastTuned)}</div>
+                ) : (
+                  <>
+                    <div className="text-lg font-semibold">First, tune to A = 440</div>
+                    <p className="text-[15px] text-muted">
+                      {lastCheck
+                        ? `${tuneNotes.length > 1 ? "Not every string was" : "The A wasn't"} in tune at ${tunedAt(lastCheck)}. `
+                        : ""}
+                      Tuning first means the review hears true pitch.{" "}
+                      {tuneNotes.length > 1
+                        ? "You can skip it; the review then works out the tuning from the open strings."
+                        : "You can skip it."}
+                    </p>
+                  </>
+                )}
+                {tunerError && <div className="text-sm text-danger">{tunerError}</div>}
+                <Button
+                  type="button"
+                  variant={lastTuned ? "secondary" : "plum"}
+                  className="min-h-12 text-lg"
+                  onClick={() => void openTuner()}
+                >
+                  {lastTuned ? "Tune again" : "Open the tuner"}
+                </Button>
+              </div>
+            ))}
           {phase.name === "idle" && (
             <p className="text-sm text-muted">
               Set the phone or iPad near {firstName}, press Start, and practise as usual. When you stop, we listen back,
@@ -478,6 +670,12 @@ export function PracticeRecorder({ studentId, firstName, hasPlan }: { studentId:
 
       {recording && (
         <>
+          {tunerView}
+          {tuneNotes && !tuner && (
+            <Button type="button" variant="secondary" className="min-h-12 text-lg" onClick={() => void openTuner()}>
+              Tuner
+            </Button>
+          )}
           <div className="h-2 overflow-hidden rounded-full bg-plum/15" aria-hidden>
             <div className="h-full rounded-full bg-plum transition-[width] duration-100" style={{ width: `${meter * 100}%` }} />
           </div>
