@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, cx, textareaClass } from "./ui";
 
 type Msg = { id: string; role: "user" | "assistant"; content: string };
+export type SetProgress = { id: string; title: string; blurb: string; done: number; total: number; complete: boolean };
 
 async function send(message: string): Promise<{ reply?: string; error?: string }> {
   const res = await fetch("/api/assistant", {
@@ -18,7 +19,19 @@ async function send(message: string): Promise<{ reply?: string; error?: string }
 }
 
 /** The chat with the teacher's teaching assistant. Opens with the next interview question. */
-export function AssistantChat({ initial }: { initial: Msg[] }) {
+export function AssistantChat({
+  initial,
+  sets,
+  basicsDone,
+  current,
+}: {
+  initial: Msg[];
+  /** The optional sets after the basics, with progress. */
+  sets: SetProgress[];
+  basicsDone: boolean;
+  /** The set being worked on now, if any and unfinished. */
+  current?: string;
+}) {
   const router = useRouter();
   const [msgs, setMsgs] = useState<Msg[]>(initial);
   const [draft, setDraft] = useState("");
@@ -84,6 +97,31 @@ export function AssistantChat({ initial }: { initial: Msg[] }) {
         {!msgs.length && !busy && <div className="text-sm text-muted">Starting the interview…</div>}
         <div ref={end} />
       </div>
+      {basicsDone && !busy && sets.some((s) => !s.complete) && (
+        <div className="flex flex-col gap-2">
+          <div className="text-sm text-muted">
+            {current ? "Or switch to another set of questions:" : "Pick the next set of questions, or stop here and come back any time:"}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {sets
+              .filter((s) => !s.complete && s.id !== current)
+              .map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  title={s.blurb}
+                  onClick={() => void turn(`Let's do the "${s.title}" questions next.`)}
+                  className="min-h-11 rounded-full border border-accent/30 bg-accent-soft px-3.5 text-sm font-medium text-accent-ink"
+                >
+                  {s.title}
+                  <span className="ml-1.5 font-normal text-muted">
+                    {s.done}/{s.total}
+                  </span>
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
       {error && <div className="text-sm text-danger">{error}</div>}
       <textarea
         className={cx(textareaClass)}

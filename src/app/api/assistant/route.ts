@@ -6,7 +6,7 @@ import { DraftError } from "@/lib/ai/draft-lesson";
 import { askAssistant, type ChatTurn } from "@/lib/ai/assistant";
 import { claudeCost, type ClaudeUsage } from "@/lib/ai/pricing";
 import { teachingStyleFor } from "@/lib/ai/teaching-style";
-import { SECTION_IDS, SECTION_MAX_CHARS, toneOf, type TeachingProfile } from "@/lib/assistant/profile";
+import { LEVEL_IDS, SECTION_IDS, SECTION_MAX_CHARS, toneOf, type TeachingProfile } from "@/lib/assistant/profile";
 import type { Json } from "@/lib/supabase/types";
 
 // One turn of the chat with the teacher's teaching assistant. An empty
@@ -38,10 +38,13 @@ export async function POST(req: Request) {
     usage = out.usage;
     const r = out.result;
 
+    // The set of questions the teacher is working on, if they picked a new one.
+    const level = LEVEL_IDS.find((l) => l === r.level) ?? style.profile.level;
     const profile: TeachingProfile = {
       v: 1,
       sections: { ...style.profile.sections },
       answered: [...new Set([...style.profile.answered, ...(r.answered ?? [])])],
+      ...(level ? { level } : {}),
       updated_at: new Date().toISOString(),
     };
     for (const u of r.updates ?? []) {

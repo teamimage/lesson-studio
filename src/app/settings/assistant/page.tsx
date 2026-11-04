@@ -5,7 +5,17 @@ import { Button, Card, Field, Notice, SectionTitle, Textarea } from "@/component
 import { updateTeachingProfile } from "@/app/settings/actions";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { PROFILE_SECTIONS, QUESTIONS, SECTION_MAX_CHARS, TONE_LABELS, parseProfile, toneOf } from "@/lib/assistant/profile";
+import {
+  PROFILE_SECTIONS,
+  QUESTIONS,
+  SECTION_MAX_CHARS,
+  TONE_LABELS,
+  answeredCount,
+  basicsDone,
+  levelProgress,
+  parseProfile,
+  toneOf,
+} from "@/lib/assistant/profile";
 import type { Json } from "@/lib/supabase/types";
 
 type SP = Promise<{ profile?: string }>;
@@ -30,7 +40,11 @@ async function Body({ searchParams }: { searchParams: SP }) {
     .limit(200);
   const profile = parseProfile(teacher.teaching_profile as Json | null | undefined);
   const tone = toneOf(teacher.review_tone);
-  const answered = QUESTIONS.filter((q) => profile.answered.includes(q.id)).length;
+  const answered = answeredCount(profile);
+  const progress = levelProgress(profile);
+  const basics = progress[0];
+  const sets = progress.slice(1);
+  const current = sets.find((l) => l.id === profile.level && !l.complete)?.id;
 
   return (
     <Shell title="Teaching assistant" back={{ href: "/settings#assistant", label: "Settings" }} tab="settings">
@@ -44,11 +58,23 @@ async function Body({ searchParams }: { searchParams: SP }) {
           <section>
             <p className="mb-3 text-sm text-muted">
               Answer in your own words, typed or dictated. Your answers become your teaching profile below, which every
-              practice review, grade and lesson draft follows. {answered} of {QUESTIONS.length} interview questions covered.
-              Reviews are set to <span className="font-medium text-ink">{TONE_LABELS[tone].label}</span>; you can change that
+              practice review, grade and lesson draft follows. Everyone starts with {basics.total} basic questions (
+              {basics.done} done); after that, pick any of the other sets whenever you like. {answered} of {QUESTIONS.length}{" "}
+              questions covered in all. Reviews are set to <span className="font-medium text-ink">{TONE_LABELS[tone].label}</span>; you can change that
               here or in Settings.
             </p>
+            <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              {progress.map((l) => (
+                <li key={l.id} className={l.complete ? "text-sage" : l.done ? "text-ink" : "text-muted"}>
+                  {l.complete ? "✓ " : ""}
+                  {l.title} {l.done}/{l.total}
+                </li>
+              ))}
+            </ul>
             <AssistantChat
+              sets={sets}
+              basicsDone={basicsDone(profile)}
+              current={current}
               initial={(rows ?? []).map((r) => ({ id: r.id, role: r.role === "user" ? "user" : "assistant", content: r.content }))}
             />
           </section>
