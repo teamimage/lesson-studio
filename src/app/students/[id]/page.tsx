@@ -9,9 +9,11 @@ import { Shell } from "@/components/shell";
 import { Button, Card, EmptyState, LinkButton, Notice, Pill, SectionTitle } from "@/components/ui";
 import { requireTeacher } from "@/lib/auth";
 import { getPracticeWeek, getStudent, practiceSpanLabel, listLessons, listParentsForStudent, listRepertoire } from "@/lib/data";
-import { formatDate } from "@/lib/format";
+import { formatDate, todayISO } from "@/lib/format";
 import { TodayDate } from "@/components/today-date";
-import { WeekStrip } from "@/components/week-strip";
+import { PracticeCalendarLegend, PracticeMonthCalendar } from "@/components/practice-month-calendar";
+import { monthOf, monthRange } from "@/lib/practice/month";
+import { listLessonMarks } from "@/lib/lesson-marks";
 import { RepertoireMap } from "@/components/repertoire-map";
 import { AddLesson } from "@/components/add-lesson";
 import { openMusicStand } from "@/app/students/music-actions";
@@ -64,7 +66,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     proposed ? listRecordingsForStudent(id, 100) : Promise.resolve([]),
     listReminders(id),
   ]);
-  const practiceDays = week.days.length ? await listPracticeDays(id, week.days[0], week.days[week.days.length - 1]) : {};
+  const today = todayISO();
+  const monthSpan = monthRange(monthOf(today));
+  const [practiceDays, lessonDays] = await Promise.all([
+    listPracticeDays(id, ...monthSpan),
+    listLessonMarks(id, ...monthSpan, today),
+  ]);
 
   return (
     <Shell
@@ -194,14 +201,22 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           >
             Practice record
           </SectionTitle>
-          <Card>
-            <div className="mb-2 text-sm font-medium text-muted">
-              {practiceSpanLabel(week).replace(/^./, (c) => c.toUpperCase())}
+          <Card className="flex flex-col gap-3">
+            <div className="text-sm text-muted">
+              {practiceSpanLabel(week).replace(/^./, (c) => c.toUpperCase())}: {week.daysPracticed} of{" "}
+              {week.days.length} days, {week.totalMinutes} min. Tap a day for its practice and grade, or the lesson.
             </div>
-            <WeekStrip week={week} days={practiceDays} teacherView />
-            <GradeLegend className="mt-2" />
+            <PracticeMonthCalendar
+              studentId={id}
+              today={today}
+              initialDays={practiceDays}
+              initialLessons={lessonDays}
+              teacherView
+            />
+            <PracticeCalendarLegend />
+            <GradeLegend />
             {week.notes.length > 0 && (
-              <ul className="mt-3 flex flex-col gap-1.5 text-sm">
+              <ul className="flex flex-col gap-1.5 text-sm">
                 {week.notes.map((n) => (
                   <li key={n.id} className="rounded-xl bg-plum-soft px-3 py-2">
                     <span className="font-medium text-plum">{formatDate(n.practice_date)}:</span> {n.parent_note}
@@ -209,7 +224,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 ))}
               </ul>
             )}
-            <Link href={`/family/${id}`} className="mt-3 inline-block text-sm text-accent-ink underline">
+            <Link href={`/family/${id}`} className="self-start text-sm text-accent-ink underline">
               Open the parent view
             </Link>
           </Card>
@@ -367,14 +382,22 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           >
             Practice record
           </SectionTitle>
-          <Card>
-            <div className="mb-2 text-sm font-medium text-muted">
-              {practiceSpanLabel(week).replace(/^./, (c) => c.toUpperCase())}
+          <Card className="flex flex-col gap-3">
+            <div className="text-sm text-muted">
+              {practiceSpanLabel(week).replace(/^./, (c) => c.toUpperCase())}: {week.daysPracticed} of{" "}
+              {week.days.length} days, {week.totalMinutes} min. Tap a day for its practice and grade, or the lesson.
             </div>
-            <WeekStrip week={week} days={practiceDays} teacherView />
-            <GradeLegend className="mt-2" />
+            <PracticeMonthCalendar
+              studentId={id}
+              today={today}
+              initialDays={practiceDays}
+              initialLessons={lessonDays}
+              teacherView
+            />
+            <PracticeCalendarLegend />
+            <GradeLegend />
             {week.notes.length > 0 && (
-              <ul className="mt-3 flex flex-col gap-1.5 text-sm">
+              <ul className="flex flex-col gap-1.5 text-sm">
                 {week.notes.map((n) => (
                   <li key={n.id} className="rounded-xl bg-plum-soft px-3 py-2">
                     <span className="font-medium text-plum">{formatDate(n.practice_date)}:</span> {n.parent_note}
@@ -382,7 +405,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 ))}
               </ul>
             )}
-            <Link href={`/family/${id}`} className="mt-3 inline-block text-sm text-accent-ink underline">
+            <Link href={`/family/${id}`} className="self-start text-sm text-accent-ink underline">
               Open the parent view
             </Link>
           </Card>
