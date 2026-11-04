@@ -16,7 +16,11 @@ import { Button, cx } from "@/components/ui";
 const TICK_MS = 70;
 /** Readings that must agree before a string's reading is kept (about 0.6 s). */
 const STEADY_READINGS = 8;
-const STEADY_SPREAD = 12;
+const STEADY_SPREAD = 15;
+/** Readings the needle averages over (about half a second). */
+const NEEDLE_READINGS = 7;
+/** A little louder than the recorder needs, so room noise doesn't move the needle. */
+const TUNER_QUIET_DB = QUIET_DB + 4;
 
 const NOTE_NAMES = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
 
@@ -76,7 +80,7 @@ export function Tuner({
         return;
       }
       analyser.getFloatTimeDomainData(buf);
-      const p = levelDb(buf) > QUIET_DB ? detectPitch(buf, ctx.sampleRate, minHz) : null;
+      const p = levelDb(buf) > TUNER_QUIET_DB ? detectPitch(buf, ctx.sampleRate, minHz) : null;
       if (!p) {
         if (performance.now() - lastHeard > 1200) {
           recent = [];
@@ -89,10 +93,10 @@ export function Tuner({
       const r: Reading = near
         ? { midi: p.midi, target: near.note, cents: near.cents }
         : { midi: p.midi, target: null, cents: (p.midi - Math.round(p.midi)) * 100 };
-      recent = [...recent, r].slice(-STEADY_READINGS);
+      recent = [...recent, r].slice(-Math.max(STEADY_READINGS, NEEDLE_READINGS));
       // Show the median of the last few, so the needle doesn't jitter.
       const same = recent.filter((x) => x.target?.name === r.target?.name && Math.round(x.midi) === Math.round(r.midi));
-      const last = same.slice(-5);
+      const last = same.slice(-NEEDLE_READINGS);
       setShown({ ...r, cents: median(last.map((x) => x.cents)) });
       if (
         r.target &&
@@ -164,9 +168,9 @@ export function Tuner({
       {/* Needle */}
       <svg viewBox="0 0 240 140" className="w-full max-w-[320px]" aria-hidden>
         <path d="M 30 120 A 90 90 0 0 1 210 120" fill="none" stroke="var(--rule)" strokeWidth="14" strokeLinecap="round" />
-        {/* The in-tune zone, ±5 cents of the 120° arc. */}
+        {/* The in-tune zone, ±TUNED_CENTS of the 120° arc. */}
         <path
-          d={arc(120, 120, 90, -6, 6)}
+          d={arc(120, 120, 90, -(TUNED_CENTS / 50) * 60, (TUNED_CENTS / 50) * 60)}
           fill="none"
           stroke="var(--sage)"
           strokeWidth="14"
@@ -186,7 +190,7 @@ export function Tuner({
           );
         })}
         <g
-          style={{ transform: `rotate(${angle}deg)`, transformOrigin: "120px 120px", transition: "transform 120ms linear" }}
+          style={{ transform: `rotate(${angle}deg)`, transformOrigin: "120px 120px", transition: "transform 200ms ease-out" }}
           opacity={shown ? 1 : 0.25}
         >
           <line x1="120" y1="120" x2="120" y2="38" stroke={inTune ? "var(--sage)" : "var(--ink)"} strokeWidth="4" strokeLinecap="round" />

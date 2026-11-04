@@ -69,7 +69,7 @@ export function hasStrings(instrument: string): boolean {
 }
 
 /** A string counts as tuned within this many cents of A = 440. */
-export const TUNED_CENTS = 5;
+export const TUNED_CENTS = 6;
 /** A tuning check counts for the session when done this long before Start, or during it. */
 export const TUNING_VALID_SECONDS = 30 * 60;
 
