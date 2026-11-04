@@ -123,7 +123,7 @@ export function GradeLegend({
           <p className="mt-1">
             {family
               ? "The app also measures each held note against the instrument's tuning. A cent is a tiny step in pitch (100 cents make one half step):"
-              : "Measured by code, not the AI: each held note (a quarter second or longer) against the instrument's tuning, taken from the open strings, else A=440."}
+              : "Measured by code, not the AI: each held note (a quarter second or longer) against A=440 when the strings were tuned with the app's tuner, otherwise against the tuning heard on the open strings (else A=440)."}
           </p>
           <ul className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             {TUNING_BANDS.map(([cents, word]) => (
