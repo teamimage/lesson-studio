@@ -1,3 +1,4 @@
+import { GradeLegend } from "@/components/grade-legend";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
@@ -15,6 +16,7 @@ import { formatClock } from "@/lib/lesson-moments";
 import { practiceJumps } from "@/lib/practice-jumps";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { listScores } from "@/lib/scores";
+import { listPracticeDays } from "@/lib/practice/data";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ saved?: string; error?: string }>;
@@ -48,6 +50,9 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const first = student.name.split(" ")[0];
   const done = new Set(log?.completed_assignment_ids ?? []);
   const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
+  const practiceDays = week.days.length
+    ? await listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1])
+    : {};
 
   return (
     <Shell title={`${first}'s practice`} eyebrow={formatDate(today, "long")} v3Tab="family" me={<Me />} large>
@@ -154,11 +159,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <section className="flex flex-col gap-2">
             <h2 className="font-display text-[22px] font-semibold">Since the last lesson</h2>
             <Card>
-              <WeekStrip week={week} large />
+              <WeekStrip week={week} large days={practiceDays} />
               <p className="mt-3 text-[18px]">
                 {week.daysPracticed} of {week.days.length} days practised
                 {week.totalMinutes > 0 ? ` · ${week.totalMinutes} min` : ""}
               </p>
+              <GradeLegend family className="mt-2" />
             </Card>
           </section>
         </div>

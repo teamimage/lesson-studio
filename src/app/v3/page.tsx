@@ -1,3 +1,4 @@
+import { GradeLegend } from "@/components/grade-legend";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Shell } from "@/components/shell";
@@ -234,6 +235,7 @@ async function LessonDay({
               <Card>
                 <div className="mb-2 text-sm font-medium text-muted">{capitalize(practiceSpanLabel(next.week))}</div>
                 <WeekStrip week={next.week} days={days} teacherView />
+                <GradeLegend className="mt-2" />
                 <div className="mt-2 text-sm text-muted">
                   {next.week.totalMinutes} min · listened {next.week.daysListened} of {next.week.days.length} days
                 </div>
