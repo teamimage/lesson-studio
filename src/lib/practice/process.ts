@@ -15,6 +15,7 @@ import { addPieceGroups, intonationText, sessionIntonation, withPrevious } from 
 import type { SessionIntonation } from "./review-types";
 import { matchMusic, musicByPiece, type MusicMatch } from "@/lib/melody";
 import { studentMelodies } from "@/lib/ai/transcribe-melody";
+import { methodText, practiceMethod } from "./method";
 
 // A practice session after Stop:
 //
@@ -230,7 +231,12 @@ async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
   try {
     const ctx = await contextFor(db, s);
     const out = await analyzePractice(ctx);
-    analysis = { ...out.analysis, scales: ctx.scales, ...(ctx.music.length ? { music: ctx.music } : {}) };
+    analysis = {
+      ...out.analysis,
+      scales: ctx.scales,
+      ...(ctx.music.length ? { music: ctx.music } : {}),
+      ...(ctx.method.length ? { method: ctx.method } : {}),
+    };
     if (ctx.intonation && out.analysis.counted) {
       // Each piece gets its own verdict too: where code matched it against the
       // uploaded music, else where Claude's timeline puts it.
@@ -332,11 +338,9 @@ async function contextFor(db: Db, s: PracticeSession) {
   const activity = parseActivity(s.activity);
   const notes = extractNotes(activity);
   const scales = summarizeScales(findScales(notes));
-  const music = matchMusic(
-    notes,
-    melodies,
-    scales.flatMap((g) => g.when),
-  );
+  const scaleTimes = scales.flatMap((g) => g.when);
+  const music = matchMusic(notes, melodies, scaleTimes);
+  const method = practiceMethod(notes, melodies, music, scaleTimes);
   const assignments = (lesson?.assignments ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
   const earlierIntonation = (earlier ?? []).flatMap((e) => {
     const i = (e.analysis as PracticeAnalysis | null)?.intonation;
@@ -367,10 +371,12 @@ async function contextFor(db: Db, s: PracticeSession) {
     scales,
     scalesText: scalesText(scales),
     musicText: musicText(music, melodies.length),
+    methodText: methodText(method),
     intonationText: intonation ? intonationText(intonation, notes) : "",
     // Used after the review, not sent to Claude.
     notes,
     music,
+    method,
     intonation,
     earlierIntonation,
     knownTitles,

@@ -3,6 +3,7 @@ import { cx } from "@/components/ui";
 import { workOnTexts, type PracticeAnalysis } from "@/lib/practice/review-types";
 import { scaleLine } from "@/lib/practice/scales";
 import { musicByPiece } from "@/lib/melody";
+import { barsLabel, VERDICT_WORDS, type MethodVerdict, type PieceMethod } from "@/lib/practice/method";
 import {
   CLEAR_CENTS,
   INTONATION_VERSION,
@@ -172,6 +173,10 @@ export function PracticeReviewBody({
             ))}
           </ul>
         </div>
+      )}
+
+      {!compact && (r.method_note || (teacherView && (r.method?.length ?? 0) > 0)) && (
+        <MethodBlock note={r.method_note ?? ""} methods={teacherView ? (r.method ?? []) : []} />
       )}
 
       {r.intonation && <IntonationBlock i={r.intonation} compact={compact} teacherView={teacherView} />}
@@ -370,6 +375,87 @@ function IntonationBlock({ i, compact, teacherView }: { i: SessionIntonation; co
               </div>
             ))}
         </details>
+      )}
+    </div>
+  );
+}
+
+const GOOD_VERDICTS: MethodVerdict[] = ["good_method"];
+const POOR_VERDICTS: MethodVerdict[] = ["stuck_restarting", "run_throughs", "drilled_not_through"];
+
+function clockOf(sec: number): string {
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+}
+
+/**
+ * How the practising was done: Claude's sentence for everyone, and for the
+ * teacher the code's counts per piece (attempts, stops, spot loops, tempo).
+ */
+function MethodBlock({ note, methods }: { note: string; methods: PieceMethod[] }) {
+  return (
+    <div>
+      <Label>How it was practised</Label>
+      {note && <div className="mt-0.5">{note}</div>}
+      {methods.length > 0 && (
+        <ul className="mt-1.5 flex flex-col gap-2">
+          {methods.map((m) => (
+            <li key={m.title} className="flex flex-col gap-0.5 text-sm">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-medium">{m.title}</span>
+                <span
+                  className={cx(
+                    "rounded-full px-2 py-0.5 text-[13px] font-medium",
+                    GOOD_VERDICTS.includes(m.verdict)
+                      ? "bg-sage-soft text-sage"
+                      : POOR_VERDICTS.includes(m.verdict)
+                        ? "bg-accent-soft text-accent-ink"
+                        : "bg-amber-soft",
+                  )}
+                >
+                  {VERDICT_WORDS[m.verdict]}
+                </span>
+              </div>
+              <div className="text-muted">
+                {[
+                  `${m.attempts.length} attempt${m.attempts.length === 1 ? "" : "s"}`,
+                  `${m.starts_from_top} from the top`,
+                  `${m.completed} start to end`,
+                  `furthest bar ${m.furthest_bar} of ${m.last_bar}`,
+                  ...(m.stall_bars.length ? [`stopped at ${m.stall_bars.map((s) => `bar ${s.bar} ×${s.times}`).join(", ")}`] : []),
+                  ...(m.drills.length
+                    ? [`spot loops: ${m.drills.map((d) => `${barsLabel(d)} ×${d.times}${d.slower ? " (slower)" : ""}`).join(", ")}`]
+                    : ["no spot loops"]),
+                  m.slowed ? "slowed down" : "never slowed down",
+                ].join(" · ")}
+              </div>
+              <details>
+                <summary className="cursor-pointer text-accent-ink">Each attempt</summary>
+                <table className="mt-1">
+                  <thead>
+                    <tr className="text-left text-muted">
+                      <th className="pr-3 font-normal">When</th>
+                      <th className="pr-3 font-normal">Bars</th>
+                      <th className="pr-3 font-normal">Tempo</th>
+                      <th className="font-normal">Ended</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {m.attempts.map((a, i) => (
+                      <tr key={i}>
+                        <td className="pr-3 font-mono text-xs">{clockOf(a.start)}</td>
+                        <td className="pr-3">{barsLabel(a).replace(/^bars? /, "")}</td>
+                        <td className="pr-3">{a.bpm ? `~${a.bpm} bpm` : a.sec_per_bar ? `${a.sec_per_bar} s/bar` : "–"}</td>
+                        <td className={cx(a.stalled && "text-accent-ink")}>
+                          {a.reached_end ? "reached the end" : a.drill ? "spot loop" : a.stalled ? "stopped, went back" : "moved on"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
