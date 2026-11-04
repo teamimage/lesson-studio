@@ -8,6 +8,7 @@ import { requireTeacher } from "@/lib/auth";
 import { getLesson, getStudent, listLessons, listRepertoire } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 import { booksFor } from "@/lib/suzuki";
+import { listeningChoices } from "@/lib/reference-data";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ error?: string }>;
@@ -32,6 +33,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     listLessons(lesson.student_id, 10),
   ]);
   if (!student) notFound();
+  const recordings = await listeningChoices(student.instrument);
   const previous = lessons.find((l) => l.id !== id && l.status === "approved" && l.lesson_date <= lesson.lesson_date);
 
   return (
@@ -54,11 +56,14 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         action={saveLesson}
         knownPieces={repertoire.map((r) => r.title)}
         books={booksFor(student.instrument)}
+        recordings={recordings}
         previousAssignments={(previous?.assignments ?? []).map((a) => ({
           kind: a.kind,
           title: a.title,
           how: a.how ?? "",
           every_day: a.every_day,
+          reference_recording_id: a.reference_recording_id ?? null,
+          listen_times: a.listen_times ?? null,
         }))}
         initial={{
           lesson_date: lesson.lesson_date,
@@ -76,6 +81,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             title: a.title,
             how: a.how ?? "",
             every_day: a.every_day,
+            reference_recording_id: a.reference_recording_id ?? null,
+            listen_times: a.listen_times ?? null,
           })),
         }}
       />

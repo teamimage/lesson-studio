@@ -189,6 +189,26 @@ async function Dashboard() {
         </section>
       )}
 
+      <section>
+        <SectionTitle>Studio library</SectionTitle>
+        <Link href="/listening" className="block">
+          <Card className="flex items-center gap-3 transition hover:border-plum/50">
+            <span className="text-2xl text-plum" aria-hidden>
+              ♪
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">Reference recordings</span>
+              <span className="block text-sm text-muted">
+                Book recordings and other listening, to assign as practice
+              </span>
+            </span>
+            <span className="text-muted" aria-hidden>
+              ›
+            </span>
+          </Card>
+        </Link>
+      </section>
+
       <p className="text-center text-xs text-muted">
         Signed in as {viewer.email}.{" "}
         <Link href="/family" className="underline">

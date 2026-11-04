@@ -49,6 +49,9 @@ import { JumpButton, VideoPopupProvider } from "@/components/video-popup";
 import { listScores } from "@/lib/scores";
 import { practiceJumps } from "@/lib/practice-jumps";
 import { formatClock } from "@/lib/lesson-moments";
+import { listenTracksFor } from "@/lib/reference-data";
+import { parsePlays } from "@/lib/reference-recordings";
+import { ListenPlayer } from "@/components/listen-player";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ date?: string; saved?: string; error?: string }>;
@@ -126,6 +129,11 @@ async function Body({
       [...recordings, ...watch.recordings].map((r) => [r.id, r]),
     ).values(),
   ];
+  // Recordings the plan assigns for listening, ready to play.
+  const listenTracks = plan
+    ? await listenTracksFor(plan.assignments.map((a) => a.reference_recording_id))
+    : {};
+  const plays = parsePlays(log?.listen_plays);
   const isTeacher =
     !!viewer.teacher && viewer.teacher.id === student.teacher_id;
   const firstName = student.name.split(" ")[0];
@@ -239,15 +247,28 @@ async function Body({
                   <input type="hidden" name="student_id" value={studentId} />
                   <input type="hidden" name="practice_date" value={date} />
                   <ol className="flex flex-col gap-2">
-                    {plan.assignments.map((a, i) => (
-                      <li key={a.id}>
+                    {plan.assignments.map((a, i) => {
+                      const track = a.reference_recording_id
+                        ? listenTracks[a.reference_recording_id]
+                        : undefined;
+                      return (
+                      <li
+                        key={a.id}
+                        className={cx(
+                          track &&
+                            "overflow-hidden rounded-2xl border border-rule bg-sheet has-[:checked]:border-sage has-[:checked]:bg-sage-soft",
+                        )}
+                      >
                         <label
                           className={cx(
-                            "flex cursor-pointer items-start gap-3 rounded-2xl border bg-sheet p-3 has-[:checked]:border-sage has-[:checked]:bg-sage-soft",
-                            "border-rule",
+                            "flex cursor-pointer items-start gap-3 p-3",
+                            !track &&
+                              "rounded-2xl border border-rule bg-sheet has-[:checked]:border-sage has-[:checked]:bg-sage-soft",
                           )}
                         >
                           <input
+                            // Remounts when a play-through ticks it on the server.
+                            key={`${a.id}-${completed.has(a.id)}`}
                             type="checkbox"
                             name="done"
                             value={a.id}
@@ -292,8 +313,22 @@ async function Body({
                             )}
                           </span>
                         </label>
+                        {track && (
+                          <div className="px-3 pb-3 pl-12">
+                            <ListenPlayer
+                              key={`${a.id}-${date}`}
+                              track={track}
+                              assignmentId={a.id}
+                              studentId={studentId}
+                              date={date}
+                              times={Math.max(1, a.listen_times ?? 1)}
+                              initialPlays={plays[a.id] ?? 0}
+                            />
+                          </div>
+                        )}
                       </li>
-                    ))}
+                      );
+                    })}
                   </ol>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -310,6 +345,7 @@ async function Body({
                     </Field>
                     <label className="flex items-end gap-3 pb-2.5 text-[16px]">
                       <input
+                        key={`listened-${log?.listened ?? false}`}
                         type="checkbox"
                         name="listened"
                         defaultChecked={log?.listened ?? false}

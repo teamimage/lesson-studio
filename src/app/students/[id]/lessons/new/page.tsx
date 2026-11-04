@@ -8,6 +8,7 @@ import { requireTeacher } from "@/lib/auth";
 import { getCurrentPlan, getStudent, listRepertoire } from "@/lib/data";
 import { addDays, todayISO } from "@/lib/format";
 import { booksFor } from "@/lib/suzuki";
+import { listeningChoices } from "@/lib/reference-data";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ error?: string }>;
@@ -27,6 +28,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const [student, plan, repertoire] = await Promise.all([getStudent(id), getCurrentPlan(id), listRepertoire(id)]);
   if (!student) notFound();
   const today = todayISO();
+  const recordings = await listeningChoices(student.instrument);
 
   return (
     <Shell title="Record lesson" eyebrow={student.name} back={{ href: `/students/${id}`, label: student.name }} tab="studio">
@@ -41,11 +43,14 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         action={saveLesson}
         knownPieces={repertoire.map((r) => r.title)}
         books={booksFor(student.instrument)}
+        recordings={recordings}
         previousAssignments={(plan?.assignments ?? []).map((a) => ({
           kind: a.kind,
           title: a.title,
           how: a.how ?? "",
           every_day: a.every_day,
+          reference_recording_id: a.reference_recording_id ?? null,
+          listen_times: a.listen_times ?? null,
         }))}
         initial={{
           lesson_date: today,

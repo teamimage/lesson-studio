@@ -22,6 +22,9 @@ export type AssignmentInput = {
   title: string;
   how: string;
   every_day: boolean;
+  /** Listening items: the reference recording to play, and plays a day. */
+  reference_recording_id?: string | null;
+  listen_times?: number | null;
 };
 export type LessonInput = {
   student_id: string;
@@ -76,6 +79,16 @@ function parsePayloadObject(raw: Partial<LessonInput>): LessonInput {
         title: clean(a.title),
         how: clean(a.how),
         every_day: a.every_day !== false,
+        reference_recording_id:
+          a.kind === "listening" &&
+          typeof a.reference_recording_id === "string" &&
+          /^[0-9a-f-]{36}$/.test(a.reference_recording_id)
+            ? a.reference_recording_id
+            : null,
+        listen_times:
+          a.kind === "listening" && Number.isInteger(Number(a.listen_times)) && Number(a.listen_times) > 0
+            ? Math.min(20, Number(a.listen_times))
+            : null,
       }))
       .filter((a) => a.title),
   };
@@ -157,17 +170,34 @@ async function writeAssignments(supabase: Db, id: string, studentId: string, ass
       how: orNull(a.how),
       every_day: a.every_day,
       sort_order: i + 1,
+      reference_recording_id: a.reference_recording_id ?? null,
+      listen_times: a.listen_times ?? null,
     };
     if (a.id && existing.has(a.id)) {
       keep.add(a.id);
-      await supabase.from("assignments").update(row).eq("id", a.id);
+      const { error } = await supabase.from("assignments").update(row).eq("id", a.id);
+      if (error && missingListenColumns(error)) await supabase.from("assignments").update(withoutListen(row)).eq("id", a.id);
     } else {
       inserts.push(row);
     }
   }
   const stale = [...existing].filter((x) => !keep.has(x));
   if (stale.length) await supabase.from("assignments").delete().in("id", stale);
-  if (inserts.length) await supabase.from("assignments").insert(inserts);
+  if (inserts.length) {
+    const { error } = await supabase.from("assignments").insert(inserts);
+    if (error && missingListenColumns(error)) await supabase.from("assignments").insert(inserts.map(withoutListen));
+  }
+}
+
+// Until reference-recordings.sql is run the listening columns don't exist;
+// lessons still save, just without the recording link.
+function missingListenColumns(error: { code?: string; message?: string }): boolean {
+  return error.code === "42703" || error.code === "PGRST204" || /listen_times|reference_recording_id/.test(error.message ?? "");
+}
+function withoutListen<T extends { reference_recording_id?: unknown; listen_times?: unknown }>(row: T) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { reference_recording_id, listen_times, ...rest } = row;
+  return rest;
 }
 
 /**
@@ -199,6 +229,16 @@ export async function saveLessonSection(
   } else if (proposal.section === "assignments") {
     const raw = { assignments: proposal.assignments } as unknown as Partial<LessonInput>;
     const { assignments } = parsePayloadObject(raw);
+    // A rewrite keeps each listening item's recording (matched by id, else title).
+    const { data: before } = await supabase.from("assignments").select("*").eq("lesson_id", lessonId);
+    for (const a of assignments) {
+      if (a.kind !== "listening" || a.reference_recording_id) continue;
+      const old = (before ?? []).find((b) => (a.id && b.id === a.id) || b.title.toLowerCase() === a.title.toLowerCase());
+      if (old?.reference_recording_id) {
+        a.reference_recording_id = old.reference_recording_id;
+        a.listen_times ??= old.listen_times;
+      }
+    }
     await writeAssignments(supabase, lessonId, lesson.student_id, assignments);
   } else if (isTextSection(proposal.section)) {
     const { error } = await supabase

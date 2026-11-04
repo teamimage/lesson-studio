@@ -16,6 +16,12 @@ import { viewerHref } from "@/lib/music-links";
 import Link from "next/link";
 import type { StandScore } from "@/lib/stand-timeline";
 import { moveScore, openMusicStand, renameScore, setScoreArchived } from "@/app/students/music-actions";
+import { ReferenceLinkForm, ReferenceUploader } from "@/components/reference-uploader";
+import { ReferenceLibrary } from "@/components/reference-library";
+import { listReferenceRecordings } from "@/lib/reference-data";
+import { bookChoices } from "@/lib/reference-recordings";
+import { suzukiBookTitles } from "@/lib/constants";
+import { booksFor } from "@/lib/suzuki";
 
 type Params = Promise<{ id: string }>;
 
@@ -32,20 +38,28 @@ async function Body({ params }: { params: Params }) {
   const { id } = await params;
   const student = await getStudent(id);
   if (!student) notFound();
-  const [scores, melody] = await Promise.all([
+  const [scores, melody, library] = await Promise.all([
     listScores(id, {
       includeArchived: true,
       withSourceLinks: true,
     }),
     melodyProgressFor(id),
+    listReferenceRecordings({ withUrls: true }),
   ]);
   const active = scores.filter((s) => !s.archived);
   const archived = scores.filter((s) => s.archived);
+  const books = bookChoices(
+    suzukiBookTitles(student.instrument),
+    booksFor(student.instrument),
+    scores.map((s) => ({ id: s.id, book: s.analysis?.book ?? "", sections: s.sections })),
+  );
+  // This instrument's recordings, plus any filed without one.
+  const recordings = library.recordings.filter((r) => !r.instrument || r.instrument === student.instrument);
 
   return (
     <Shell
       title="Music"
-      eyebrow={`${student.name} · music stand`}
+      eyebrow={`${student.name} · sheet music and recordings`}
       back={{ href: `/students/${id}`, label: student.name }}
       tab="studio"
     >
@@ -65,6 +79,18 @@ async function Body({ params }: { params: Params }) {
           </form>
         </Card>
 
+        <nav className="grid grid-cols-2 gap-2 text-sm font-semibold">
+          <a href="#sheet-music" className="rounded-xl border border-rule bg-sheet px-3 py-2.5 text-center text-accent-ink">
+            ♫ Sheet music ({active.length})
+          </a>
+          <a href="#recordings" className="rounded-xl border border-rule bg-sheet px-3 py-2.5 text-center text-plum">
+            ♪ Reference recordings ({recordings.length})
+          </a>
+        </nav>
+
+        <h2 id="sheet-music" className="-mb-3 scroll-mt-24 font-display text-xl font-semibold">
+          Sheet music
+        </h2>
         <section>
           <SectionTitle>On the stand ({active.length})</SectionTitle>
           {active.length === 0 ? (
@@ -87,7 +113,7 @@ async function Body({ params }: { params: Params }) {
         </section>
 
         <section>
-          <SectionTitle>Add music</SectionTitle>
+          <SectionTitle>Add sheet music</SectionTitle>
           <Card>
             <ScoreUploader studentId={id} />
           </Card>
@@ -102,6 +128,59 @@ async function Body({ params }: { params: Params }) {
               ))}
             </ul>
           </section>
+        )}
+
+        <h2 id="recordings" className="-mb-3 scroll-mt-24 font-display text-xl font-semibold">
+          Reference recordings
+        </h2>
+        <Card tone="plum" className="text-[15px]">
+          Recordings to listen to, like the tracks that come with each Suzuki book. Assign one as a Listening item in the
+          lesson&apos;s practice list and {student.name.split(" ")[0]}&apos;s family gets a player on Home practice that
+          ticks itself off when played through. These are only for listening; practice reviews never compare playing
+          against them. They belong to your studio, so they show for every {student.instrument} student.
+        </Card>
+        {!library.ready ? (
+          <Card className="text-sm text-muted">
+            Reference recordings aren&apos;t set up yet. Run reference-recordings.sql in the Supabase SQL Editor, then
+            reload this page.
+          </Card>
+        ) : (
+          <>
+            <section>
+              <SectionTitle>Recordings ({recordings.length})</SectionTitle>
+              {recordings.length === 0 ? (
+                <EmptyState title="No recordings yet">
+                  Add the recording that came with {student.current_book || "the book"} below, a whole album at once.
+                </EmptyState>
+              ) : (
+                <ReferenceLibrary recordings={recordings} urls={library.urls} books={books} studentId={id} />
+              )}
+              <p className="mt-2 text-sm">
+                <Link href="/listening" className="text-accent-ink underline">
+                  All recordings in the studio
+                </Link>
+              </p>
+            </section>
+            <section>
+              <SectionTitle>Add recordings</SectionTitle>
+              <Card className="flex flex-col gap-4">
+                <ReferenceUploader
+                  instrument={student.instrument}
+                  books={books}
+                  defaultBook={student.current_book}
+                  studentId={id}
+                />
+                <details className="border-t border-rule pt-3">
+                  <summary className="cursor-pointer text-sm font-medium text-accent-ink">
+                    Or add a link to a recording somewhere else
+                  </summary>
+                  <div className="mt-3">
+                    <ReferenceLinkForm instrument={student.instrument} books={books} studentId={id} />
+                  </div>
+                </details>
+              </Card>
+            </section>
+          </>
         )}
       </div>
     </Shell>
