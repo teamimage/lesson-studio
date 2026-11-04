@@ -10,7 +10,8 @@ import { claudeCost, type ClaudeUsage } from "@/lib/ai/pricing";
 import type { PracticeAnalysis, PeriodReview } from "./review-types";
 import type { PracticeSessionView } from "./data";
 import { scaleLine } from "./scales";
-import { tendencyText } from "./intonation";
+import { INTONATION_VERSION, tendencyText, verdictText } from "./intonation";
+import { regradeIntonation } from "./regrade";
 
 // Practice reviews from one lesson to the next.
 //
@@ -181,7 +182,7 @@ export async function getPeriod(studentId: string, day: string, today = todayISO
 
   const logs = (logsAll ?? []).filter((l) => l.practice_date >= start);
   const prevLogs = (logsAll ?? []).filter((l) => l.practice_date < start);
-  const sessRows = sessAll ?? [];
+  const sessRows = await regradeIntonation(db, sessAll ?? []);
   const periodSess = sessRows.filter((s) => s.practice_date >= start);
   const prevSess = sessRows.filter((s) => s.practice_date < start);
 
@@ -468,7 +469,7 @@ function periodInput(student: Tables<"students">, p: PeriodData, prev: PeriodRev
           if (r.scales?.length) parts.push(`  Scales and arpeggios found by code: ${r.scales.map(scaleLine).join("; ")}`);
           if (r.intonation)
             parts.push(
-              `  Intonation (code): overall ${r.intonation.score}% in tune${r.intonation.groups.map((g) => `; ${g.label} ${g.score}%${g.tendencies.length ? ` (${g.tendencies.map(tendencyText).join(", ")})` : ""}`).join("")}`,
+              `  Intonation (code${(r.intonation.v ?? 1) < INTONATION_VERSION ? ", old scale" : ""}): overall ${verdictText(r.intonation.verdict)}, ${r.intonation.score}% in tune${r.intonation.typical !== undefined ? `, typical miss ${r.intonation.typical} cents` : ""}${r.intonation.tendencies.length ? ` (${r.intonation.tendencies.map(tendencyText).join(", ")})` : ""}${r.intonation.groups.map((g) => `; ${g.label} ${verdictText(g.verdict)}, ${g.score}% in tune${g.right_notes !== undefined ? `, right notes ${g.right_notes}%` : ""}${g.tendencies.length ? ` (${g.tendencies.map(tendencyText).join(", ")})` : ""}`).join("")}`,
             );
           if (r.going_well?.length) parts.push(`  Going well: ${r.going_well.map((x) => x.text).join("; ")}`);
           const work = r.work_on?.length ? r.work_on.map((x) => x.text) : (r.tips ?? []);

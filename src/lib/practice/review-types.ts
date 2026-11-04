@@ -84,7 +84,24 @@ export type PracticeAnalysis = {
   tips?: string[];
 };
 
-export type IntonationVerdict = "good" | "fair" | "needs work";
+/**
+ * "secure" / "mostly" / "uneven" / "poor" since Nov 4 2026 (v 2, strict
+ * cents scale). "good" / "fair" / "needs work" are the old lenient scale and
+ * only appear until a session is re-graded.
+ */
+export type IntonationVerdict = "secure" | "mostly" | "uneven" | "poor" | "good" | "fair" | "needs work";
+
+/** One pitch class across a group: how it sat against the tuning. */
+export type NoteIntonation = {
+  note: string;
+  degree?: string;
+  /** Held notes measured. */
+  n: number;
+  /** Median cents, + sharp / - flat. */
+  cents: number;
+  /** Share within the in-tune band, 0-100. */
+  in_tune: number;
+};
 
 export type IntonationGroup = {
   /** "G major scale", a piece title, or "Whole session". */
@@ -92,23 +109,47 @@ export type IntonationGroup = {
   kind: "scale" | "arpeggio" | "piece" | "session";
   /** Held notes measured. */
   notes: number;
-  /** Share of held notes in tune, 0-100. */
+  /** Share of held notes in tune (within the in-tune band), 0-100. */
   score: number;
   verdict: IntonationVerdict;
+  /** Share within the "slightly off" band or better, 0-100 (v 2). */
+  close?: number;
+  /** Share more than the "clearly off" limit away, 0-100 (v 2). */
+  off?: number;
+  /** Median distance from the tuning, in cents, either way (v 2). */
+  typical?: number;
+  /** Median signed cents: + the group sits sharp overall, - flat (v 2). */
+  lean?: number;
+  /**
+   * Scales and arpeggios only: share of notes that belong to the key (right
+   * notes), separate from whether they were in tune (v 2).
+   */
+  right_notes?: number;
   /** Notes that lean the same way again and again, most off first. */
   tendencies: { note: string; degree?: string; cents: number }[];
+  /** Every note heard 3+ times, for the teacher (v 2). */
+  by_note?: NoteIntonation[];
   /** Same group in the most recent earlier session that had it. */
   prev_score?: number;
   prev_date?: string;
 };
 
 export type SessionIntonation = {
+  /** Grading scale: 2 = strict cents bands (Nov 4 2026). Missing = old lenient scale. */
+  v?: number;
   /** The instrument's tuning against A=440, in cents. */
   offset: number;
+  /** Where the offset came from. */
+  offset_from?: "open strings" | "A=440";
   score: number;
   notes: number;
   verdict: IntonationVerdict;
   tendencies: IntonationGroup["tendencies"];
+  close?: number;
+  off?: number;
+  typical?: number;
+  lean?: number;
+  by_note?: NoteIntonation[];
   prev_score?: number;
   prev_date?: string;
   groups: IntonationGroup[];

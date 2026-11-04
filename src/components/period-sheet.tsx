@@ -3,7 +3,7 @@ import type { Student } from "@/lib/data";
 import type { Tables } from "@/lib/supabase/types";
 import { capitalize, formatDate, parseISODate } from "@/lib/format";
 import { type CheckGridRow, type PeriodData } from "@/lib/practice/period";
-import { intonationTrend, verdictText } from "@/lib/practice/intonation";
+import { intonationTrend, verdictShort, verdictTone } from "@/lib/practice/intonation";
 
 // The lesson-to-lesson practice review as a printable page: the period's
 // numbers, check marks per day for every assigned item and current piece, and Claude's short
@@ -171,10 +171,10 @@ export function PeriodSheet({
                     {row.points.map((p, i) => (
                       <span key={i} className="mr-3 inline-block whitespace-nowrap">
                         <span className="text-[#5d524a]">{formatDate(p.date, "weekday")}: </span>
-                        <span style={{ color: p.verdict === "good" ? C.sage : p.verdict === "fair" ? C.muted : C.accent }}>
-                          {verdictText(p.verdict)}
+                        <span style={{ color: verdictTone(p.verdict) === "good" ? C.sage : verdictTone(p.verdict) === "mid" ? C.muted : C.accent }}>
+                          {verdictShort(p.verdict)}
                         </span>
-                        {teacherView && <span className="text-[#5d524a]"> ({p.score}%)</span>}
+                        <span className="text-[#5d524a]"> ({p.score}%)</span>
                       </span>
                     ))}
                   </span>

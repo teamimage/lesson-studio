@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { PracticeAnalysis } from "@/lib/ai/analyze-practice";
 import type { PracticeSession } from "./process";
+import { regradeIntonation } from "./regrade";
 
 export type PracticeSessionView = PracticeSession & {
   review: PracticeAnalysis | null;
@@ -20,6 +21,7 @@ export async function listPracticeSessions(studentId: string, limit = 10): Promi
     .limit(limit);
   // Before practice-sessions.sql has run the table doesn't exist; show nothing.
   if (error || !data?.length) return [];
+  const rows = await regradeIntonation(db, data);
 
   const lessonIds = [...new Set(data.map((s) => s.lesson_id).filter((x): x is string => !!x))];
   const { data: assignments } = lessonIds.length
@@ -27,7 +29,7 @@ export async function listPracticeSessions(studentId: string, limit = 10): Promi
     : { data: [] as { id: string; title: string }[] };
   const titles = Object.fromEntries((assignments ?? []).map((a) => [a.id, a.title]));
   // The sound timeline is large (fine pitch readings) and pages don't show it.
-  return data.map((s) => ({ ...s, activity: null, review: (s.analysis as PracticeAnalysis | null) ?? null, titles }));
+  return rows.map((s) => ({ ...s, activity: null, review: (s.analysis as PracticeAnalysis | null) ?? null, titles }));
 }
 
 /** One recorded session, trimmed for the practice chart's day popup. */
@@ -65,7 +67,7 @@ export type PracticeDay = {
  */
 export async function listPracticeDays(studentId: string, from: string, to: string): Promise<Record<string, PracticeDay>> {
   const db = await createClient();
-  const [{ data: logs }, { data: sessions }] = await Promise.all([
+  const [{ data: logs }, { data: sessionsRaw }] = await Promise.all([
     db
       .from("practice_logs")
       .select("practice_date, minutes, listened, completed_assignment_ids, parent_note")
@@ -85,7 +87,8 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
 
   const ids = new Set<string>();
   for (const l of logs ?? []) for (const a of l.completed_assignment_ids) ids.add(a);
-  for (const s of sessions ?? []) for (const it of (s.analysis as PracticeAnalysis | null)?.items ?? []) ids.add(it.assignment_id);
+  const sessions = await regradeIntonation(db, sessionsRaw ?? []);
+  for (const s of sessions) for (const it of (s.analysis as PracticeAnalysis | null)?.items ?? []) ids.add(it.assignment_id);
   const { data: assignments } = ids.size
     ? await db.from("assignments").select("id, title").in("id", [...ids])
     : { data: [] as { id: string; title: string }[] };
@@ -101,7 +104,7 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
     d.ticked = l.completed_assignment_ids.map((a) => titles[a]).filter((t): t is string => !!t);
     d.parentNote = l.parent_note?.trim() || null;
   }
-  for (const s of sessions ?? []) {
+  for (const s of sessions) {
     // Uploads that never finished have nothing to show.
     if (s.status === "uploading") continue;
     const missing = !!(s as { recording_missing?: boolean }).recording_missing;

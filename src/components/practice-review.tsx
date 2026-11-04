@@ -3,8 +3,17 @@ import { cx } from "@/components/ui";
 import { workOnTexts, type PracticeAnalysis } from "@/lib/practice/review-types";
 import { scaleLine } from "@/lib/practice/scales";
 import { musicByPiece } from "@/lib/melody";
-import { tendencyText, verdictText } from "@/lib/practice/intonation";
-import type { IntonationGroup, IntonationVerdict, SessionIntonation } from "@/lib/practice/review-types";
+import {
+  CLEAR_CENTS,
+  INTONATION_VERSION,
+  IN_TUNE_CENTS,
+  SLIGHT_CENTS,
+  signedCents,
+  tendencyText,
+  verdictShort,
+  verdictTone,
+} from "@/lib/practice/intonation";
+import type { IntonationGroup, IntonationVerdict, NoteIntonation, SessionIntonation } from "@/lib/practice/review-types";
 
 // The body of one practice session review: check marks against the assigned
 // items and current pieces, an encouraging line, "Going well" and "Things to
@@ -234,14 +243,15 @@ function CheckGroup({ label, rows, showLabel }: { label: string; rows: CheckRow[
 }
 
 function VerdictChip({ v }: { v: IntonationVerdict }) {
+  const tone = verdictTone(v);
   return (
     <span
       className={cx(
         "rounded-full px-2 py-0.5 text-[13px] font-medium",
-        v === "good" ? "bg-sage-soft text-sage" : v === "fair" ? "bg-amber-soft" : "bg-accent-soft text-accent-ink",
+        tone === "good" ? "bg-sage-soft text-sage" : tone === "mid" ? "bg-amber-soft" : "bg-accent-soft text-accent-ink",
       )}
     >
-      {verdictText(v)}
+      {verdictShort(v)}
     </span>
   );
 }
@@ -249,47 +259,111 @@ function VerdictChip({ v }: { v: IntonationVerdict }) {
 function since(g: Pick<IntonationGroup, "score" | "prev_score">): string {
   if (g.prev_score === undefined) return "";
   const d = g.score - g.prev_score;
-  return d >= 8 ? "better than last time" : d <= -8 ? "a little shakier than last time" : "";
+  return d >= 8 ? `up from ${g.prev_score}% last time` : d <= -8 ? `down from ${g.prev_score}% last time` : "";
 }
 
-/** Coarse intonation: one verdict overall and per scale or piece, with leaning notes. */
+/** "52% in tune · typical miss 9 cents · right notes 100%" */
+function numbers(g: Pick<IntonationGroup, "score" | "typical" | "right_notes" | "off">, old: boolean): string {
+  if (old) return `${g.score}% within 20 cents (old scale)`;
+  return [
+    ...(g.right_notes !== undefined ? [`right notes ${g.right_notes}%`] : []),
+    `${g.score}% in tune`,
+    ...(g.typical !== undefined ? [`typical miss ${g.typical} cents`] : []),
+    ...(g.off ? [`${g.off}% more than ${CLEAR_CENTS} off`] : []),
+  ].join(" · ");
+}
+
+function GroupRow({ label, g, old }: { label: string; g: IntonationGroup; old: boolean }) {
+  return (
+    <li className="flex flex-col gap-0.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="font-medium">{label}</span>
+        <VerdictChip v={g.verdict} />
+        <span className="text-sm text-muted">{[numbers(g, old), since(g)].filter(Boolean).join(" · ")}</span>
+      </div>
+      {g.tendencies.length > 0 && (
+        <div className="text-sm">
+          <span className="text-muted">Leaning: </span>
+          {g.tendencies.map(tendencyText).join(", ")}
+        </div>
+      )}
+    </li>
+  );
+}
+
+/** One row per note heard 3+ times: median cents and share in tune. */
+function ByNote({ notes }: { notes: NoteIntonation[] }) {
+  return (
+    <table className="mt-1 text-sm">
+      <thead>
+        <tr className="text-left text-muted">
+          <th className="pr-4 font-normal">Note</th>
+          <th className="pr-4 font-normal">Heard</th>
+          <th className="pr-4 font-normal">Sits</th>
+          <th className="font-normal">In tune</th>
+        </tr>
+      </thead>
+      <tbody>
+        {notes.map((n) => (
+          <tr key={n.note}>
+            <td className="pr-4 font-medium">
+              {n.note}
+              {n.degree ? <span className="font-normal text-muted"> ({n.degree})</span> : null}
+            </td>
+            <td className="pr-4">{n.n}</td>
+            <td className={cx("pr-4", Math.abs(n.cents) > IN_TUNE_CENTS && "text-accent-ink")}>
+              {signedCents(n.cents)} c{Math.abs(n.cents) > IN_TUNE_CENTS ? ` ${n.cents > 0 ? "sharp" : "flat"}` : ""}
+            </td>
+            <td>{n.in_tune}%</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** Intonation on the strict cents scale: overall and per scale or piece, with leaning notes. */
 function IntonationBlock({ i, compact, teacherView }: { i: SessionIntonation; compact: boolean; teacherView: boolean }) {
-  const pct = (n: number) => (teacherView ? ` · ${n}% in tune` : "");
+  const old = (i.v ?? 1) < INTONATION_VERSION;
   if (compact)
     return (
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
         <span className="text-muted">Intonation:</span>
         <VerdictChip v={i.verdict} />
-        {since(i) && <span className="text-muted">{since(i)}</span>}
+        <span className="text-muted">{[numbers(i, old), since(i)].filter(Boolean).join(" · ")}</span>
       </div>
     );
   return (
     <div>
       <Label>Intonation</Label>
-      <ul className="mt-1 flex flex-col gap-1 text-[15px]">
-        <li className="flex flex-wrap items-center gap-1.5">
-          <span className="font-medium">Overall</span>
-          <VerdictChip v={i.verdict} />
-          <span className="text-sm text-muted">
-            {[since(i), i.tendencies.map(tendencyText).join(", ")].filter(Boolean).join(" · ")}
-            {pct(i.score)}
-          </span>
-        </li>
+      <ul className="mt-1 flex flex-col gap-1.5 text-[15px]">
+        <GroupRow label="Overall" g={{ ...i, label: "Overall", kind: "session" }} old={old} />
         {i.groups.map((g) => (
-          <li key={g.label} className="flex flex-wrap items-center gap-1.5">
-            <span className="font-medium">{g.label}</span>
-            <VerdictChip v={g.verdict} />
-            <span className="text-sm text-muted">
-              {[since(g), g.tendencies.map(tendencyText).join(", ")].filter(Boolean).join(" · ")}
-              {pct(g.score)}
-            </span>
-          </li>
+          <GroupRow key={g.label} label={g.label} g={g} old={old} />
         ))}
       </ul>
-      {teacherView && i.offset !== 0 && (
+      {!old && (
         <div className="mt-1 text-xs text-muted">
-          Judged against the instrument&apos;s own tuning ({Math.abs(i.offset)} cents {i.offset > 0 ? "above" : "below"} A=440).
+          In tune means within {IN_TUNE_CENTS} cents; {IN_TUNE_CENTS + 1}–{SLIGHT_CENTS} is slightly off, {SLIGHT_CENTS + 1}–{CLEAR_CENTS} clearly off.
+          Judged on notes held a quarter second or more,{" "}
+          {i.offset_from === "open strings"
+            ? `against the open strings (${Math.abs(i.offset)} cents ${i.offset >= 0 ? "above" : "below"} A=440).`
+            : "against A=440 (too few open strings to read the tuning)."}
         </div>
+      )}
+      {teacherView && !old && (i.by_note?.length ?? 0) > 0 && (
+        <details className="mt-1 text-sm">
+          <summary className="cursor-pointer text-accent-ink">Note by note</summary>
+          <ByNote notes={i.by_note!} />
+          {i.groups
+            .filter((g) => (g.by_note?.length ?? 0) > 0)
+            .map((g) => (
+              <div key={g.label} className="mt-2">
+                <div className="font-medium">{g.label}</div>
+                <ByNote notes={g.by_note!} />
+              </div>
+            ))}
+        </details>
       )}
     </div>
   );

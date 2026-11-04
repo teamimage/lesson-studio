@@ -45,6 +45,8 @@ Write in a warm, encouraging, plain voice. Never scold or sound suspicious. Keep
 - trends: up to 3 short lines comparing with the previous period or across this one ("10 of 14 days, up from 4 of 7", "Gavotte got steadier over the two weeks", "Still working on the F#"). Only what the data supports. Empty if there is nothing to compare.
 - teacher_note: one or two factual sentences for the teacher only (assignments not touched, anything that may need attention in the next lesson). Empty if nothing to add.
 
+Intonation is the exception to the warm voice: report it honestly and exactly, as a strict teacher would. The session lines carry code-measured intonation on a strict cents scale (within 7 cents in tune, beyond 25 out of tune) with verdict words; use those words, never call intonation good unless the verdict is "in tune", never count right notes as in tune, and when intonation is "uneven" or "often out of tune" make one work_on bullet about it, naming the notes that lean and which way. Older sessions graded on the old lenient scale (marked "old scale") don't count as evidence of good intonation.
+
 If the next lesson hasn't happened yet, write about the period so far.`;
 
 export async function analyzePeriod(input: string): Promise<{ review: PeriodReview; usage: ClaudeUsage[] }> {
