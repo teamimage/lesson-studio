@@ -216,7 +216,9 @@ export async function retry(id: string): Promise<PracticeState | null> {
   const db = await createClient();
   const s = await load(db, id);
   if (!s) return null;
-  const claimed = await patch(db, id, { status: "analyzing", error: null }, ["error"]);
+  // A finished review can be written again too (e.g. after the intonation
+  // scale changed); the practice log isn't ticked twice (`applied`).
+  const claimed = await patch(db, id, { status: "analyzing", error: null }, ["error", "done"]);
   if (!claimed) return stateOf(s);
   return review(db, claimed);
 }

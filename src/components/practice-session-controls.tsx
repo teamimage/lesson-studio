@@ -29,12 +29,29 @@ export function PracticePoller({ id }: { id: string }) {
   return null;
 }
 
-export function PracticeSessionButtons({ id, canRetry }: { id: string; canRetry: boolean }) {
+export function PracticeSessionButtons({ id, canRetry, canRedo = false }: { id: string; canRetry: boolean; canRedo?: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm">
+      {canRedo && (
+        <button
+          type="button"
+          disabled={pending}
+          className="font-medium text-accent-ink underline disabled:opacity-50"
+          onClick={() =>
+            start(async () => {
+              setMsg("Writing the review again…");
+              await retryPracticeReview(id);
+              setMsg(null);
+              router.refresh();
+            })
+          }
+        >
+          Review again
+        </button>
+      )}
       {canRetry && (
         <button
           type="button"

@@ -92,7 +92,7 @@ function SessionCard({
           {s.status === "error" && <div className="text-sm text-danger">{s.error || "The review didn't finish."}</div>}
           {working && <div className="text-sm text-muted">Listening back to the practice. This takes a minute or two.</div>}
           {r && <PracticeReviewBody review={r} titles={s.titles} compact={compact} teacherView={teacherView} />}
-          <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} />
+          <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canRedo={teacherView && s.status === "done" && !!r} />
         </div>
       </details>
     </Card>
