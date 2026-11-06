@@ -2,7 +2,8 @@ import { GradeLegend } from "@/components/grade-legend";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
-import { WeekStrip } from "@/components/week-strip";
+import { PracticeCalendarLegend, PracticeMonthCalendar } from "@/components/practice-month-calendar";
+import { monthOf, monthRange } from "@/lib/practice/month";
 import { listLessonMarks } from "@/lib/lesson-marks";
 import {
   Card,
@@ -104,12 +105,11 @@ async function Body({
       getConsentStatus(studentId),
       listActiveReminders(studentId),
     ]);
-  const [practiceDays, lessonDays] = week.days.length
-    ? await Promise.all([
-        listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1]),
-        listLessonMarks(studentId, week.days[0], week.days[week.days.length - 1]),
-      ])
-    : [{}, {}];
+  const monthSpan = monthRange(monthOf(today));
+  const [practiceDays, lessonDays] = await Promise.all([
+    listPracticeDays(studentId, ...monthSpan),
+    listLessonMarks(studentId, ...monthSpan, today),
+  ]);
   // Families watch the fast streaming copy; the original is only offered
   // while that copy is still being made.
   const [recordings, scores] = plan
@@ -244,6 +244,58 @@ async function Body({
             />
           )}
 
+          <section>
+            <SectionTitle>Practice record</SectionTitle>
+            <Card>
+              <div className="mb-2 text-sm font-medium text-muted">
+                {capitalize(practiceSpanLabel(week))}
+              </div>
+              <PracticeMonthCalendar
+                studentId={studentId}
+                today={today}
+                initialDays={practiceDays}
+                initialLessons={lessonDays}
+                teacherView={isTeacher}
+              />
+              <PracticeCalendarLegend />
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <Pill
+                  tone={
+                    practiceTone(week) === "danger"
+                      ? "muted"
+                      : practiceTone(week)
+                  }
+                >
+                  {week.daysPracticed} of {week.days.length} days
+                </Pill>
+                <Pill tone="plum">
+                  listened {week.daysListened} of {week.days.length}
+                </Pill>
+                {week.totalMinutes > 0 && <Pill>{week.totalMinutes} min</Pill>}
+              </div>
+              <GradeLegend family={!isTeacher} className="mt-2" />
+            </Card>
+          </section>
+
+          {recentSessions.length > 0 && (
+            <section>
+              <SectionTitle>Practice reviews</SectionTitle>
+              <PracticeSessionList
+                sessions={recentSessions}
+                teacherView={isTeacher}
+              />
+            </section>
+          )}
+
+          <section>
+            <SectionTitle>Weekly practice reviews</SectionTitle>
+            <PeriodReviewList
+              studentId={studentId}
+              periods={periods}
+              writeMissing
+            />
+          </section>
+
           {!plan && reminders.length > 0 && (
             <Card tone="plum" className="flex flex-col gap-2">
               <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
@@ -291,51 +343,6 @@ async function Body({
               </Card>
             </>
           )}
-
-          <section>
-            <SectionTitle>Practice record</SectionTitle>
-            <Card>
-              <div className="mb-2 text-sm font-medium text-muted">
-                {capitalize(practiceSpanLabel(week))}
-              </div>
-              <WeekStrip week={week} large days={practiceDays} lessons={lessonDays} teacherView={isTeacher} />
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <Pill
-                  tone={
-                    practiceTone(week) === "danger"
-                      ? "muted"
-                      : practiceTone(week)
-                  }
-                >
-                  {week.daysPracticed} of {week.days.length} days
-                </Pill>
-                <Pill tone="plum">
-                  listened {week.daysListened} of {week.days.length}
-                </Pill>
-                {week.totalMinutes > 0 && <Pill>{week.totalMinutes} min</Pill>}
-              </div>
-              <GradeLegend family={!isTeacher} className="mt-2" />
-            </Card>
-          </section>
-
-          {recentSessions.length > 0 && (
-            <section>
-              <SectionTitle>Practice reviews</SectionTitle>
-              <PracticeSessionList
-                sessions={recentSessions}
-                teacherView={isTeacher}
-              />
-            </section>
-          )}
-
-          <section>
-            <SectionTitle>Weekly practice reviews</SectionTitle>
-            <PeriodReviewList
-              studentId={studentId}
-              periods={periods}
-              writeMissing
-            />
-          </section>
 
           {plan && recordings.length > 0 && (
             <section>
