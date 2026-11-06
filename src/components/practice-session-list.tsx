@@ -5,7 +5,8 @@ import type { PracticeSessionView } from "@/lib/practice/data";
 import { PracticePoller, PracticeSessionButtons } from "@/components/practice-session-controls";
 import { PracticeReviewBody, checklist } from "@/components/practice-review";
 
-// Practice reviews, newest first. Each one: a short summary (up to about five lines), check marks
+// Practice reviews, newest first, each starting closed (title, the
+// length line and a fading four-line preview of the summary). Opened: a short summary (up to about five lines), check marks
 // for the assigned items and current pieces, an encouraging line, and short
 // "Going well" / "Things to work on" lists. The teacher also sees a short
 // teacher-only note, and can use the compact layout for a quick glance.
@@ -34,8 +35,8 @@ export function PracticeSessionList({
   if (!sessions.length) return null;
   return (
     <div className="flex flex-col gap-2">
-      {sessions.map((s, i) => (
-        <SessionCard key={s.id} s={s} teacherView={teacherView} compact={compact} open={i === 0} />
+      {sessions.map((s) => (
+        <SessionCard key={s.id} s={s} teacherView={teacherView} compact={compact} />
       ))}
     </div>
   );
@@ -45,12 +46,10 @@ function SessionCard({
   s,
   teacherView,
   compact,
-  open,
 }: {
   s: PracticeSessionView;
   teacherView: boolean;
   compact: boolean;
-  open: boolean;
 }) {
   const r = s.review;
   const working = s.status === "transcribing" || s.status === "analyzing";
@@ -61,8 +60,8 @@ function SessionCard({
   return (
     <Card className="p-0">
       {working && <PracticePoller id={s.id} />}
-      <details open={open && s.status === "done"} className="group">
-        <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3">
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-2.5">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-medium">
@@ -81,7 +80,12 @@ function SessionCard({
               {minutes(s.duration_seconds)} session · {minutes(s.playing_seconds)} playing
               {checks.length > 0 ? ` · ${done} of ${checks.length} checked` : ""}
             </div>
-            {r?.summary && <div className="mt-1 text-[16px]">{r.summary}</div>}
+            {r?.summary && (
+              // Closed: about four lines, fading out. Open: the whole summary.
+              <div className="mt-1 line-clamp-4 text-[16px] [mask-image:linear-gradient(to_bottom,black_55%,transparent)] group-open:line-clamp-none group-open:[mask-image:none]">
+                {r.summary}
+              </div>
+            )}
           </div>
           <span className="mt-1 text-muted transition group-open:rotate-90" aria-hidden>
             ›

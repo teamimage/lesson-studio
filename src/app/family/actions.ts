@@ -39,3 +39,17 @@ export async function savePractice(fd: FormData) {
   revalidatePath(`/students/${studentId}/brief`);
   redirect(`/family/${studentId}?date=${date}${error ? "&error=save" : "&saved=1"}`);
 }
+
+// One day's practice log, for switching days on Home practice without
+// reloading the page. Row-level security decides what the viewer may read.
+export async function loadPracticeLog(studentId: string, date: string) {
+  if (!studentId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("practice_logs")
+    .select("practice_date, minutes, listened, completed_assignment_ids, parent_note, listen_plays")
+    .eq("student_id", studentId)
+    .eq("practice_date", date)
+    .maybeSingle();
+  return data;
+}

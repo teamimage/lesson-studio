@@ -1,22 +1,16 @@
 import { GradeLegend } from "@/components/grade-legend";
-import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { WeekStrip } from "@/components/week-strip";
 import { listLessonMarks } from "@/lib/lesson-marks";
 import {
-  Button,
   Card,
-  Field,
-  Input,
   LinkButton,
   Notice,
   Pill,
   Row,
   SectionTitle,
-  Textarea,
-  cx,
 } from "@/components/ui";
 import { getViewer } from "@/lib/auth";
 import {
@@ -30,13 +24,10 @@ import {
   practiceTone,
 } from "@/lib/data";
 import {
-  addDays,
   capitalize,
   formatDate,
-  relativeDay,
   todayISO,
 } from "@/lib/format";
-import { savePractice } from "../actions";
 import { isPlayable, listRecordingsForLesson } from "@/lib/recordings";
 import { RecordingList } from "@/components/recording-player";
 import { PracticeRecorder } from "@/components/practice-recorder";
@@ -46,18 +37,17 @@ import { PracticeSessionList } from "@/components/practice-session-list";
 import { listPracticeDays, listPracticeSessions } from "@/lib/practice/data";
 import { listPeriods } from "@/lib/practice/period";
 import { PeriodReviewList } from "@/components/period-review-list";
-import { JumpButton, VideoPopupProvider } from "@/components/video-popup";
+import { VideoPopupProvider } from "@/components/video-popup";
 import { listScores } from "@/lib/scores";
 import { practiceJumps } from "@/lib/practice-jumps";
 import { formatClock } from "@/lib/lesson-moments";
 import { listenTracksFor } from "@/lib/reference-data";
-import { parsePlays } from "@/lib/reference-recordings";
-import { ListenPlayer } from "@/components/listen-player";
 import { ReminderList } from "@/components/reminder-editor";
 import { listActiveReminders } from "@/lib/reminders";
 import { getUiVersion } from "@/lib/ui-version-server";
 import { getPracticeView } from "@/lib/practice-view-server";
 import { PracticeViewToggle } from "@/components/practice-view-toggle";
+import { DayPractice, type DayItem, type DayLog } from "@/components/day-practice";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ date?: string; saved?: string; error?: string }>;
@@ -109,7 +99,7 @@ async function Body({
       getPracticeLog(studentId, date),
       listPracticeLogs(studentId, 30),
       getTeacherForStudent(student),
-      listPracticeSessions(studentId, 10),
+      listPracticeSessions(studentId, 20),
       listPeriods(studentId),
       getConsentStatus(studentId),
       listActiveReminders(studentId),
@@ -143,7 +133,6 @@ async function Body({
   const listenTracks = plan
     ? await listenTracksFor(plan.assignments.map((a) => a.reference_recording_id))
     : {};
-  const plays = parsePlays(log?.listen_plays);
   const ownTeacher =
     !!viewer.teacher && viewer.teacher.id === student.teacher_id;
   // Proposed version: the teacher can switch to Family and see the page
@@ -151,7 +140,33 @@ async function Body({
   const toggle = ui === "proposed" && ownTeacher;
   const isTeacher = ownTeacher && !(toggle && view === "family");
   const firstName = student.name.split(" ")[0];
-  const completed = new Set(log?.completed_assignment_ids ?? []);
+  // The last 30 logs cover every day back to the oldest of them, so the day
+  // arrows switch instantly inside that stretch.
+  const dayLogs: DayLog[] = [...history, ...(log && !history.some((h) => h.id === log.id) ? [log] : [])];
+  const knownFrom =
+    history.length < 30 ? "0000-01-01" : history[history.length - 1].practice_date;
+  const dayItems: DayItem[] = (plan?.assignments ?? []).map((a) => {
+    const jump = watch.jumps[a.id];
+    return {
+      id: a.id,
+      title: a.title,
+      kind: a.kind,
+      how: a.how,
+      jump,
+      jumpLabel: jump
+        ? jump.earlier
+          ? formatDate(jump.lessonDate, "short")
+          : formatClock(jump.seconds)
+        : undefined,
+      track: a.reference_recording_id ? listenTracks[a.reference_recording_id] : undefined,
+      listenTimes: Math.max(1, a.listen_times ?? 1),
+    };
+  });
+
+  // Every session since the last lesson, stacked; without a lesson, the last 10.
+  const recentSessions = plan
+    ? sessions.filter((x) => x.practice_date >= plan.lesson_date)
+    : sessions.slice(0, 10);
 
   return (
     <Shell
@@ -217,6 +232,18 @@ async function Body({
             />
           )}
 
+          {plan && (
+            <DayPractice
+              key={`${date}-${sp.saved ?? ""}`}
+              studentId={studentId}
+              today={today}
+              initialDate={date}
+              logs={dayLogs}
+              knownFrom={knownFrom}
+              items={dayItems}
+            />
+          )}
+
           {!plan && reminders.length > 0 && (
             <Card tone="plum" className="flex flex-col gap-2">
               <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
@@ -262,169 +289,8 @@ async function Body({
                   </Row>
                 )}
               </Card>
-
-              <section>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h2 className="text-lg font-semibold">
-                    {date === today ? "Today" : formatDate(date, "weekday")}
-                  </h2>
-                  <DayPicker studentId={studentId} date={date} today={today} />
-                </div>
-                <form action={savePractice} className="flex flex-col gap-3">
-                  <input type="hidden" name="student_id" value={studentId} />
-                  <input type="hidden" name="practice_date" value={date} />
-                  <ol className="flex flex-col gap-2">
-                    {plan.assignments.map((a, i) => {
-                      const track = a.reference_recording_id
-                        ? listenTracks[a.reference_recording_id]
-                        : undefined;
-                      return (
-                      <li
-                        key={a.id}
-                        className={cx(
-                          track &&
-                            "overflow-hidden rounded-2xl border border-rule bg-sheet has-[:checked]:border-sage has-[:checked]:bg-sage-soft",
-                        )}
-                      >
-                        <label
-                          className={cx(
-                            "flex cursor-pointer items-start gap-3 p-3",
-                            !track &&
-                              "rounded-2xl border border-rule bg-sheet has-[:checked]:border-sage has-[:checked]:bg-sage-soft",
-                          )}
-                        >
-                          <input
-                            // Remounts when a play-through ticks it on the server.
-                            key={`${a.id}-${completed.has(a.id)}`}
-                            type="checkbox"
-                            name="done"
-                            value={a.id}
-                            defaultChecked={completed.has(a.id)}
-                            className="mt-1 h-6 w-6 shrink-0 accent-[var(--sage)]"
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="flex flex-wrap items-center gap-x-2">
-                              <span className="font-medium">
-                                {i + 1}. {a.title}
-                              </span>
-                              {a.kind === "listening" && (
-                                <Pill tone="plum">listening</Pill>
-                              )}
-                              {a.kind === "review" && (
-                                <Pill tone="sage">review</Pill>
-                              )}
-                              {a.kind === "game" && (
-                                <Pill tone="amber">game</Pill>
-                              )}
-                              {watch.jumps[a.id] && (
-                                <JumpButton
-                                  jump={watch.jumps[a.id]}
-                                  className="ml-auto font-medium"
-                                >
-                                  ▶ Watch{" "}
-                                  <span className="font-normal text-muted">
-                                    {watch.jumps[a.id].earlier
-                                      ? formatDate(
-                                          watch.jumps[a.id].lessonDate,
-                                          "short",
-                                        )
-                                      : formatClock(watch.jumps[a.id].seconds)}
-                                  </span>
-                                </JumpButton>
-                              )}
-                            </span>
-                            {a.how && (
-                              <span className="block text-sm text-muted">
-                                {a.how}
-                              </span>
-                            )}
-                          </span>
-                        </label>
-                        {track && (
-                          <div className="px-3 pb-3 pl-12">
-                            <ListenPlayer
-                              key={`${a.id}-${date}`}
-                              track={track}
-                              assignmentId={a.id}
-                              studentId={studentId}
-                              date={date}
-                              times={Math.max(1, a.listen_times ?? 1)}
-                              initialPlays={plays[a.id] ?? 0}
-                            />
-                          </div>
-                        )}
-                      </li>
-                      );
-                    })}
-                  </ol>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Minutes">
-                      <Input
-                        name="minutes"
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        max={600}
-                        defaultValue={log?.minutes ?? ""}
-                        placeholder="20"
-                      />
-                    </Field>
-                    <label className="flex items-end gap-3 pb-2.5 text-[16px]">
-                      <input
-                        key={`listened-${log?.listened ?? false}`}
-                        type="checkbox"
-                        name="listened"
-                        defaultChecked={log?.listened ?? false}
-                        className="h-6 w-6 accent-[var(--plum)]"
-                      />
-                      Listened to the recording
-                    </label>
-                  </div>
-                  <Field
-                    label="Note for the teacher"
-                    hint="What was hard, what went well, a question. Shows up in the teacher's brief."
-                  >
-                    <Textarea
-                      name="parent_note"
-                      rows={2}
-                      defaultValue={log?.parent_note ?? ""}
-                    />
-                  </Field>
-                  <Button variant="plum" className="mt-1">
-                    {log ? "Update" : "Save"}{" "}
-                    {date === today ? "today's" : "this day's"} practice
-                  </Button>
-                </form>
-              </section>
-
-              {recordings.length > 0 && (
-                <section>
-                  <SectionTitle>Lesson video</SectionTitle>
-                  <RecordingList recordings={recordings} />
-                </section>
-              )}
             </>
           )}
-
-          {sessions.length > 0 && (
-            <section>
-              <SectionTitle>Practice reviews</SectionTitle>
-              <PracticeSessionList
-                sessions={sessions}
-                teacherView={isTeacher}
-              />
-            </section>
-          )}
-
-          <section>
-            <SectionTitle>Weekly practice reviews</SectionTitle>
-            <PeriodReviewList
-              studentId={studentId}
-              periods={periods}
-              writeMissing
-            />
-          </section>
 
           <section>
             <SectionTitle>Practice record</SectionTitle>
@@ -452,90 +318,33 @@ async function Body({
             </Card>
           </section>
 
-          {history.length > 0 && (
+          {recentSessions.length > 0 && (
             <section>
-              <SectionTitle>Practice log</SectionTitle>
-              <Card className="divide-y divide-rule p-0">
-                {history.map((l) => (
-                  <Link
-                    key={l.id}
-                    href={`/family/${studentId}?date=${l.practice_date}`}
-                    className={cx(
-                      "flex items-start gap-3 px-4 py-2.5",
-                      l.practice_date === date && "bg-accent-soft/60",
-                    )}
-                  >
-                    <div className="w-24 shrink-0 text-sm font-medium">
-                      {relativeDay(l.practice_date)}
-                    </div>
-                    <div className="min-w-0 flex-1 text-sm">
-                      <span>
-                        {l.minutes
-                          ? `${l.minutes} min`
-                          : l.completed_assignment_ids.length > 0
-                            ? "practiced"
-                            : "saved, nothing ticked"}
-                        {l.completed_assignment_ids.length > 0
-                          ? ` · ${l.completed_assignment_ids.length} items`
-                          : ""}
-                        {l.listened ? " · listened" : ""}
-                      </span>
-                      {l.parent_note && (
-                        <div className="text-muted">“{l.parent_note}”</div>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </Card>
+              <SectionTitle>Practice reviews</SectionTitle>
+              <PracticeSessionList
+                sessions={recentSessions}
+                teacherView={isTeacher}
+              />
+            </section>
+          )}
+
+          <section>
+            <SectionTitle>Weekly practice reviews</SectionTitle>
+            <PeriodReviewList
+              studentId={studentId}
+              periods={periods}
+              writeMissing
+            />
+          </section>
+
+          {plan && recordings.length > 0 && (
+            <section>
+              <SectionTitle>Lesson video</SectionTitle>
+              <RecordingList recordings={recordings} />
             </section>
           )}
         </div>
       </VideoPopupProvider>
     </Shell>
-  );
-}
-
-function DayPicker({
-  studentId,
-  date,
-  today,
-}: {
-  studentId: string;
-  date: string;
-  today: string;
-}) {
-  const prev = addDays(date, -1);
-  const next = addDays(date, 1);
-  return (
-    <div className="flex items-center gap-1 text-sm">
-      <Link
-        href={`/family/${studentId}?date=${prev}`}
-        className="flex h-9 w-9 items-center justify-center rounded-lg text-accent-ink hover:bg-accent-soft"
-        aria-label="Previous day"
-      >
-        ‹
-      </Link>
-      {date !== today ? (
-        <Link
-          href={`/family/${studentId}`}
-          className="font-medium text-accent-ink underline"
-        >
-          today
-        </Link>
-      ) : (
-        <span className="text-muted">log a past day</span>
-      )}
-      <Link
-        href={next <= today ? `/family/${studentId}?date=${next}` : "#"}
-        aria-disabled={next > today}
-        className={cx(
-          "flex h-9 w-9 items-center justify-center rounded-lg",
-          next > today ? "text-rule" : "text-accent-ink hover:bg-accent-soft",
-        )}
-        aria-label="Next day"
-      >
-        ›
-      </Link>
-    </div>
   );
 }
