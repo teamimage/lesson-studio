@@ -203,7 +203,6 @@ async function Body({
           {consent.state === "signed" ? (
             <PracticeRecorder
               studentId={studentId}
-              firstName={firstName}
               hasPlan={!!plan}
               instrument={student.instrument}
             />

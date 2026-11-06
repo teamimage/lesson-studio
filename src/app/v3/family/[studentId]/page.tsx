@@ -97,7 +97,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
           {consent.state === "signed" ? (
             <div className="[&_button]:min-h-14 [&_button]:text-[19px]">
-              <PracticeRecorder studentId={studentId} firstName={first} hasPlan={!!plan} instrument={student.instrument} />
+              <PracticeRecorder studentId={studentId} hasPlan={!!plan} instrument={student.instrument} />
             </div>
           ) : (
             <ConsentNeeded

@@ -87,12 +87,10 @@ function saveChecks(studentId: string, checks: StoredCheck[]) {
 
 export function PracticeRecorder({
   studentId,
-  firstName,
   hasPlan,
   instrument,
 }: {
   studentId: string;
-  firstName: string;
   hasPlan: boolean;
   instrument: string;
 }) {
@@ -556,10 +554,7 @@ export function PracticeRecorder({
 
   return (
     <Card tone="plum" className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <div className="font-semibold">Practice session</div>
-        {recording && <div className="font-mono text-2xl tabular-nums">{clock(elapsed)}</div>}
-      </div>
+      {recording && <div className="text-right font-mono text-2xl tabular-nums">{clock(elapsed)}</div>}
 
       {withVideo && (
         <video
@@ -624,12 +619,9 @@ export function PracticeRecorder({
                 </Button>
               </div>
             ))}
-          {phase.name === "idle" && (
-            <p className="text-sm text-muted">
-              Set the phone or iPad near {firstName}, press Start, and practise as usual. When you stop, we listen back,
-              tick off what was practised and keep a short review. The recording itself is deleted afterwards.
-            </p>
-          )}
+          <Button type="button" variant="plum" className="min-h-14 text-lg" onClick={start}>
+            Start practice
+          </Button>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[16px]">
             <label className="flex items-center gap-2">
               <input
@@ -660,9 +652,6 @@ export function PracticeRecorder({
               side, whole body and bow in view.
             </p>
           )}
-          <Button type="button" variant="plum" className="min-h-14 text-lg" onClick={start}>
-            Start practice
-          </Button>
         </>
       )}
 
