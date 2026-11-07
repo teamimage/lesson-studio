@@ -40,7 +40,7 @@ async function Body() {
       <EmptyState title="No students linked to this account yet">
         {viewer.teacher
           ? "Add a student in the Studio tab. This view shows what their family sees."
-          : "Ask the teacher to add your email to your child's profile, then sign in again."}
+          : "Ask your teacher for an invite link to your child's practice page, then open it on this device."}
       </EmptyState>
     );
   }

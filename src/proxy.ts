@@ -1,10 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
+import { ROLE_COOKIE, parseRoleCookie } from "@/lib/role";
 import { UI_COOKIE, parseUiVersion, v3PathFor } from "@/lib/ui-version";
 
 export async function proxy(request: NextRequest) {
   const response = await updateSession(request);
   if (response.status >= 300 && response.status < 400) return response;
+  // Family accounts use the standard pages, never the version 3 ones.
+  if (parseRoleCookie(request.cookies.get(ROLE_COOKIE)?.value)?.role === "family") return response;
   return versionRoute(request, response);
 }
 

@@ -6,6 +6,7 @@ import { Avatar } from "@/components/avatar";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { studentPhotoSrc } from "@/lib/constants";
 import { Shell } from "@/components/shell";
+import { FamilyAccess } from "@/components/family-access";
 import { Button, Card, EmptyState, LinkButton, Notice, Pill, SectionTitle } from "@/components/ui";
 import { requireTeacher } from "@/lib/auth";
 import { getPracticeWeek, getStudent, practiceSpanLabel, listLessons, listParentsForStudent, listRepertoire } from "@/lib/data";
@@ -36,7 +37,7 @@ import { ReminderEditor } from "@/components/reminder-editor";
 import { listReminders } from "@/lib/reminders";
 
 type Params = Promise<{ id: string }>;
-type SP = Promise<{ consent?: string; open?: string }>;
+type SP = Promise<{ consent?: string; open?: string; invite?: string; made?: string }>;
 
 export default function StudentPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
@@ -47,7 +48,7 @@ export default function StudentPage({ params, searchParams }: { params: Params; 
 }
 
 async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
-  await requireTeacher();
+  const { teacher } = await requireTeacher();
   const { id } = await params;
   const sp = await searchParams;
   const student = await getStudent(id);
@@ -135,6 +136,9 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           </form>
           <LinkButton href={`/students/${id}/music`} variant="secondary">
             Music library
+          </LinkButton>
+          <LinkButton href={`/students/${id}?open=parents#family-access`} variant="secondary" className="col-span-2">
+            {parents.some((p) => p.user_id) ? "Family sign-in & invites" : "Invite family"}
           </LinkButton>
           <MusicPreviewLinks studentId={id} scores={music} className="col-span-2 px-1" />
           <div className="col-span-2">
@@ -265,8 +269,10 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
             </Fold>
             <Fold
-              title="Parents &amp; consent"
-              meta={consent.state === "signed" ? "consent signed" : "consent needed"}
+              title="Family &amp; consent"
+              meta={`${consent.state === "signed" ? "consent signed" : "consent needed"}${
+                parents.some((p) => p.user_id) ? " · family signed in" : ""
+              }`}
               open={consent.state !== "signed" || sp.open === "parents"}
             >
         <section>
@@ -292,17 +298,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               {consent.state === "signed" ? "View or withdraw" : "Collect consent"}
             </Link>
           </p>
-          {parents.length === 0 ? (
-            <p className="text-sm text-muted">No parent linked yet. Add one so they can see the home plan.</p>
-          ) : (
-            <ul className="text-[16px]">
-              {parents.map((p) => (
-                <li key={p.id}>
-                  {p.name} <span className="text-muted">· {p.email}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <FamilyAccess student={student} teacher={teacher} parents={parents} flash={sp.invite} made={sp.made} />
         </section>
         {(student.goals || student.notes || student.lesson_day) && (
           <Card className="flex flex-col gap-2 text-[16px]">
@@ -481,17 +477,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               {consent.state === "signed" ? "View or withdraw" : "Collect consent"}
             </Link>
           </p>
-          {parents.length === 0 ? (
-            <p className="text-sm text-muted">No parent linked yet. Add one so they can see the home plan.</p>
-          ) : (
-            <ul className="text-[16px]">
-              {parents.map((p) => (
-                <li key={p.id}>
-                  {p.name} <span className="text-muted">· {p.email}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <FamilyAccess student={student} teacher={teacher} parents={parents} flash={sp.invite} made={sp.made} />
         </section>
           </>
         )}

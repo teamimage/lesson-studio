@@ -1313,6 +1313,61 @@ export type Database = {
         };
         Relationships: [];
       };
+      family_invites: {
+        Row: {
+          id: string;
+          teacher_id: string;
+          student_id: string;
+          token: string;
+          name: string;
+          email: string;
+          status: string;
+          created_at: string;
+          expires_at: string;
+          accepted_at: string | null;
+          accepted_by: string | null;
+          accepted_email: string | null;
+          accepted_parent_id: string | null;
+          revoked_at: string | null;
+          join_email: string | null;
+        };
+        Insert: {
+          id?: string;
+          teacher_id: string;
+          student_id: string;
+          token?: string;
+          name?: string;
+          email?: string;
+          status?: string;
+          created_at?: string;
+          expires_at?: string;
+          accepted_at?: string | null;
+          accepted_by?: string | null;
+          accepted_email?: string | null;
+          accepted_parent_id?: string | null;
+          revoked_at?: string | null;
+        };
+        Update: {
+          status?: string;
+          name?: string;
+          email?: string;
+          expires_at?: string;
+          revoked_at?: string | null;
+        };
+        Relationships: [];
+      };
+      lesson_private: {
+        Row: { lesson_id: string; teacher_id: string; teacher_notes: string | null; suggestions: string | null; updated_at: string };
+        Insert: { lesson_id: string; teacher_id: string; teacher_notes?: string | null; suggestions?: string | null; updated_at?: string };
+        Update: { teacher_notes?: string | null; suggestions?: string | null; updated_at?: string };
+        Relationships: [];
+      };
+      student_private: {
+        Row: { student_id: string; teacher_id: string; notes: string | null; updated_at: string };
+        Insert: { student_id: string; teacher_id: string; notes?: string | null; updated_at?: string };
+        Update: { notes?: string | null; updated_at?: string };
+        Relationships: [];
+      };
       teaching_assistant_messages: {
         Row: {
           id: string;
@@ -1357,6 +1412,14 @@ export type Database = {
       };
       admin_make_teacher: { Args: { uid: string }; Returns: string };
       is_app_admin: { Args: never; Returns: boolean };
+      accept_family_invite: { Args: { p_token: string; p_name?: string }; Returns: string };
+      family_invite_preview: {
+        Args: { p_token: string };
+        Returns: { student_first_name: string; instrument: string; teacher_name: string; state: string }[];
+      };
+      my_role: { Args: never; Returns: string | null };
+      family_invite_start: { Args: { p_token: string; p_email: string }; Returns: boolean };
+      accept_my_family_invites: { Args: never; Returns: number };
       my_parent_ids: { Args: never; Returns: string[] };
       my_teacher_id: { Args: never; Returns: string };
       parents_student: { Args: { sid: string }; Returns: boolean };

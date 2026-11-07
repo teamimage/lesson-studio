@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { withLessonPrivate, withLessonPrivateOne, withStudentPrivate, withStudentPrivateOne } from "@/lib/private-notes";
 import type { Tables } from "@/lib/supabase/types";
 import { addDays, daysBetween, formatDate, todayISO } from "@/lib/format";
 
@@ -41,13 +42,13 @@ export async function listStudents(): Promise<Student[]> {
     .select("*")
     .order("active", { ascending: false })
     .order("name");
-  return data ?? [];
+  return withStudentPrivate(supabase, data ?? []);
 }
 
 export async function getStudent(id: string): Promise<Student | null> {
   const supabase = await createClient();
   const { data } = await supabase.from("students").select("*").eq("id", id).maybeSingle();
-  return data;
+  return withStudentPrivateOne(supabase, data);
 }
 
 export async function listLessons(studentId: string, limit = 50): Promise<LessonFull[]> {
@@ -59,7 +60,7 @@ export async function listLessons(studentId: string, limit = 50): Promise<Lesson
     .order("lesson_date", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(limit);
-  return (data ?? []).map(sortLesson);
+  return withLessonPrivate(supabase, (data ?? []).map(sortLesson));
 }
 
 export async function getLesson(id: string): Promise<LessonFull | null> {
@@ -69,7 +70,7 @@ export async function getLesson(id: string): Promise<LessonFull | null> {
     .select("*, lesson_pieces(*), assignments(*)")
     .eq("id", id)
     .maybeSingle();
-  return data ? sortLesson(data) : null;
+  return withLessonPrivateOne(supabase, data ? sortLesson(data) : null);
 }
 
 /** The most recent approved lesson, which is what the parent practices from. */
@@ -84,7 +85,7 @@ export async function getCurrentPlan(studentId: string): Promise<LessonFull | nu
     .order("approved_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return data ? sortLesson(data) : null;
+  return withLessonPrivateOne(supabase, data ? sortLesson(data) : null);
 }
 
 /** Latest lesson of any status (for the teacher's dashboard). */
@@ -98,7 +99,7 @@ export async function getLatestLesson(studentId: string): Promise<LessonFull | n
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return data ? sortLesson(data) : null;
+  return withLessonPrivateOne(supabase, data ? sortLesson(data) : null);
 }
 
 export async function listDraftLessons(): Promise<(Lesson & { students: Pick<Student, "name" | "instrument"> | null })[]> {

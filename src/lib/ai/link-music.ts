@@ -20,6 +20,7 @@ import { anthropicClient, usageRows } from "./draft-lesson";
 import { musicModel } from "./read-music";
 import { claudeCost, type ClaudeUsage } from "./pricing";
 import { latestTranscript } from "./process-lesson";
+import { withLessonPrivateOne } from "@/lib/private-notes";
 
 // Lesson review clips → the sheet music they are about.
 //
@@ -275,7 +276,8 @@ async function step2(requests: BoxRequest[]): Promise<{ boxes: Map<number, BoxAn
  */
 export async function linkLessonMusic(teacherId: string, lessonId: string, force = false): Promise<LinkResult> {
   const db = await createClient();
-  const { data: lesson } = await db.from("lessons").select("*").eq("id", lessonId).maybeSingle();
+  const { data: found } = await db.from("lessons").select("*").eq("id", lessonId).maybeSingle();
+  const lesson = await withLessonPrivateOne(db, found);
   if (!lesson) return { status: "error", error: "That lesson wasn't found." };
   const row = await latestTranscript(db, lessonId);
   if (!row?.transcript) return { status: "nothing", error: "Process the lesson video first." };

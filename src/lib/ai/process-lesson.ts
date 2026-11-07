@@ -9,6 +9,7 @@ import { teachingStyleFor } from "./teaching-style";
 import { DraftError, draftLesson, timeLesson, type LessonDraft } from "./draft-lesson";
 import { claudeCost, TRANSCRIPTION_MODEL, transcriptionCost, type ClaudeUsage } from "./pricing";
 import { lessonConsentBlock } from "@/lib/recording-consent-data";
+import { withLessonPrivateOne, withStudentPrivateOne } from "@/lib/private-notes";
 
 // Lesson video → transcript → drafted lesson record.
 //
@@ -345,11 +346,13 @@ async function applyDraft(
   replace: boolean,
   audioSeconds: number,
 ): Promise<boolean> {
-  const { data: lesson } = await db
+  const { data: found } = await db
     .from("lessons")
     .select("*, lesson_pieces(id), assignments(id)")
     .eq("id", lessonId)
     .maybeSingle();
+  // The teacher's own notes, so the AI only fills them when empty.
+  const lesson = await withLessonPrivateOne(db, found);
   if (!lesson || lesson.status !== "draft") return false;
 
   const pick = (current: string | null, next: string) => {
@@ -444,9 +447,10 @@ async function suggestReminders(db: Db, lessonId: string, d: LessonDraft, replac
 }
 
 async function draftContext(db: Db, row: Transcript) {
-  const { data: lesson } = await db.from("lessons").select("*").eq("id", row.lesson_id).single();
+  const { data: found } = await db.from("lessons").select("*").eq("id", row.lesson_id).single();
+  const lesson = await withLessonPrivateOne(db, found);
   if (!lesson) throw new Error("That lesson wasn't found.");
-  const [{ data: student }, { data: rep }, { data: prev }, { data: reminders }] = await Promise.all([
+  const [{ data: studentRow }, { data: rep }, { data: prev }, { data: reminders }] = await Promise.all([
     db.from("students").select("*").eq("id", lesson.student_id).single(),
     db.from("repertoire").select("title, status").eq("student_id", lesson.student_id).order("started_on"),
     db
@@ -465,6 +469,7 @@ async function draftContext(db: Db, row: Transcript) {
       .eq("student_id", lesson.student_id)
       .in("status", ["active", "suggested"]),
   ]);
+  const student = await withStudentPrivateOne(db, studentRow);
   if (!student) throw new Error("That student wasn't found.");
   const style = await teachingStyleFor(db, student.teacher_id);
   return {

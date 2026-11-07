@@ -10,6 +10,7 @@ import { Button, Card, Field, Input, Pill, SectionTitle } from "@/components/ui"
 import { requireAdmin } from "@/lib/admin";
 import { formatBytes, formatDate } from "@/lib/format";
 import { adminLinkParent, adminUnlinkParent } from "../../actions";
+import { withStudentPrivateOne } from "@/lib/private-notes";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ saved?: string; deleted?: string; error?: string }>;
@@ -26,7 +27,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const { db } = await requireAdmin();
   const { id } = await params;
   const sp = await searchParams;
-  const { data: student } = await db.from("students").select("*").eq("id", id).maybeSingle();
+  const { data: found } = await db.from("students").select("*").eq("id", id).maybeSingle();
+  const student = await withStudentPrivateOne(db, found);
   if (!student) notFound();
 
   const [teacherRes, linksRes, lessonsRes, repRes, logsRes, recRes, scoreRes] = await Promise.all([

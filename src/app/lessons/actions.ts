@@ -111,8 +111,9 @@ export async function saveLesson(fd: FormData) {
     duration_minutes: input.duration_minutes,
     summary: orNull(input.summary),
     focus_points: orNull(input.focus_points),
-    suggestions: orNull(input.suggestions),
-    teacher_notes: orNull(input.teacher_notes),
+    // Teacher-only: "" (not null) clears them in the private table.
+    suggestions: input.suggestions,
+    teacher_notes: input.teacher_notes,
     parent_message: orNull(input.parent_message),
     next_lesson_date: input.next_lesson_date,
   };
@@ -243,7 +244,12 @@ export async function saveLessonSection(
   } else if (isTextSection(proposal.section)) {
     const { error } = await supabase
       .from("lessons")
-      .update({ [proposal.section]: orNull(clean(proposal.text)) } as Partial<Record<TextSection, string | null>>)
+      .update({
+        [proposal.section]:
+          proposal.section === "teacher_notes" || proposal.section === "suggestions"
+            ? clean(proposal.text) // "" clears a teacher-only note (private-notes.sql)
+            : orNull(clean(proposal.text)),
+      } as Partial<Record<TextSection, string | null>>)
       .eq("id", lessonId);
     if (error) return { error: "Couldn't save. Try again." };
   }

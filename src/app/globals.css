@@ -7,6 +7,10 @@
 /* Version 3 (task-first): v3: styles apply only there, notv3: everywhere else. */
 @custom-variant v3 (&:where([data-ui="v3"], [data-ui="v3"] *));
 @custom-variant notv3 (&:where(html:not([data-ui="v3"]), html:not([data-ui="v3"]) *));
+/* Family accounts (invited parents): family: styles apply only for them,
+   staff: for everyone else (teachers). Set from the ls_role cookie. */
+@custom-variant family (&:where([data-role="family"], [data-role="family"] *));
+@custom-variant staff (&:where(html:not([data-role="family"]), html:not([data-role="family"]) *));
 
 /* Warm, mild palette: cream paper, terracotta accent, sage for "done",
    plum for the family (parent) side. Dark mode stays warm. */
