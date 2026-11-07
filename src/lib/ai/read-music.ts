@@ -48,9 +48,21 @@ const SECTION = {
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["title", "book", "edition", "instrument", "kind", "fit", "sections"],
+  required: ["title", "book", "edition", "instrument", "kind", "fit", "details", "sections"],
   properties: {
     title: { type: "string" },
+    details: {
+      type: "object",
+      additionalProperties: false,
+      required: ["composer", "arranger", "publisher", "published", "tempo"],
+      properties: {
+        composer: { type: "string" },
+        arranger: { type: "string" },
+        publisher: { type: "string" },
+        published: { type: "string" },
+        tempo: { type: "string" },
+      },
+    },
     book: { type: "string" },
     edition: { type: "string" },
     instrument: { type: "string" },
@@ -67,6 +79,7 @@ Work out:
 - book: the full book name if it is a published book or volume (e.g. "Suzuki Cello School, Volume 3"), else "".
 - edition: publisher and edition or year if printed (e.g. "Alfred, revised edition, 2003"), else "".
 - instrument: the instrument it is written for, lower case.
+- details: what is printed on the music, each "" if not printed. composer (for a book of many composers, ""); arranger (e.g. "David R. Ledgerwood"); publisher (e.g. "SoundForth", "Alfred"); published: the copyright or publication year or date as printed (e.g. "1994"); tempo: the tempo marking at the start of the first piece as printed, words and metronome mark (e.g. "With motion", "Allegro moderato ♩ = 108").
 - kind: book (a whole book or several pieces), piece, exercise, scale, etude, or other.
 - sections: every piece in the upload, in order. A multi-movement work gets one section per movement, with the work in title and the movement in movement ("I. Allegro"). Exercises, scales and études printed between pieces get their own section too. start_page and end_page are upload page numbers, inclusive. Leave out covers, contents, forewords, notes and blank pages. For each section:
   - composer: as printed, surname only if that is how it is printed; "" if none.
@@ -244,7 +257,15 @@ export async function readScore(teacherId: string, scoreId: string): Promise<Rea
     const ctx = await musicContext(db, score.student_id);
     const out = await askClaude(ctx, urls as string[], score.source_name, pages.length);
     usage = out.usage;
-    const a = out.analysis;
+    // A teacher's check (and their corrections) survive a re-read.
+    const before = parseAnalysis(score.analysis);
+    const a = {
+      ...out.analysis,
+      review: before?.review ?? "confirmed",
+      ...(before?.review === "confirmed" && before.confirmed_at
+        ? { details: before.details, confirmed_at: before.confirmed_at, confirmed_by: before.confirmed_by }
+        : {}),
+    };
 
     const update: {
       analysis: Json;

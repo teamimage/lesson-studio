@@ -5,6 +5,8 @@ import { Button, Card, EmptyState, Pill, SectionTitle, cx } from "@/components/u
 import { ReplaceScoreFile, ScoreUploader } from "@/components/score-uploader";
 import { DeleteScoreButton, ReadMusicButton, RefreshWhileReading } from "@/components/score-actions";
 import { ScanButton, type ScanSource } from "@/components/scan-music";
+import { ConfirmScore } from "@/components/confirm-score";
+import { EMPTY_DETAILS } from "@/lib/score-analysis";
 import { requireTeacher } from "@/lib/auth";
 import { getStudent } from "@/lib/data";
 import { listScores } from "@/lib/scores";
@@ -44,12 +46,15 @@ async function Body({ params }: { params: Params }) {
       includeArchived: true,
       withSourceLinks: true,
       withOriginals: true,
+      includePending: true,
     }),
     melodyProgressFor(id),
     listReferenceRecordings({ withUrls: true }),
   ]);
-  const active = scores.filter((s) => !s.archived);
-  const archived = scores.filter((s) => s.archived);
+  const pending = scores.filter((s) => s.analysis?.review === "pending");
+  const inLibrary = scores.filter((s) => s.analysis?.review !== "pending");
+  const active = inLibrary.filter((s) => !s.archived);
+  const archived = inLibrary.filter((s) => s.archived);
   const books = bookChoices(
     suzukiBookTitles(student.instrument),
     booksFor(student.instrument),
@@ -116,9 +121,29 @@ async function Body({ params }: { params: Params }) {
 
         <section>
           <SectionTitle>Add sheet music</SectionTitle>
-          <Card>
-            <ScoreUploader studentId={id} />
-          </Card>
+          <div className="flex flex-col gap-3">
+            {pending.map((s) => (
+              <ConfirmScore
+                key={s.id}
+                score={{
+                  id: s.id,
+                  title: s.title,
+                  pages: s.pages.map((p, i) => ({ n: i + 1, url: p.url, w: p.w, h: p.h })),
+                  scan: scanSources(s),
+                  status: s.analysisStatus,
+                  error: s.analysisError,
+                  book: s.analysis?.book ?? "",
+                  details: s.analysis?.details ?? EMPTY_DETAILS,
+                  sections: s.sections,
+                  viewer: viewerHref(id, s.id),
+                  hasOriginals: s.pages.some((p) => p.original),
+                }}
+              />
+            ))}
+            <Card>
+              <ScoreUploader studentId={id} />
+            </Card>
+          </div>
         </section>
 
         {archived.length > 0 && (
@@ -234,6 +259,19 @@ function ScoreRow({
           {score.pages.length} page{score.pages.length === 1 ? "" : "s"}
           {score.pages.length === 0 && <Pill tone="amber">Upload didn&apos;t finish</Pill>}
         </div>
+        {score.analysis && Object.values(score.analysis.details).some(Boolean) && (
+          <p className="text-sm text-muted">
+            {[
+              score.analysis.details.composer,
+              score.analysis.details.arranger && `arr. ${score.analysis.details.arranger}`,
+              score.analysis.details.publisher,
+              score.analysis.details.published,
+              score.analysis.details.tempo && `“${score.analysis.details.tempo}”`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        )}
         {score.source && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <span className="min-w-0 truncate text-muted">

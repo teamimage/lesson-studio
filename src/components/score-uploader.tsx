@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as tus from "tus-js-client";
 import { createClient } from "@/lib/supabase/client";
@@ -15,6 +15,7 @@ import {
 import type { ScorePage } from "@/lib/stand-timeline";
 import { Button, cx } from "@/components/ui";
 import { digitizePage, type Digitized } from "@/lib/digitize-page";
+import { CameraCapture, canUseLiveCamera } from "@/components/camera-capture";
 import { MUSIC_RIGHTS_NOTE, MUSIC_RIGHTS_STATEMENT, MUSIC_RIGHTS_VERSION } from "@/lib/music-rights";
 
 // Long edge of a stored page image. Sharp on an iPad, small enough to load fast.
@@ -275,6 +276,18 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [owned, setOwned] = useState(false);
+  const [camera, setCamera] = useState(false);
+  // The live camera couldn't open here: the phone's own camera is used instead.
+  const [plainCamera, setPlainCamera] = useState(false);
+  const onUnavailable = useCallback(() => {
+    setCamera(false);
+    setPlainCamera(true);
+    setError("The live camera couldn't open (check camera permission). Tap Take photos again to use the phone's camera.");
+  }, []);
+  const openCamera = () => {
+    if (!plainCamera && canUseLiveCamera()) setCamera(true);
+    else cameraRef.current?.click();
+  };
 
   const add = (list: FileList | null) => {
     const picked = Array.from(list ?? []);
@@ -288,7 +301,8 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
   };
   const photos = files.filter((f) => !isPdf(f)).length;
 
-  async function upload() {
+  async function upload(list: File[] = files) {
+    const files = list;
     if (files.length === 0) return setError("Take photos or choose a PDF of the music.");
     if (!owned) return setError("Tick the box to confirm you own this copy of the music.");
     setBusy(true);
@@ -304,7 +318,9 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
       setFiles([]);
       // Each upload gets its own sign-off.
       setOwned(false);
-      setStatus(`Added ${out.pages} page${out.pages === 1 ? "" : "s"}. The pieces Claude found are listed above.`);
+      setStatus(
+        `Uploaded ${out.pages} page${out.pages === 1 ? "" : "s"}. Check the pages and details above, then add it to the Music library.`,
+      );
     } catch (err) {
       setStatus(null);
       setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
@@ -322,15 +338,35 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
       }}
       className="flex flex-col gap-3"
     >
+      {camera && (
+        <CameraCapture
+          onCancel={() => setCamera(false)}
+          onUnavailable={onUnavailable}
+          onDone={(shots) => {
+            setCamera(false);
+            const all = [...files, ...shots];
+            setFiles(all);
+            setStatus(null);
+            setError(null);
+            // Signed off already: upload straight away.
+            if (owned && shots.length) upload(all);
+          }}
+        />
+      )}
       <div className={cx("grid grid-cols-2 gap-2", busy && "pointer-events-none opacity-60")}>
-        <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-accent/40 bg-accent-soft/50 px-3 py-4 text-center transition hover:border-accent">
+        <button
+          type="button"
+          onClick={openCamera}
+          className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-accent/40 bg-accent-soft/50 px-3 py-4 text-center transition hover:border-accent"
+        >
           <span className="text-2xl" aria-hidden>
             📷
           </span>
           <span className="text-[15px] font-semibold text-accent-ink">
-            {photos ? "Take another photo" : "Take photos"}
+            {photos ? "Take more photos" : "Take photos"}
           </span>
-          <input
+        </button>
+        <input
             ref={cameraRef}
             type="file"
             accept="image/*"
@@ -339,7 +375,6 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
             disabled={busy}
             onChange={(e) => add(e.target.files)}
           />
-        </label>
         <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-accent/40 bg-accent-soft/50 px-3 py-4 text-center transition hover:border-accent">
           <span className="text-2xl" aria-hidden>
             🗂
@@ -399,7 +434,7 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
             {files.length} page{files.length === 1 ? "" : "s"} so far.
           </p>
           <div className="grid grid-cols-2 gap-2">
-            <Button type="button" variant="secondary" onClick={() => cameraRef.current?.click()}>
+            <Button type="button" variant="secondary" onClick={openCamera}>
               Yes, add a page
             </Button>
             <Button type="submit" disabled={!owned}>
