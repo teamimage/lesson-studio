@@ -134,7 +134,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             </Button>
           </form>
           <LinkButton href={`/students/${id}/music`} variant="secondary">
-            Music
+            Music library
           </LinkButton>
           <MusicPreviewLinks studentId={id} scores={music} className="col-span-2 px-1" />
           <div className="col-span-2">
@@ -251,7 +251,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             >
               <StudentVideos studentId={id} lessons={lessons} recordings={recordings} showTitle={false} />
             </Fold>
-            <Fold title="Music &amp; repertoire" meta={`${music.length} uploaded`} open={sp.open === "music"}>
+            <Fold title="Music library &amp; repertoire" meta={`${music.length} uploaded`} open={sp.open === "music"}>
         <section>
           <SectionTitle>Repertoire map</SectionTitle>
           <RepertoireMap

@@ -5,11 +5,20 @@ import { useEffect, useRef, useState } from "react";
 import { cx } from "@/components/ui";
 import { pageRange, sectionAt, sectionLabel, type ScoreSection } from "@/lib/score-analysis";
 import { barsText, viewerHref, type MusicRef, type PageBox } from "@/lib/music-links";
+import { ScanButton, type ScanSource } from "@/components/scan-music";
 
 // Read-only sheet music: looking at the music outside the music stand, so
 // nothing is logged and no lesson or timer starts.
 
-export type ViewerPage = { url: string | null; w: number; h: number };
+export type ViewerPage = {
+  url: string | null;
+  w: number;
+  h: number;
+  /** The photo a digitized page was made from (viewer only, when asked for). */
+  original?: { url: string | null; w: number; h: number; whole: boolean } | null;
+  /** Where to digitize this page from (viewer only). */
+  scan?: ScanSource;
+};
 export type ViewerScore = {
   id: string;
   title: string;
@@ -72,13 +81,18 @@ export function ScoreViewer({
   from,
   to,
   page,
+  originals,
 }: {
   score: ViewerScore;
   from?: number;
   to?: number;
   page?: number;
+  /** Open on the original photos instead of the digitized pages. */
+  originals?: boolean;
 }) {
   const total = score.pages.length;
+  const hasOriginals = score.pages.some((p) => p.original);
+  const [showOriginals, setShowOriginals] = useState(!!originals && hasOriginals);
   const initial = from && from >= 1 && from <= total ? { from, to: Math.min(Math.max(to ?? from, from), total) } : null;
   const [range, setRange] = useState<{ from: number; to: number } | null>(initial);
   const scrolled = useRef(false);
@@ -129,20 +143,50 @@ export function ScoreViewer({
             Whole book
           </button>
         )}
+        {hasOriginals && (
+          <button
+            type="button"
+            onClick={() => setShowOriginals((v) => !v)}
+            aria-pressed={showOriginals}
+            className={cx(
+              "min-h-10 rounded-xl border px-3 text-sm",
+              showOriginals ? "border-accent bg-accent text-white" : "border-rule text-accent-ink",
+            )}
+          >
+            {showOriginals ? "Show digitized pages" : "Show original pictures"}
+          </button>
+        )}
       </div>
       <p className="text-xs text-muted">
-        Preview only: this doesn&apos;t open the music stand, start a lesson or log page turns.
+        {showOriginals
+          ? "These are the photos as taken. Everywhere else shows the digitized pages. If a page was cropped wrong, redo it from the whole photo."
+          : "Preview only: this doesn't open the music stand, start a lesson or log page turns."}
       </p>
       <ol className="flex flex-col gap-4">
         {shown.map(({ page: p, n }) => {
           const sec = sectionAt(score.sections, n);
           return (
             <li key={n} id={`page-${n}`} className="scroll-mt-16">
-              <div className="mb-1 flex items-baseline gap-2 text-xs text-muted">
+              <div className="mb-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted">
                 <span className="font-semibold text-ink">Page {n}</span>
-                {sec && <span className="truncate">{sectionLabel(sec)}</span>}
+                {sec && <span className="min-w-0 flex-1 truncate">{sectionLabel(sec)}</span>}
+                {showOriginals && p.scan && (
+                  <span className="flex flex-wrap gap-x-3 text-sm">
+                    <ScanButton scoreId={score.id} pages={[p.scan]} label="Redigitize" />
+                    <ScanButton
+                      scoreId={score.id}
+                      pages={[p.scan]}
+                      label="Redo from the whole photo"
+                      wholePhoto
+                    />
+                  </span>
+                )}
               </div>
-              <MusicPageImage page={p} number={n} className="rounded-lg border border-rule shadow-sm" />
+              <MusicPageImage
+                page={showOriginals && p.original ? p.original : p}
+                number={n}
+                className="rounded-lg border border-rule shadow-sm"
+              />
             </li>
           );
         })}

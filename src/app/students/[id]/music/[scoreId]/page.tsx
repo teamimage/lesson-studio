@@ -9,7 +9,7 @@ import { listScores } from "@/lib/scores";
 import { sectionLabel } from "@/lib/score-analysis";
 
 type Params = Promise<{ id: string; scoreId: string }>;
-type SP = Promise<{ from?: string; to?: string; page?: string }>;
+type SP = Promise<{ from?: string; to?: string; page?: string; originals?: string }>;
 
 // Read-only music viewer: look at a book or one piece without opening the
 // music stand (which starts today's lesson and logs page turns).
@@ -17,7 +17,7 @@ export default function MusicViewerPage({ params, searchParams }: { params: Para
   return (
     <Suspense
       fallback={
-        <Shell title="Music" tab="studio">
+        <Shell title="Music library" tab="studio">
           {null}
         </Shell>
       }
@@ -33,7 +33,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const sp = await searchParams;
   const student = await getStudent(id);
   if (!student) notFound();
-  const score = (await listScores(id, { includeArchived: true })).find((s) => s.id === scoreId);
+  const score = (await listScores(id, { includeArchived: true, withOriginals: true })).find((s) => s.id === scoreId);
   if (!score) notFound();
   const n = (v?: string) => (v && Number.isFinite(Number(v)) ? Math.round(Number(v)) : undefined);
   const from = n(sp.from);
@@ -44,7 +44,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     <Shell
       title={piece ? sectionLabel(piece, false) : score.title}
       eyebrow={`${student.name} · ${piece ? score.title : "music preview"}`}
-      back={{ href: `/students/${id}/music`, label: "Music" }}
+      back={{ href: `/students/${id}/music`, label: "Music library" }}
       tab="studio"
       actions={
         <Link href={`/students/${id}`} className="text-sm font-medium text-accent-ink">
@@ -59,12 +59,21 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           score={{
             id: score.id,
             title: score.title,
-            pages: score.pages.map((p) => ({ url: p.url, w: p.w, h: p.h })),
+            pages: score.pages.map((p, i) => ({
+              url: p.url,
+              w: p.w,
+              h: p.h,
+              original: p.original
+                ? { url: p.originalUrl ?? null, w: p.original.w, h: p.original.h, whole: !!p.whole }
+                : null,
+              scan: { n: i + 1, url: p.originalUrl ?? null, path: p.original?.path ?? p.path },
+            })),
             sections: score.sections,
           }}
           from={from}
           to={to}
           page={n(sp.page)}
+          originals={sp.originals === "1"}
         />
       )}
     </Shell>

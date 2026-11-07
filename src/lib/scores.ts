@@ -17,14 +17,17 @@ const READ_STALE_MS = 6 * 60 * 1000;
  */
 export async function listScores(
   studentId: string,
-  { includeArchived = false, withSourceLinks = false } = {},
+  { includeArchived = false, withSourceLinks = false, withOriginals = false } = {},
 ): Promise<StandScore[]> {
   const supabase = await createClient();
   let query = supabase.from("scores").select("*").eq("student_id", studentId);
   if (!includeArchived) query = query.eq("archived", false);
   const { data } = await query.order("sort_order").order("created_at");
   const rows = (data ?? []).map((r) => ({ ...r, parsed: parsePages(r.pages), barMap: parseBarMap(r.pages) }));
-  const paths = rows.flatMap((r) => r.parsed.map((p) => p.path));
+  // The photos behind digitized pages are only signed when asked for ("Show original pictures").
+  const paths = rows.flatMap((r) =>
+    r.parsed.flatMap((p) => (withOriginals && p.original ? [p.path, p.original.path] : [p.path])),
+  );
   const urls = new Map<string, string>();
   if (paths.length > 0) {
     const { data: signed } = await supabase.storage.from(SCORES_BUCKET).createSignedUrls(paths, SIGNED_URL_SECONDS);
@@ -57,7 +60,12 @@ export async function listScores(
       title: r.title,
       kind: r.kind,
       archived: r.archived,
-      pages: r.parsed.map((p, i) => ({ ...p, url: urls.get(p.path) ?? null, bars: r.barMap[i] ?? null })),
+      pages: r.parsed.map((p, i) => ({
+        ...p,
+        url: urls.get(p.path) ?? null,
+        ...(withOriginals ? { originalUrl: p.original ? (urls.get(p.original.path) ?? null) : (urls.get(p.path) ?? null) } : {}),
+        bars: r.barMap[i] ?? null,
+      })),
       sections: analysis?.sections ?? [],
       analysis,
       analysisStatus: status,

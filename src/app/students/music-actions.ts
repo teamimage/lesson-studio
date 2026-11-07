@@ -7,7 +7,10 @@ import { createClient } from "@/lib/supabase/server";
 import { SCORES_BUCKET } from "@/lib/constants";
 import { titleFromFileName } from "@/lib/score-analysis";
 import { findTodayLesson } from "@/lib/lesson-today";
-import { parsePages, type ScorePage } from "@/lib/stand-timeline";
+import { pageFiles, parsePages, parseRect, type ScorePage } from "@/lib/stand-timeline";
+import { isMat3, mapBars, mapRect, refit, type Mat3 } from "@/lib/page-fit";
+import { parseMusicLinks } from "@/lib/music-links";
+import type { Json } from "@/lib/supabase/types";
 import { saveBarPages } from "@/lib/ai/number-bars";
 import { MUSIC_RIGHTS_STATEMENT, MUSIC_RIGHTS_VERSION, type RightsConfirmation } from "@/lib/music-rights";
 
@@ -152,7 +155,7 @@ export async function finishScore(
     .maybeSingle();
   if (!rights) return { ok: false };
   const prefix = `${teacher.id}/${score.student_id}/${id}/`;
-  const clean = parsePages(pages).filter((p) => p.path.startsWith(prefix));
+  const clean = parsePages(pages as unknown as Json).filter((p) => pageFiles(p).every((f) => f.startsWith(prefix)));
   if (clean.length === 0) return { ok: false };
   const src = source && typeof source.path === "string" && source.path.startsWith(prefix) ? source : null;
 
@@ -178,8 +181,8 @@ export async function finishScore(
   if (error) return { ok: false };
 
   // Old files from before a Replace file.
-  const keep = new Set([...clean.map((p) => p.path), ...(src ? [src.path] : [])]);
-  const old = [...parsePages(score.pages).map((p) => p.path), ...(score.source_path ? [score.source_path] : [])].filter(
+  const keep = new Set([...clean.flatMap(pageFiles), ...(src ? [src.path] : [])]);
+  const old = [...parsePages(score.pages).flatMap(pageFiles), ...(score.source_path ? [score.source_path] : [])].filter(
     (p) => !keep.has(p),
   );
   if (old.length) await supabase.storage.from(SCORES_BUCKET).remove(old);
@@ -243,7 +246,7 @@ export async function deleteScore(fd: FormData) {
   if (!score) return;
   // The whole upload goes: original file, every page image, and the pieces
   // found in it (they live on this row).
-  const paths = [...parsePages(score.pages).map((p) => p.path), ...(score.source_path ? [score.source_path] : [])];
+  const paths = [...parsePages(score.pages).flatMap(pageFiles), ...(score.source_path ? [score.source_path] : [])];
   if (paths.length) await supabase.storage.from(SCORES_BUCKET).remove(paths);
   await supabase.from("scores").delete().eq("id", id);
   revalidatePath(`/students/${score.student_id}/music`);
@@ -268,4 +271,128 @@ export async function saveBarMap(
 ): Promise<{ ok: boolean; error?: string }> {
   await requireTeacher();
   return saveBarPages(String(scoreId), changes);
+}
+
+export type ScanChange = {
+  /** Upload page number (1-based). */
+  page: number;
+  /** The new clean page, uploaded beside the photo. */
+  path: string;
+  w: number;
+  h: number;
+  /** Photo (fractions) → clean page (fractions). */
+  fit: Mat3;
+  whole?: boolean;
+};
+
+/**
+ * Saves digitized pages: each becomes the page every view shows, and the
+ * photo it came from is kept as the original (shown only on "Show original
+ * pictures"). Everything drawn on the old page (stand marks, the bars a
+ * lesson clip highlights, the bar map) is moved onto the new page.
+ */
+export async function saveScan(scoreId: string, changes: ScanChange[]): Promise<{ ok: boolean; error?: string }> {
+  const { teacher } = await requireTeacher();
+  const supabase = await createClient();
+  const { data: score } = await supabase.from("scores").select("*").eq("id", String(scoreId)).maybeSingle();
+  if (!score) return { ok: false, error: "That music wasn't found." };
+  const prefix = `${teacher.id}/${score.student_id}/${score.id}/`;
+  const raw = Array.isArray(score.pages) ? (score.pages as Record<string, unknown>[]) : [];
+  const parsed = parsePages(score.pages);
+  if (raw.length !== parsed.length) return { ok: false, error: "This music's pages couldn't be read." };
+
+  const now = new Date().toISOString();
+  const moves = new Map<number, Mat3>(); // page number → old geometry to new
+  const remove: string[] = [];
+  const next = raw.map((entry) => ({ ...entry }));
+  let done = 0;
+  for (const c of Array.isArray(changes) ? changes : []) {
+    const n = Math.round(Number(c?.page));
+    const old = parsed[n - 1];
+    if (!old || typeof c.path !== "string" || !c.path.startsWith(prefix) || !isMat3(c.fit)) continue;
+    const w = Math.round(Number(c.w));
+    const h = Math.round(Number(c.h));
+    if (!(w > 0 && h > 0)) continue;
+    const original = old.original ?? { path: old.path, w: old.w, h: old.h };
+    // A clean page made before is replaced.
+    if (old.original && old.path !== c.path) remove.push(old.path);
+    const move = refit(old.fit, c.fit);
+    if (move) moves.set(n, move);
+    const entry: Record<string, unknown> = {
+      ...raw[n - 1],
+      path: c.path,
+      w,
+      h,
+      original,
+      fit: c.fit,
+      scanned_at: now,
+      whole: c.whole === true,
+    };
+    if (move && entry.bars) entry.bars = mapBars(move, entry.bars);
+    next[n - 1] = entry;
+    done++;
+  }
+  if (!done) return { ok: false, error: "No pages were digitized." };
+
+  const { error } = await supabase
+    .from("scores")
+    .update({ pages: next as unknown as Json })
+    .eq("id", score.id);
+  if (error) return { ok: false, error: "Couldn't save the digitized pages. Try again." };
+  if (remove.length) await supabase.storage.from(SCORES_BUCKET).remove(remove);
+
+  if (moves.size) await moveMarks(score.id, score.student_id, moves);
+
+  revalidatePath(`/students/${score.student_id}/music`);
+  revalidatePath(`/students/${score.student_id}/music/${score.id}`);
+  return { ok: true };
+}
+
+/** Moves the boxes saved on a score's pages (stand marks, lesson-clip highlights) to the new page geometry. */
+async function moveMarks(scoreId: string, studentId: string, moves: Map<number, Mat3>) {
+  const supabase = await createClient();
+  const { data: marks } = await supabase
+    .from("stand_events")
+    .select("id, page, rect")
+    .eq("score_id", scoreId)
+    .not("rect", "is", null);
+  await Promise.all(
+    (marks ?? []).map((m) => {
+      const move = m.page ? moves.get(m.page) : undefined;
+      const rect = parseRect(m.rect);
+      if (!move || !rect) return null;
+      return supabase
+        .from("stand_events")
+        .update({ rect: mapRect(move, rect) as unknown as Json })
+        .eq("id", m.id);
+    }),
+  );
+
+  const { data: lessons } = await supabase.from("lessons").select("id").eq("student_id", studentId);
+  const ids = (lessons ?? []).map((l) => l.id);
+  if (!ids.length) return;
+  const { data: rows } = await supabase.from("lesson_transcripts").select("id, draft").in("lesson_id", ids);
+  await Promise.all(
+    (rows ?? []).map((row) => {
+      const links = parseMusicLinks(row.draft);
+      if (!links) return null;
+      let changed = false;
+      const draft = row.draft as Record<string, unknown>;
+      const stored = (draft.music_links as { links?: unknown[] }).links ?? [];
+      const moved = stored.map((l) => {
+        const music = (l as { music?: Record<string, unknown> | null })?.music;
+        const page = Number(music?.page);
+        const move = music && music.scoreId === scoreId ? moves.get(page) : undefined;
+        const box = music?.box as { x: number; y: number; w: number; h: number } | null | undefined;
+        if (!move || !box || typeof box !== "object") return l;
+        changed = true;
+        return { ...(l as object), music: { ...music, box: mapRect(move, box) } };
+      });
+      if (!changed) return null;
+      return supabase
+        .from("lesson_transcripts")
+        .update({ draft: { ...draft, music_links: { ...(draft.music_links as object), links: moved } } as unknown as Json })
+        .eq("id", row.id);
+    }),
+  );
 }

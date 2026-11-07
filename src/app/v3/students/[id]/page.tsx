@@ -87,7 +87,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     <div className="flex flex-col gap-4">
       <Card className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="font-display text-[20px] font-semibold">Music</h2>
+          <h2 className="font-display text-[20px] font-semibold">Music library</h2>
           <Link href={`/students/${id}/music`} className="text-sm text-accent-ink underline">
             Upload or manage
           </Link>
