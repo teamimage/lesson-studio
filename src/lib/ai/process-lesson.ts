@@ -50,7 +50,7 @@ export function stateOf(row: Transcript | null): ProcessState {
   return {
     status: row.status as ProcessState["status"],
     error: row.error,
-    recordingId: row.recording_id,
+    recordingId: row.recording_id ?? undefined,
     applied: draft?.applied,
     since: row.updated_at,
   };
@@ -519,4 +519,66 @@ function now() {
 }
 function round(n: number) {
   return Math.round(n * 1_000_000) / 1_000_000;
+}
+
+/**
+ * A practice switched to a lesson (src/lib/convert.ts): Claude drafts the
+ * lesson from the practice's transcript. The transcript is saved as the
+ * lesson's (with no video behind it) so Draft again works later; before
+ * convert-lesson-practice.sql is run that save fails and the draft is still
+ * written into the lesson.
+ */
+export async function draftFromTranscript(
+  teacherId: string,
+  lessonId: string,
+  transcript: string,
+  audioSeconds: number,
+): Promise<ProcessState> {
+  const blocked = await lessonConsentBlock(lessonId);
+  if (blocked) return { status: "error", error: blocked };
+  const db = await createClient();
+  const stamp = now();
+  const { data: saved } = await db
+    .from("lesson_transcripts")
+    .insert({
+      teacher_id: teacherId,
+      lesson_id: lessonId,
+      recording_id: null,
+      status: "drafting",
+      transcript,
+      audio_seconds: audioSeconds || null,
+      updated_at: stamp,
+    })
+    .select("*")
+    .maybeSingle();
+  if (saved) return runDraft(db, teacherId, saved, false);
+
+  // No row to keep it on: draft straight into the lesson.
+  const row = {
+    id: "",
+    teacher_id: teacherId,
+    lesson_id: lessonId,
+    recording_id: null,
+    status: "drafting",
+    provider_job_id: null,
+    audio_seconds: audioSeconds,
+    transcript,
+    draft: null,
+    error: null,
+    created_at: stamp,
+    updated_at: stamp,
+  } as Transcript;
+  let usage: ClaudeUsage[] = [];
+  try {
+    const out = await draftLesson(await draftContext(db, row));
+    usage = out.usage;
+    await logClaude(db, teacherId, row, usage);
+    await applyDraft(db, lessonId, out.draft, false, audioSeconds);
+    await suggestReminders(db, lessonId, out.draft, false);
+    return { status: "done" };
+  } catch (e) {
+    if (e instanceof DraftError) usage = e.usage;
+    await logClaude(db, teacherId, row, usage);
+    return { status: "error", error: messageOf(e) };
+  }
 }

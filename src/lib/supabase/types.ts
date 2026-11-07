@@ -114,7 +114,7 @@ export type Database = {
           id: string;
           lesson_id: string;
           provider_job_id: string | null;
-          recording_id: string;
+          recording_id: string | null;
           status: string;
           teacher_id: string;
           transcript: string | null;
@@ -128,7 +128,7 @@ export type Database = {
           id?: string;
           lesson_id: string;
           provider_job_id?: string | null;
-          recording_id: string;
+          recording_id?: string | null;
           status?: string;
           teacher_id: string;
           transcript?: string | null;
@@ -142,7 +142,7 @@ export type Database = {
           id?: string;
           lesson_id?: string;
           provider_job_id?: string | null;
-          recording_id?: string;
+          recording_id?: string | null;
           status?: string;
           teacher_id?: string;
           transcript?: string | null;

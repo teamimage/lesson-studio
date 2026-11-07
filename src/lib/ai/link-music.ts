@@ -379,7 +379,7 @@ export async function linkLessonMusic(teacherId: string, lessonId: string, force
 async function logUsage(
   db: Db,
   teacherId: string,
-  row: { lesson_id: string; recording_id: string },
+  row: { lesson_id: string; recording_id: string | null },
   usage: ClaudeUsage[],
 ) {
   if (!usage.length) return;

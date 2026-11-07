@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deletePracticeSession, retryPracticeReview } from "@/app/family/practice-actions";
+import { PracticeToLesson } from "@/components/switch-recording";
 
 /** Keeps an unfinished session moving while it is on screen, then refreshes. */
 export function PracticePoller({ id }: { id: string }) {
@@ -29,7 +30,18 @@ export function PracticePoller({ id }: { id: string }) {
   return null;
 }
 
-export function PracticeSessionButtons({ id, canRetry, canRedo = false }: { id: string; canRetry: boolean; canRedo?: boolean }) {
+export function PracticeSessionButtons({
+  id,
+  canRetry,
+  canRedo = false,
+  canSwitch = false,
+}: {
+  id: string;
+  canRetry: boolean;
+  canRedo?: boolean;
+  /** "This was a lesson": switch a session that was really a lesson. */
+  canSwitch?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -83,6 +95,7 @@ export function PracticeSessionButtons({ id, canRetry, canRedo = false }: { id: 
       >
         Delete
       </button>
+      {canSwitch && <PracticeToLesson sessionId={id} />}
       {msg && <span className="text-muted">{msg}</span>}
     </div>
   );

@@ -26,9 +26,12 @@ export function PracticeSessionList({
   sessions,
   teacherView = false,
   compact = false,
+  canSwitch = teacherView,
 }: {
   sessions: PracticeSessionView[];
   teacherView?: boolean;
+  /** Show "This was a lesson" (needs the teacher's account, also in Family mode). */
+  canSwitch?: boolean;
   /** Teacher's quick glance: check marks as a compact row, no item notes. */
   compact?: boolean;
 }) {
@@ -36,7 +39,7 @@ export function PracticeSessionList({
   return (
     <div className="flex flex-col gap-2">
       {sessions.map((s) => (
-        <SessionCard key={s.id} s={s} teacherView={teacherView} compact={compact} />
+        <SessionCard key={s.id} s={s} teacherView={teacherView} compact={compact} canSwitch={canSwitch} />
       ))}
     </div>
   );
@@ -46,10 +49,12 @@ function SessionCard({
   s,
   teacherView,
   compact,
+  canSwitch,
 }: {
   s: PracticeSessionView;
   teacherView: boolean;
   compact: boolean;
+  canSwitch: boolean;
 }) {
   const r = s.review;
   const working = s.status === "transcribing" || s.status === "analyzing";
@@ -96,7 +101,9 @@ function SessionCard({
           {s.status === "error" && <div className="text-sm text-danger">{s.error || "The review didn't finish."}</div>}
           {working && <div className="text-sm text-muted">Listening back to the practice. This takes a minute or two.</div>}
           {r && <PracticeReviewBody review={r} titles={s.titles} compact={compact} teacherView={teacherView} />}
-          <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canRedo={teacherView && s.status === "done" && !!r} />
+          <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canRedo={teacherView && s.status === "done" && !!r}
+            canSwitch={canSwitch && (s.status === "done" || s.status === "error")}
+          />
         </div>
       </details>
     </Card>

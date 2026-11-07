@@ -449,3 +449,79 @@ export function currentPieces(rep: { title: string; status: string }[], assignme
   }
   return out.slice(0, 12);
 }
+
+/**
+ * A recording first saved as a lesson and switched to a practice (see
+ * src/lib/convert.ts): the session row is already saved with the lesson's
+ * transcript and, when the browser could listen through the file, a sound
+ * timeline. Reviews it like any practice. With neither playing nor talking
+ * to go on, the time is logged without a review.
+ */
+export async function reviewConverted(id: string): Promise<PracticeState | null> {
+  const db = await createClient();
+  const s = await load(db, id);
+  if (!s) return null;
+  if (s.status !== "uploading") return stateOf(s);
+  const activity = parseActivity(s.activity);
+  if (tooQuiet(activity, s.duration_seconds) && !s.transcript?.trim()) {
+    const analysis: PracticeAnalysis = {
+      counted: true,
+      not_counted_reason: "",
+      summary: "Practice logged from a recording first saved as a lesson. There was no sound timeline or transcript to review, so there's no grade for this one.",
+      items: [],
+      repertoire: [],
+      other: [],
+      timeline: [],
+      encouragement: "",
+      going_well: [],
+      work_on: [],
+      teacher_note: "Switched from a lesson; nothing to review.",
+    };
+    const done = await patch(db, id, { status: "done", counted: true, analysis: analysis as unknown as Json }, ["uploading"]);
+    if (done && !done.applied) await applyToLog(db, done, analysis);
+    return stateOf(done ?? s);
+  }
+  const claimed = await patch(db, id, { status: "analyzing", error: null }, ["uploading"]);
+  if (!claimed) return stateOf((await load(db, id)) ?? s);
+  return review(db, claimed);
+}
+
+/**
+ * Takes a session's minutes and ticks back out of that day's practice log
+ * (before it is switched to a lesson). Ticks another counted session that
+ * day also made stay.
+ */
+export async function unapplyFromLog(db: Db, s: PracticeSession) {
+  if (!s.applied) return;
+  const a = s.analysis as PracticeAnalysis | null;
+  if (s.counted === false || (a && a.counted === false)) return;
+  const { data: log } = await db
+    .from("practice_logs")
+    .select("*")
+    .eq("student_id", s.student_id)
+    .eq("practice_date", s.practice_date)
+    .maybeSingle();
+  if (!log) return;
+  const ticksOf = (x: PracticeAnalysis | null) =>
+    (x?.items ?? []).filter((i) => i.practiced && i.confidence !== "low").map((i) => i.assignment_id);
+  const { data: others } = await db
+    .from("practice_sessions")
+    .select("analysis, counted")
+    .eq("student_id", s.student_id)
+    .eq("practice_date", s.practice_date)
+    .eq("applied", true)
+    .neq("id", s.id);
+  const keep = new Set((others ?? []).filter((o) => o.counted !== false).flatMap((o) => ticksOf(o.analysis as PracticeAnalysis | null)));
+  const mine = new Set(ticksOf(a).filter((id) => !keep.has(id)));
+  const completed = (log.completed_assignment_ids ?? []).filter((id) => !mine.has(id));
+  const minutes = Math.max(0, (log.minutes ?? 0) - Math.max(1, Math.round(s.duration_seconds / 60)));
+  if (!completed.length && !minutes && !log.listened && !log.parent_note?.trim()) {
+    await db.from("practice_logs").delete().eq("student_id", s.student_id).eq("practice_date", s.practice_date);
+    return;
+  }
+  await db
+    .from("practice_logs")
+    .update({ completed_assignment_ids: completed, minutes })
+    .eq("student_id", s.student_id)
+    .eq("practice_date", s.practice_date);
+}

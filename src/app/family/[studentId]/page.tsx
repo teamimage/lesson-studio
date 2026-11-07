@@ -278,11 +278,12 @@ async function Body({
           </section>
 
           {recentSessions.length > 0 && (
-            <section>
+            <section id="practice-reviews" className="scroll-mt-4">
               <SectionTitle>Practice reviews</SectionTitle>
               <PracticeSessionList
                 sessions={recentSessions}
                 teacherView={isTeacher}
+                canSwitch={ownTeacher}
               />
             </section>
           )}
