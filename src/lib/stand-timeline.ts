@@ -4,11 +4,30 @@
 import type { Json } from "@/lib/supabase/types";
 import type { AnalysisStatus, ScoreAnalysis, ScoreSection } from "@/lib/score-analysis";
 import type { PageBars } from "@/lib/bar-map";
+import { isMat3, type Mat3 } from "@/lib/page-fit";
 
-export type ScorePage = { path: string; w: number; h: number };
+/** The photo or PDF page as uploaded, kept when the page is digitized. */
+export type OriginalPage = { path: string; w: number; h: number };
+/**
+ * One page of an upload. Once digitized, `path` is the clean page (what every
+ * view shows) and `original` the photo it came from; `fit` maps the photo
+ * onto the clean page (see page-fit.ts).
+ */
+export type ScorePage = {
+  path: string;
+  w: number;
+  h: number;
+  original?: OriginalPage;
+  fit?: Mat3;
+  scanned_at?: string;
+  /** The page edges weren't looked for: the whole photo was cleaned. */
+  whole?: boolean;
+};
 /** A score page with a signed image URL. */
 export type ScorePageWithUrl = ScorePage & {
   url: string | null;
+  /** The original photo's link, when it was asked for. */
+  originalUrl?: string | null;
   /** The page's bar map, once made (see bar-map.ts). */
   bars?: PageBars | null;
 };
@@ -44,10 +63,23 @@ export function parsePages(json: Json): ScorePage[] {
   if (!Array.isArray(json)) return [];
   return json.flatMap((p) => {
     if (!p || typeof p !== "object" || Array.isArray(p)) return [];
-    const { path, w, h } = p as Record<string, unknown>;
+    const { path, w, h, original, fit, scanned_at, whole } = p as Record<string, unknown>;
     if (typeof path !== "string") return [];
-    return [{ path, w: Number(w) || 1000, h: Number(h) || 1400 }];
+    const page: ScorePage = { path, w: Number(w) || 1000, h: Number(h) || 1400 };
+    const o = original as Record<string, unknown> | null | undefined;
+    if (o && typeof o === "object" && typeof o.path === "string") {
+      page.original = { path: o.path, w: Number(o.w) || 1000, h: Number(o.h) || 1400 };
+      if (isMat3(fit)) page.fit = fit;
+      if (typeof scanned_at === "string") page.scanned_at = scanned_at;
+      if (whole === true) page.whole = true;
+    }
+    return [page];
   });
+}
+
+/** Every stored file of a page: the clean page and, once digitized, the photo. */
+export function pageFiles(p: ScorePage): string[] {
+  return p.original ? [p.path, p.original.path] : [p.path];
 }
 
 export function parseRect(json: Json | null): Rect | null {

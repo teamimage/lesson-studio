@@ -4,6 +4,7 @@ import { Shell } from "@/components/shell";
 import { Button, Card, EmptyState, Pill, SectionTitle, cx } from "@/components/ui";
 import { ReplaceScoreFile, ScoreUploader } from "@/components/score-uploader";
 import { DeleteScoreButton, ReadMusicButton, RefreshWhileReading } from "@/components/score-actions";
+import { ScanButton, type ScanSource } from "@/components/scan-music";
 import { requireTeacher } from "@/lib/auth";
 import { getStudent } from "@/lib/data";
 import { listScores } from "@/lib/scores";
@@ -27,7 +28,7 @@ type Params = Promise<{ id: string }>;
 
 export default function MusicPage({ params }: { params: Params }) {
   return (
-    <Suspense fallback={<Shell title="Music" tab="studio">{null}</Shell>}>
+    <Suspense fallback={<Shell title="Music library" tab="studio">{null}</Shell>}>
       <Body params={params} />
     </Suspense>
   );
@@ -42,6 +43,7 @@ async function Body({ params }: { params: Params }) {
     listScores(id, {
       includeArchived: true,
       withSourceLinks: true,
+      withOriginals: true,
     }),
     melodyProgressFor(id),
     listReferenceRecordings({ withUrls: true }),
@@ -58,7 +60,7 @@ async function Body({ params }: { params: Params }) {
 
   return (
     <Shell
-      title="Music"
+      title="Music library"
       eyebrow={`${student.name} · sheet music and recordings`}
       back={{ href: `/students/${id}`, label: student.name }}
       tab="studio"
@@ -259,6 +261,7 @@ function ScoreRow({
             View the music (doesn&apos;t open the stand)
           </Link>
         )}
+        {score.pages.length > 0 && <Digitized score={score} studentId={studentId} />}
         {score.pages.length > 0 && score.sections.length > 0 && <BarMapLink score={score} studentId={studentId} />}
         <MusicReading score={score} studentName={studentName} studentId={studentId} />
         {melody && score.analysisStatus === "done" && <MelodyReader scoreId={score.id} initial={melody} />}
@@ -299,6 +302,46 @@ function ScoreRow({
         </div>
       </div>
     </li>
+  );
+}
+
+/** The photos the pages are (or will be) digitized from. */
+function scanSources(score: StandScore, from = 1, to = score.pages.length): ScanSource[] {
+  return score.pages
+    .map((p, i) => ({ p, n: i + 1 }))
+    .filter(({ n }) => n >= from && n <= to)
+    .map(({ p, n }) => ({ n, url: p.originalUrl ?? null, path: p.original?.path ?? p.path }));
+}
+
+// Digitizing: the clean pages are what every view shows; the photos only on "Show original pictures".
+function Digitized({ score, studentId }: { score: StandScore; studentId: string }) {
+  const scanned = score.pages.filter((p) => p.original).length;
+  const all = scanSources(score);
+  const todo = all.filter((s) => !score.pages[s.n - 1].original);
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      {scanned === 0 ? (
+        <span className="text-muted">Not digitized yet</span>
+      ) : (
+        <span className="text-muted">
+          ✓ Digitized{scanned < score.pages.length ? ` · ${scanned} of ${score.pages.length} pages` : ""}
+        </span>
+      )}
+      {todo.length > 0 && (
+        <ScanButton
+          scoreId={score.id}
+          pages={todo}
+          label={scanned ? `Scan the other ${todo.length} page${todo.length === 1 ? "" : "s"}` : "Scan"}
+          className="font-semibold"
+        />
+      )}
+      {scanned > 0 && <ScanButton scoreId={score.id} pages={all} label="Redigitize" />}
+      {scanned > 0 && (
+        <Link href={`${viewerHref(studentId, score.id)}?originals=1`} className="text-accent-ink underline">
+          Show original pictures
+        </Link>
+      )}
+    </div>
   );
 }
 
@@ -400,6 +443,14 @@ function MusicReading({
             </Link>
             {STATUS_LABELS[s.status] && <Pill tone={STATUS_TONES[s.status]}>{STATUS_LABELS[s.status]}</Pill>}
             <span className="shrink-0 tabular-nums text-muted">{pageRange(s)}</span>
+            <span className="shrink-0 text-xs font-normal">
+              <ScanButton
+                scoreId={score.id}
+                pages={scanSources(score, s.start_page, s.end_page)}
+                label={score.pages.slice(s.start_page - 1, s.end_page).some((p) => p.original) ? "Redigitize" : "Scan"}
+                busyLabel="…"
+              />
+            </span>
           </li>
         ))}
       </ol>

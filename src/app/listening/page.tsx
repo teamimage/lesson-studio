@@ -90,7 +90,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
               <p className="mt-2 text-sm text-muted">
                 Tip: on a student&apos;s{" "}
                 <Link href={`/students/${firstStudent.id}/music#recordings`} className="text-accent-ink underline">
-                  Music page
+                  Music library
                 </Link>{" "}
                 the book list also offers the pieces Claude found in their uploaded music.
               </p>

@@ -37,7 +37,7 @@ async function Body({ params }: { params: Params }) {
     <Shell
       title="Bar map"
       eyebrow={`${student.name} · ${score.title}`}
-      back={{ href: `/students/${id}/music`, label: "Music" }}
+      back={{ href: `/students/${id}/music`, label: "Music library" }}
       tab="studio"
       actions={
         <Link href={viewerHref(id, score.id)} className="text-sm font-medium text-accent-ink">
@@ -49,7 +49,7 @@ async function Body({ params }: { params: Params }) {
         <p className="text-sm text-muted">The pages of this music haven&apos;t finished uploading.</p>
       ) : score.sections.length === 0 ? (
         <p className="text-sm text-muted">
-          Let Claude find the pieces in this music first (on the Music page), then come back to make the bar map.
+          Let Claude find the pieces in this music first (in the music library), then come back to make the bar map.
         </p>
       ) : (
         <BarMapEditor

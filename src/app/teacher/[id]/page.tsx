@@ -138,7 +138,7 @@ async function Body({ params }: { params: Params }) {
             <SectionTitle>More for {student.name}</SectionTitle>
             <div className="grid grid-cols-2 gap-2">
               <LinkButton href={`/students/${id}/music`} variant="secondary" className="text-sm">
-                Music for the stand
+                Music library
               </LinkButton>
               <LinkButton href={`/students/${id}`} variant="secondary" className="text-sm">
                 Full lesson history

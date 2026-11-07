@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as tus from "tus-js-client";
 import { createClient } from "@/lib/supabase/client";
@@ -14,13 +14,15 @@ import {
 } from "@/app/students/music-actions";
 import type { ScorePage } from "@/lib/stand-timeline";
 import { Button, cx } from "@/components/ui";
+import { digitizePage, type Digitized } from "@/lib/digitize-page";
 import { MUSIC_RIGHTS_NOTE, MUSIC_RIGHTS_STATEMENT, MUSIC_RIGHTS_VERSION } from "@/lib/music-rights";
 
 // Long edge of a stored page image. Sharp on an iPad, small enough to load fast.
 const MAX_EDGE = 2000;
 const JPEG_QUALITY = 0.85;
 
-type Prepared = { blob: Blob; w: number; h: number };
+/** A page ready to upload; photos also carry their digitized (clean) version. */
+type Prepared = { blob: Blob; w: number; h: number; digital?: Digitized };
 
 function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) =>
@@ -148,14 +150,25 @@ async function uploadMusic(
   afterSave: () => void,
 ): Promise<{ id: string; pages: number }> {
   const prepared: Prepared[] = [];
+  const photos = files.filter((f) => !isPdf(f)).length;
+  let photo = 0;
   for (const f of files) {
     if (isPdf(f)) {
       prepared.push(...(await pdfPages(f, (d, t) => setStatus(`Reading PDF page ${d} of ${t}…`))));
     } else {
+      photo++;
+      setStatus(`Digitizing photo ${photo} of ${photos}…`);
+      await new Promise((r) => setTimeout(r, 0));
       const img = await loadImage(f);
       const canvas = draw(img.source, img.w, img.h);
-      prepared.push({ blob: await canvasToJpeg(canvas), w: canvas.width, h: canvas.height });
-      setStatus(`Prepared ${prepared.length} page${prepared.length === 1 ? "" : "s"}…`);
+      const page: Prepared = { blob: await canvasToJpeg(canvas), w: canvas.width, h: canvas.height };
+      // Photos are digitized straight away; if that fails the photo is used as it is.
+      try {
+        page.digital = await digitizePage(canvas, canvas.width, canvas.height);
+      } catch (e) {
+        console.error("digitize", e);
+      }
+      prepared.push(page);
     }
   }
   if (prepared.length === 0) throw new Error("No pages found in those files.");
@@ -178,14 +191,33 @@ async function uploadMusic(
 
   const supabase = createClient();
   const pages: ScorePage[] = [];
-  for (const [i, p] of prepared.entries()) {
-    setStatus(`Uploading page ${i + 1} of ${prepared.length}…`);
-    const path = `${started.prefix}${String(i + 1).padStart(3, "0")}.jpg`;
+  const put = async (path: string, blob: Blob) => {
     const { error: upErr } = await supabase.storage
       .from(SCORES_BUCKET)
-      .upload(path, p.blob, { contentType: "image/jpeg", upsert: true });
+      .upload(path, blob, { contentType: "image/jpeg", upsert: true });
     if (upErr) throw new Error("Upload stopped. Check the connection and try again.");
-    pages.push({ path, w: p.w, h: p.h });
+  };
+  const scannedAt = new Date().toISOString();
+  for (const [i, p] of prepared.entries()) {
+    setStatus(`Uploading page ${i + 1} of ${prepared.length}…`);
+    const base = `${started.prefix}${String(i + 1).padStart(3, "0")}`;
+    if (p.digital) {
+      // The clean page is what shows; the photo is kept behind "Show original pictures".
+      await put(`${base}-photo.jpg`, p.blob);
+      await put(`${base}.jpg`, p.digital.blob);
+      pages.push({
+        path: `${base}.jpg`,
+        w: p.digital.w,
+        h: p.digital.h,
+        original: { path: `${base}-photo.jpg`, w: p.w, h: p.h },
+        fit: p.digital.fit,
+        scanned_at: scannedAt,
+        whole: !p.digital.cropped,
+      });
+    } else {
+      await put(`${base}.jpg`, p.blob);
+      pages.push({ path: `${base}.jpg`, w: p.w, h: p.h });
+    }
   }
   const res = await finishScore(started.id, pages, source, fileName, started.rightsId);
   if (!res.ok) throw new Error("Uploaded, but couldn't be saved. Try again.");
@@ -199,8 +231,44 @@ async function uploadMusic(
   return { id: started.id, pages: pages.length };
 }
 
+/** A small preview of a staged photo, with a button to take it out. */
+function Thumb({ file, n, onRemove, disabled }: { file: File; n: number; onRemove: () => void; disabled: boolean }) {
+  const img = useRef<HTMLImageElement>(null);
+  const pdf = isPdf(file);
+  useEffect(() => {
+    if (pdf || !img.current) return;
+    const u = URL.createObjectURL(file);
+    img.current.src = u;
+    return () => URL.revokeObjectURL(u);
+  }, [file, pdf]);
+  return (
+    <li className="relative h-24 w-[72px] shrink-0 overflow-hidden rounded-lg border border-rule bg-white">
+      {!pdf ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img ref={img} alt={`Page ${n}`} className="h-full w-full object-cover" />
+      ) : (
+        <span className="grid h-full place-items-center px-1 text-center text-xs text-muted">PDF</span>
+      )}
+      <span className="absolute bottom-0 left-0 rounded-tr-md bg-black/55 px-1.5 text-xs font-semibold text-white">
+        {n}
+      </span>
+      {!disabled && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute right-0 top-0 grid h-7 w-7 place-items-center rounded-bl-md bg-black/55 text-sm text-white"
+          aria-label={`Take out page ${n}`}
+        >
+          ×
+        </button>
+      )}
+    </li>
+  );
+}
+
 export function ScoreUploader({ studentId }: { studentId: string }) {
   const router = useRouter();
+  const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -208,9 +276,20 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
   const [busy, setBusy] = useState(false);
   const [owned, setOwned] = useState(false);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (files.length === 0) return setError("Choose photos or a PDF of the music.");
+  const add = (list: FileList | null) => {
+    const picked = Array.from(list ?? []);
+    if (cameraRef.current) cameraRef.current.value = "";
+    if (fileRef.current) fileRef.current.value = "";
+    if (picked.length) {
+      setFiles((f) => [...f, ...picked]);
+      setStatus(null);
+      setError(null);
+    }
+  };
+  const photos = files.filter((f) => !isPdf(f)).length;
+
+  async function upload() {
+    if (files.length === 0) return setError("Take photos or choose a PDF of the music.");
     if (!owned) return setError("Tick the box to confirm you own this copy of the music.");
     setBusy(true);
     setError(null);
@@ -225,7 +304,6 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
       setFiles([]);
       // Each upload gets its own sign-off.
       setOwned(false);
-      if (fileRef.current) fileRef.current.value = "";
       setStatus(`Added ${out.pages} page${out.pages === 1 ? "" : "s"}. The pieces Claude found are listed above.`);
     } catch (err) {
       setStatus(null);
@@ -237,29 +315,66 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3">
-      <label
-        className={cx(
-          "flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-accent/40 bg-accent-soft/50 px-4 py-5 text-center transition hover:border-accent",
-          busy && "pointer-events-none opacity-60",
-        )}
-      >
-        <span className="text-[16px] font-semibold text-accent-ink">
-          {files.length ? `${files.length === 1 ? files[0].name : `${files.length} files chosen`}` : "Take photos or choose a PDF"}
-        </span>
-        <span className="text-sm text-muted">
-          A whole book is fine. Claude reads it, names it and finds each piece and movement.
-        </span>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,application/pdf,.pdf"
-          multiple
-          className="sr-only"
-          disabled={busy}
-          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-        />
-      </label>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        upload();
+      }}
+      className="flex flex-col gap-3"
+    >
+      <div className={cx("grid grid-cols-2 gap-2", busy && "pointer-events-none opacity-60")}>
+        <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-accent/40 bg-accent-soft/50 px-3 py-4 text-center transition hover:border-accent">
+          <span className="text-2xl" aria-hidden>
+            📷
+          </span>
+          <span className="text-[15px] font-semibold text-accent-ink">
+            {photos ? "Take another photo" : "Take photos"}
+          </span>
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            disabled={busy}
+            onChange={(e) => add(e.target.files)}
+          />
+        </label>
+        <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-accent/40 bg-accent-soft/50 px-3 py-4 text-center transition hover:border-accent">
+          <span className="text-2xl" aria-hidden>
+            🗂
+          </span>
+          <span className="text-[15px] font-semibold text-accent-ink">Choose photos or a PDF</span>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,application/pdf,.pdf"
+            multiple
+            className="sr-only"
+            disabled={busy}
+            onChange={(e) => add(e.target.files)}
+          />
+        </label>
+      </div>
+      <p className="-mt-1 text-sm text-muted">
+        Photos are digitized into clean pages. A whole book is fine: Claude reads it, names it and finds each piece and
+        movement.
+      </p>
+
+      {files.length > 0 && (
+        <ul className="flex gap-2 overflow-x-auto pb-1" aria-label="Pages to add">
+          {files.map((f, i) => (
+            <Thumb
+              key={`${f.name}-${f.lastModified}-${i}`}
+              file={f}
+              n={i + 1}
+              disabled={busy}
+              onRemove={() => setFiles((all) => all.filter((_, j) => j !== i))}
+            />
+          ))}
+        </ul>
+      )}
+
       <label className={cx("flex items-start gap-3 text-[15px] leading-snug", busy && "opacity-60")}>
         <input
           type="checkbox"
@@ -276,7 +391,26 @@ export function ScoreUploader({ studentId }: { studentId: string }) {
       <p className="text-sm text-muted">{MUSIC_RIGHTS_NOTE}</p>
       {error && <p className="text-sm text-danger">{error}</p>}
       {status && <p className="text-sm text-muted">{status}</p>}
-      <Button disabled={busy || files.length === 0 || !owned}>{busy ? "Working…" : "Add to music"}</Button>
+
+      {photos > 0 && !busy ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-accent/40 bg-sheet p-3">
+          <p className="text-[16px] font-semibold">Do you have any more pages to add to this piece of music?</p>
+          <p className="-mt-2 text-sm text-muted">
+            {files.length} page{files.length === 1 ? "" : "s"} so far.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" variant="secondary" onClick={() => cameraRef.current?.click()}>
+              Yes, add a page
+            </Button>
+            <Button type="submit" disabled={!owned}>
+              No, upload
+            </Button>
+          </div>
+          {!owned && <p className="text-sm text-muted">Tick the box above to upload.</p>}
+        </div>
+      ) : (
+        <Button disabled={busy || files.length === 0 || !owned}>{busy ? "Working…" : "Add to music library"}</Button>
+      )}
     </form>
   );
 }
