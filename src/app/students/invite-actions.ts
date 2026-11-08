@@ -6,7 +6,13 @@ import { requireTeacher } from "@/lib/auth";
 import { getStudent } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 
-const back = (studentId: string, q: string) => `/students/${studentId}?open=parents&${q}#family-access`;
+// Back to the page the form was on: the student page, or (version 3) the
+// student & family page. Only those two, so the field can't send anyone off-site.
+function back(studentId: string, q: string, fd?: FormData) {
+  const to = String(fd?.get("return_to") ?? "");
+  if (to === `/v3/students/${studentId}/about`) return `${to}?${q}#family-access`;
+  return `/students/${studentId}?open=parents&${q}#family-access`;
+}
 
 /** Makes a new invite link for the student's family. */
 export async function createFamilyInvite(fd: FormData) {
@@ -24,10 +30,11 @@ export async function createFamilyInvite(fd: FormData) {
     .select("id")
     .single();
   revalidatePath(`/students/${studentId}`);
+  revalidatePath(`/v3/students/${studentId}/about`);
   if (error || !data) {
-    redirect(back(studentId, `invite=${error?.code === "42P01" || error?.code === "PGRST205" ? "setup" : "error"}`));
+    redirect(back(studentId, `invite=${error?.code === "42P01" || error?.code === "PGRST205" ? "setup" : "error"}`, fd));
   }
-  redirect(back(studentId, `invite=new&made=${data.id}`));
+  redirect(back(studentId, `invite=new&made=${data.id}`, fd));
 }
 
 /**
@@ -59,8 +66,9 @@ export async function revokeFamilyInvite(fd: FormData) {
     }
   }
   revalidatePath(`/students/${studentId}`);
+  revalidatePath(`/v3/students/${studentId}/about`);
   revalidatePath(`/family/${studentId}`);
-  redirect(back(studentId, "invite=revoked"));
+  redirect(back(studentId, "invite=revoked", fd));
 }
 
 /** Removes a linked family account's access to this student. */
@@ -76,6 +84,7 @@ export async function removeFamilyAccess(fd: FormData) {
     .eq("student_id", studentId)
     .eq("accepted_parent_id", parentId);
   revalidatePath(`/students/${studentId}`);
+  revalidatePath(`/v3/students/${studentId}/about`);
   revalidatePath(`/family/${studentId}`);
-  redirect(back(studentId, "invite=removed"));
+  redirect(back(studentId, "invite=removed", fd));
 }

@@ -14,7 +14,7 @@ import { PreLessonBrief } from "@/components/pre-lesson-brief";
 import { PracticeSessionList } from "@/components/practice-session-list";
 import { PeriodReviewWriter } from "@/components/period-review-writer";
 import { RepertoireMap } from "@/components/repertoire-map";
-import { WeekStrip } from "@/components/week-strip";
+import { PracticeCalendarLegend, PracticeMonthCalendar } from "@/components/practice-month-calendar";
 import { listLessonMarks } from "@/lib/lesson-marks";
 import { LocalDateTime } from "@/components/local-time";
 import { Button, Card, LinkButton, Notice, Pill } from "@/components/ui";
@@ -26,13 +26,13 @@ import {
   getPracticeWeek,
   getStudent,
   listLessons,
-  listParentsForStudent,
   listPracticeLogs,
   listRepertoire,
   practiceSpanLabel,
   practiceTone,
 } from "@/lib/data";
-import { capitalize, formatDate, formatDuration, humanize, relativeDay } from "@/lib/format";
+import { capitalize, formatDate, formatDuration, humanize, relativeDay, todayISO } from "@/lib/format";
+import { monthOf, monthRange } from "@/lib/practice/month";
 import { viewerHref } from "@/lib/music-links";
 import { listPracticeDays, listPracticeSessions, type PracticeSessionView } from "@/lib/practice/data";
 import { listPeriods, periodLabel } from "@/lib/practice/period";
@@ -44,9 +44,10 @@ import { listScoreIndex } from "@/lib/scores";
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ show?: string; consent?: string }>;
 
-// Version 3 student page: one timeline (lessons, practice, videos, reviews)
-// with filters, each entry opening in place. Music and bar maps live in a
-// side panel (on a phone, a fold above the timeline).
+// Version 3 student page: pre-lesson brief, then the full practice calendar,
+// then one box of sections (Everything, Lessons, Practice, Videos, Reviews,
+// Music) picked from buttons on the left (across the top on a phone). Family,
+// consent and invites are on the student & family page (tap the name).
 export default function V3StudentPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
     <Suspense fallback={<Shell title=" " v3Tab="students" me={<Me />} wide>{null}</Shell>}>
@@ -61,11 +62,10 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const sp = await searchParams;
   const student = await getStudent(id);
   if (!student) notFound();
-  const [lessons, week, repertoire, parents, music, sessions, logs, periods, consent, recordings] = await Promise.all([
+  const [lessons, week, repertoire, music, sessions, logs, periods, consent, recordings] = await Promise.all([
     listLessons(id, 50),
     getPracticeWeek(id),
     listRepertoire(id),
-    listParentsForStudent(id),
     listScoreIndex(id),
     listPracticeSessions(id, 40),
     listPracticeLogs(id, 90),
@@ -73,17 +73,17 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     getConsentStatus(id),
     listRecordingsForStudent(id, 100),
   ]);
-  const [practiceDays, lessonDays] = week.days.length
-    ? await Promise.all([
-        listPracticeDays(id, week.days[0], week.days[week.days.length - 1]),
-        listLessonMarks(id, week.days[0], week.days[week.days.length - 1]),
-      ])
-    : [{}, {}];
+  const today = todayISO();
+  const monthSpan = monthRange(monthOf(today));
+  const [practiceDays, lessonDays] = await Promise.all([
+    listPracticeDays(id, ...monthSpan),
+    listLessonMarks(id, ...monthSpan, today),
+  ]);
   const first = student.name.split(" ")[0];
   const drafts = lessons.filter((l) => l.status === "draft");
   const entries = buildEntries({ studentId: id, lessons, sessions, logs, periods, recordings });
 
-  const sidePanel = (
+  const musicSection = (
     <div className="flex flex-col gap-4">
       <Card className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">
@@ -131,54 +131,6 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <RepertoireMap studentId={id} instrument={student.instrument} repertoire={repertoire} scores={music} editable />
         </div>
       </details>
-      <Card className="flex flex-col gap-2 text-[16px]">
-        <h2 className="font-display text-[18px] font-semibold">Family</h2>
-        <p className="text-sm">
-          {consent.state === "signed" ? (
-            <>
-              ✓ Consent signed by {consent.consent.signerName}, <LocalDateTime iso={consent.consent.signedAt} />.{" "}
-            </>
-          ) : (
-            <span className="text-danger">No recording consent on file. </span>
-          )}
-          <Link href={consentPath(id, `/v3/students/${id}`)} className="text-accent-ink underline">
-            {consent.state === "signed" ? "View or withdraw" : "Collect consent"}
-          </Link>
-        </p>
-        {parents.length === 0 ? (
-          <p className="text-sm text-muted">No parent linked yet.</p>
-        ) : (
-          <ul className="text-sm">
-            {parents.map((p) => (
-              <li key={p.id}>
-                {p.name} <span className="text-muted">· {p.email}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {student.lesson_day && (
-          <div className="text-sm">
-            <span className="text-muted">Lessons: </span>
-            {student.lesson_day}
-            {student.lesson_time ? ` at ${student.lesson_time}` : ""}
-          </div>
-        )}
-        {student.goals && (
-          <div className="text-sm">
-            <span className="text-muted">Goals: </span>
-            {student.goals}
-          </div>
-        )}
-        {student.notes && (
-          <div className="text-sm">
-            <span className="text-muted">Private notes: </span>
-            {student.notes}
-          </div>
-        )}
-        <Link href={`/v3/family/${id}`} className="text-sm text-plum underline">
-          See {first}&apos;s Family mode
-        </Link>
-      </Card>
     </div>
   );
 
@@ -194,7 +146,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             editStudentId={student.id}
           />
           <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            {student.name}
+            <Link
+              href={`/v3/students/${id}/about`}
+              className="underline decoration-rule decoration-2 underline-offset-4 hover:decoration-accent"
+              title={`${first}: details, progress and family`}
+            >
+              {student.name}
+            </Link>
             <InstrumentTag instrument={student.instrument} />
           </span>
         </span>
@@ -253,26 +211,37 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         </Fold>
 
 
-        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="flex min-w-0 flex-col gap-4">
-            {/* Phones and iPad portrait: the side panel folds above the timeline. */}
-            <div className="lg:hidden">
-              <Fold title="Music, bar maps &amp; family" meta={`${music.length} uploaded`}>
-                {sidePanel}
-              </Fold>
-            </div>
-            <Card className="flex flex-col gap-2">
-              <div className="text-sm font-medium text-muted">{capitalize(practiceSpanLabel(week))}</div>
-              <WeekStrip week={week} days={practiceDays} lessons={lessonDays} teacherView />
-              <GradeLegend />
-            </Card>
-            <Timeline entries={entries} initial={sp.show} />
-            <AddLesson studentId={id} />
+        <Card className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-display text-[20px] font-semibold">Practice calendar</h2>
+            <span className="text-sm text-muted">
+              {capitalize(practiceSpanLabel(week))}: {week.daysPracticed} of {week.days.length} days, {week.totalMinutes} min
+            </span>
           </div>
-          <aside className="sticky top-28 hidden max-h-[calc(100dvh-8rem)] overflow-y-auto lg:block" aria-label="Music and family">
-            {sidePanel}
-          </aside>
-        </div>
+          <PracticeMonthCalendar
+            studentId={id}
+            today={today}
+            initialDays={practiceDays}
+            initialLessons={lessonDays}
+            teacherView
+          />
+          <PracticeCalendarLegend />
+          <GradeLegend />
+        </Card>
+
+        <Timeline
+          entries={entries}
+          initial={sp.show}
+          extras={[{ key: "music", label: "Music", meta: String(music.length), node: musicSection }]}
+          footer={<AddLesson studentId={id} />}
+        />
+        <p className="text-sm text-muted">
+          Family, consent and invites:{" "}
+          <Link href={`/v3/students/${id}/about`} className="text-accent-ink underline">
+            {first}&apos;s student &amp; family page
+          </Link>
+          {consent.state !== "signed" && <span className="text-danger"> (consent needed)</span>}
+        </p>
       </div>
     </Shell>
   );

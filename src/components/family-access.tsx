@@ -22,12 +22,15 @@ export async function FamilyAccess({
   parents,
   flash,
   made,
+  returnTo,
 }: {
   student: Tables<"students">;
   teacher: Tables<"teachers">;
   parents: Tables<"parents">[];
   flash?: string;
   made?: string;
+  /** Page to come back to after an invite action (default: the student page). */
+  returnTo?: string;
 }) {
   const [{ invites, setup }, origin] = await Promise.all([listFamilyInvites(student.id), siteOrigin()]);
   const firstName = student.name.split(" ")[0] || student.name;
@@ -53,6 +56,7 @@ export async function FamilyAccess({
               </span>
               <form action={removeFamilyAccess} className="ml-auto">
                 <input type="hidden" name="student_id" value={student.id} />
+                {returnTo && <input type="hidden" name="return_to" value={returnTo} />}
                 <input type="hidden" name="parent_id" value={p.id} />
                 <ConfirmSubmit
                   message={`Remove ${p.name}'s access to ${firstName}'s practice page?`}
@@ -85,6 +89,7 @@ export async function FamilyAccess({
           <InviteLink url={`${origin}/join/${i.token}`} childName={firstName} teacherName={teacherName} email={i.email} />
           <form action={revokeFamilyInvite}>
             <input type="hidden" name="student_id" value={student.id} />
+                {returnTo && <input type="hidden" name="return_to" value={returnTo} />}
             <input type="hidden" name="invite_id" value={i.id} />
             <ConfirmSubmit message="Cancel this invite? The link will stop working." className="text-sm text-danger underline">
               Cancel invite
@@ -97,6 +102,7 @@ export async function FamilyAccess({
         <summary className="cursor-pointer text-[16px] font-semibold text-accent-ink">+ Invite family</summary>
         <form action={createFamilyInvite} className="mt-3 flex flex-col gap-3">
           <input type="hidden" name="student_id" value={student.id} />
+                {returnTo && <input type="hidden" name="return_to" value={returnTo} />}
           <p className="text-sm text-muted">
             Makes a private link for {firstName}&apos;s parent. They open it, sign in with their email, and see only{" "}
             {firstName}&apos;s Home practice: the plan, practice recording, reviews and lesson videos. Never your notes,
