@@ -263,6 +263,7 @@ export type Database = {
           approved_at: string | null;
           created_at: string;
           duration_minutes: number | null;
+          duration_source: string | null;
           focus_points: string | null;
           id: string;
           lesson_date: string;
@@ -281,6 +282,7 @@ export type Database = {
           approved_at?: string | null;
           created_at?: string;
           duration_minutes?: number | null;
+          duration_source?: string | null;
           focus_points?: string | null;
           id?: string;
           lesson_date?: string;
@@ -299,6 +301,7 @@ export type Database = {
           approved_at?: string | null;
           created_at?: string;
           duration_minutes?: number | null;
+          duration_source?: string | null;
           focus_points?: string | null;
           id?: string;
           lesson_date?: string;

@@ -328,7 +328,9 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             )}
             {(lesson.duration_minutes || lesson.next_lesson_date) && (
               <Row label="Details">
-                {lesson.duration_minutes ? `${lesson.duration_minutes} minutes. ` : ""}
+                {lesson.duration_minutes
+                  ? `${lesson.duration_minutes} minutes${lesson.duration_source === "video" ? " (from the video)" : ""}. `
+                  : ""}
                 {lesson.next_lesson_date ? `Next lesson ${formatDate(lesson.next_lesson_date, "weekday")}.` : ""}
               </Row>
             )}

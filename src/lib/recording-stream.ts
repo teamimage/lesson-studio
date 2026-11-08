@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/types";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
+import { lengthFromVideos } from "@/lib/lesson-length";
 import { getStreamState, startStreamCopy, streamingEnabled, type StreamState } from "@/lib/stream";
 
 type Recording = Tables<"recordings">;
@@ -28,10 +29,22 @@ export async function syncStream(rec: Recording, { retry = false } = {}): Promis
   const supabase = await createClient();
 
   const save = async (uid: string, s: StreamState) => {
+    // Cloudflare's length is the one to trust: the browser can't always read
+    // an iPhone video's length before upload.
+    const newLength =
+      s.durationSeconds != null &&
+      (rec.duration_seconds == null || Math.abs(rec.duration_seconds - s.durationSeconds) >= 1);
     await supabase
       .from("recordings")
-      .update({ stream_uid: uid, stream_status: s.status, stream_hls_url: s.hlsUrl, stream_error: s.error })
+      .update({
+        stream_uid: uid,
+        stream_status: s.status,
+        stream_hls_url: s.hlsUrl,
+        stream_error: s.error,
+        ...(newLength ? { duration_seconds: s.durationSeconds } : {}),
+      })
       .eq("id", rec.id);
+    if (newLength) await lengthFromVideos(supabase, rec.lesson_id);
     return { status: s.status, percent: s.percent, error: s.error } satisfies StreamProgress;
   };
 

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { lessonLengthSource, writeLength } from "@/lib/lesson-length";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { findOrCreateTodayLesson } from "@/lib/lesson-today";
@@ -76,8 +77,11 @@ async function writeLessonLength(id: string, onlyIfEmpty: boolean) {
     .maybeSingle();
   if (!lesson) return false;
   if (onlyIfEmpty && lesson.duration_minutes != null) return true;
+  // A typed length, or one from the lesson's video, is better than the timer.
+  const source = await lessonLengthSource(supabase, id);
+  if (source === "manual" || source === "video") return true;
   const minutes = Math.max(1, Math.round((Date.now() - Date.parse(lesson.created_at)) / 60000));
-  await supabase.from("lessons").update({ duration_minutes: minutes }).eq("id", id);
+  await writeLength(supabase, id, minutes, "timer");
   revalidatePath(`/lessons/${id}`);
   revalidatePath(`/lessons/${id}/live`);
   return true;

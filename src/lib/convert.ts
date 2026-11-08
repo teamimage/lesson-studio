@@ -4,6 +4,7 @@ import { PRACTICE_BUCKET, RECORDINGS_BUCKET } from "@/lib/constants";
 import type { Json } from "@/lib/supabase/types";
 import { deleteStream } from "@/lib/stream";
 import { lessonMainId } from "@/lib/main-camera";
+import { writeLength } from "@/lib/lesson-length";
 import { draftFromTranscript, latestTranscript } from "@/lib/ai/process-lesson";
 import { parseActivity, playingSeconds } from "@/lib/practice/activity";
 import { reviewConverted, unapplyFromLog } from "@/lib/practice/process";
@@ -150,7 +151,7 @@ export async function practiceToLesson(sessionId: string): Promise<ConvertResult
   let lessonId = empty?.id ?? null;
   const minutes = Math.max(1, Math.round(s.duration_seconds / 60));
   if (lessonId) {
-    await db.from("lessons").update({ duration_minutes: minutes }).eq("id", lessonId);
+    await writeLength(db, lessonId, minutes, "practice");
   } else {
     const { data: made } = await db
       .from("lessons")
