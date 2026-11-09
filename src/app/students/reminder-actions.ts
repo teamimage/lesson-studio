@@ -28,6 +28,7 @@ function refresh(studentId: string, lessonId?: string | null) {
   revalidatePath(`/students/${studentId}`);
   revalidatePath(`/family/${studentId}`);
   revalidatePath(`/v3/family/${studentId}`);
+  revalidatePath(`/v3/family/${studentId}/practice`);
   revalidatePath("/teacher");
   if (lessonId) {
     revalidatePath(`/lessons/${lessonId}`);

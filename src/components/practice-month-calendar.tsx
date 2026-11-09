@@ -24,7 +24,10 @@ export function PracticeMonthCalendar({
   initialDays,
   initialLessons = {},
   teacherView = false,
+  eventLinks = false,
 }: {
+  /** Version 3: a tapped day lists what happened, each item opening its own page. */
+  eventLinks?: boolean;
   studentId: string;
   today: string;
   /** This month's grid, loaded with the page. */
@@ -139,6 +142,7 @@ export function PracticeMonthCalendar({
                   date={d}
                   lessons={lessons}
                   teacherView={teacherView}
+                  practiceHref={eventLinks ? `/v3/students/${studentId}/practice/${d}` : undefined}
                   title={`${parseISODate(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${minutes ? ` · ${minutes} min` : ""}${day?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}${noRecording ? " · no recording" : ""}`}
                   className={cx(
                     "relative flex h-11 flex-col items-center justify-center rounded-lg",

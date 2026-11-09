@@ -44,8 +44,10 @@ export function v3PathFor(pathname: string): string | null {
 export function classicPathFor(pathname: string): string | null {
   if (pathname === "/v3") return "/teacher";
   if (pathname === "/v3/setup") return "/settings";
-  const about = pathname.match(new RegExp(`^/v3/students/(${ID})/about$`));
+  const about = pathname.match(new RegExp(`^/v3/students/(${ID})/(?:about|history|practice/[0-9-]+)$`));
   if (about) return `/students/${about[1]}`;
+  const fam = pathname.match(new RegExp(`^/v3/family/(${ID})/practice$`));
+  if (fam) return `/family/${fam[1]}`;
   if (pathname.startsWith("/v3/")) return pathname.slice(3);
   return null;
 }

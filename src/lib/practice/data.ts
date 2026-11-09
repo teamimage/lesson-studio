@@ -10,15 +10,12 @@ export type PracticeSessionView = PracticeSession & {
   titles: Record<string, string>;
 };
 
-/** Recent practice sessions for a student, newest first, with assignment titles. */
-export async function listPracticeSessions(studentId: string, limit = 10): Promise<PracticeSessionView[]> {
+/** Recent practice sessions for a student (or one day of them), newest first, with assignment titles. */
+export async function listPracticeSessions(studentId: string, limit = 10, day?: string): Promise<PracticeSessionView[]> {
   const db = await createClient();
-  const { data, error } = await db
-    .from("practice_sessions")
-    .select("*")
-    .eq("student_id", studentId)
-    .order("started_at", { ascending: false })
-    .limit(limit);
+  let query = db.from("practice_sessions").select("*").eq("student_id", studentId);
+  if (day) query = query.eq("practice_date", day);
+  const { data, error } = await query.order("started_at", { ascending: false }).limit(limit);
   // Before practice-sessions.sql has run the table doesn't exist; show nothing.
   if (error || !data?.length) return [];
   const rows = await regradeIntonation(db, data);

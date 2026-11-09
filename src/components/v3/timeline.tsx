@@ -1,6 +1,7 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import Link from "next/link";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { cx } from "@/components/ui";
 
 export type TimelineKind = "lesson" | "practice" | "video" | "review";
@@ -9,6 +10,8 @@ export type TimelineEntry = {
   kind: TimelineKind;
   /** Heading for the day group, e.g. "Tue, Nov 3". */
   day: string;
+  /** The day as YYYY-MM-DD, for "the last 10 days". */
+  date: string;
   node: ReactNode;
 };
 
@@ -35,19 +38,23 @@ export type ExtraSection = { key: string; label: string; meta?: string; node: Re
  * by day. On a computer the sections are a column of buttons on the left and
  * the chosen one fills a box across the rest of the page; on a phone the
  * buttons run across the top and the box is full width. Extra sections (music,
- * family) sit under the timeline buttons. Each timeline entry opens in place.
+ * family) sit under the timeline buttons. Each entry's title opens its own
+ * page; its first few lines show, and "Show more" opens the rest in place.
  */
 export function Timeline({
   entries,
   initial = "all",
   extras = [],
   footer,
+  headingNote,
 }: {
   entries: TimelineEntry[];
   initial?: string;
   extras?: ExtraSection[];
-  /** Shown under the timeline sections only (e.g. "Add a lesson"). */
+  /** Shown under the timeline sections only (e.g. "See all history"). */
   footer?: ReactNode;
+  /** Shown after the section name in the box heading, e.g. "· last 10 days". */
+  headingNote?: ReactNode;
 }) {
   const keys = [...FILTERS.map((f) => f.key as string), ...extras.map((x) => x.key)];
   const [show, setShow] = useState<string>(keys.includes(initial) ? initial : "all");
@@ -99,7 +106,8 @@ export function Timeline({
         aria-label={label}
         className="flex min-w-0 flex-col gap-4 rounded-2xl border border-rule bg-paper p-3 sm:p-5"
       >
-        <h2 className="font-display text-[22px] font-semibold">{label}</h2>
+        <h2 className="font-display text-[22px] font-semibold">{label}
+          {!extra && headingNote && <span className="font-sans text-[15px] font-normal text-muted"> · {headingNote}</span>}</h2>
         {extra ? (
           extra.node
         ) : (
@@ -131,41 +139,100 @@ export function Timeline({
   );
 }
 
-/** One timeline entry: a title row that opens its detail in place. */
+const FADE: Record<"sheet" | "amber" | "plum", string> = {
+  sheet: "from-sheet",
+  amber: "from-amber-soft",
+  plum: "from-plum-soft",
+};
+
+/**
+ * One timeline entry: the title (a link to the entry's own page, when it has
+ * one) with its badge right after it, a short meta line, then the detail. A
+ * long detail shows its first six lines or so, fading out, with "Show more"
+ * centred on the cut-off line to open the rest in place (and close it again).
+ */
 export function Entry({
   title,
+  href,
   meta,
   badge,
-  open,
   tone = "sheet",
   children,
 }: {
   title: ReactNode;
+  href?: string;
   meta?: ReactNode;
   badge?: ReactNode;
-  open?: boolean;
   tone?: "sheet" | "amber" | "plum";
-  children: ReactNode;
+  children?: ReactNode;
 }) {
+  const body = useRef<HTMLDivElement>(null);
+  const [long, setLong] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const el = body.current;
+    if (!el) return;
+    const check = () => setLong(el.scrollHeight > el.clientHeight + 4 || el.dataset.open === "1");
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <details
-      open={open}
+    <article
       className={cx(
-        "group rounded-2xl border",
+        "rounded-2xl border",
         tone === "amber" ? "border-amber/25 bg-amber-soft" : tone === "plum" ? "border-plum/20 bg-plum-soft" : "border-rule bg-sheet",
       )}
     >
-      <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 px-4 py-2.5 [&::-webkit-details-marker]:hidden">
-        <span className="min-w-0 flex-1">
-          <span className="block text-[17px] font-semibold leading-snug">{title}</span>
-          {meta && <span className="block truncate text-sm text-muted group-open:whitespace-normal">{meta}</span>}
-        </span>
-        {badge}
-        <span aria-hidden className="text-xl text-muted transition-transform group-open:rotate-90">
-          ›
-        </span>
-      </summary>
-      <div className="flex flex-col gap-3 border-t border-rule/70 px-4 pb-4 pt-3 text-[16px]">{children}</div>
-    </details>
+      <div className="px-4 pt-3 pb-2">
+        <h3 className="text-[17px] font-semibold leading-snug">
+          {href ? (
+            <Link href={href} className="underline decoration-rule decoration-2 underline-offset-4 hover:decoration-accent">
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
+          {badge && <span className="ml-2 inline-block align-[0.1em]">{badge}</span>}
+        </h3>
+        {meta && <p className="mt-0.5 text-sm text-muted">{meta}</p>}
+      </div>
+      {children && (
+        <div className="relative">
+          <div
+            ref={body}
+            data-open={open ? "1" : "0"}
+            className={cx("flex flex-col gap-3 px-4 pb-3 text-[16px] leading-normal", !open && "max-h-[9.5rem] overflow-hidden")}
+          >
+            {children}
+          </div>
+          {long && !open && (
+            <div
+              aria-hidden
+              className={cx("pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t to-transparent", FADE[tone])}
+            />
+          )}
+        </div>
+      )}
+      {children && long && (
+        <div className="relative flex items-center justify-center px-4 pb-3">
+          <span aria-hidden className="absolute inset-x-4 top-1/2 h-px -translate-y-1/2 bg-rule" />
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            className="relative flex min-h-9 items-center gap-1.5 rounded-full border border-rule bg-paper px-4 text-sm font-medium text-accent-ink"
+          >
+            {open ? "Show less" : "Show more"}
+            <span aria-hidden className={cx("inline-block transition-transform", open && "rotate-180")}>
+              ▾
+            </span>
+          </button>
+        </div>
+      )}
+    </article>
   );
 }
