@@ -4,12 +4,13 @@
 // story, Family mode, Setup). The choice lives in a cookie so server pages,
 // the proxy and the header all see it.
 //
-// Proposed is the default (Nov 7 2026): it opens unless "current" or "v3" was
-// picked in the dropdown. The cookie was renamed from ls_ui to ls_ui2 then so
-// every device starts on Proposed again; a later pick in the dropdown sticks.
+// Version 3 is the default (Nov 10 2026): it opens unless "current" or
+// "proposed" was picked in the dropdown. The cookie was renamed from ls_ui to
+// ls_ui2 so every device starts on the default again; a later pick in the
+// dropdown sticks. To change the default, change DEFAULT_UI only.
 export type UiVersion = "current" | "proposed" | "v3";
 export const UI_COOKIE = "ls_ui2";
-export const DEFAULT_UI: UiVersion = "proposed";
+export const DEFAULT_UI: UiVersion = "v3";
 
 export function parseUiVersion(v: string | undefined | null): UiVersion {
   return v === "current" || v === "v3" || v === "proposed" ? v : DEFAULT_UI;

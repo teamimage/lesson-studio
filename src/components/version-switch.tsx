@@ -42,9 +42,9 @@ export function VersionSwitch() {
         className="min-h-9 rounded-lg border border-rule bg-sheet px-2 text-sm font-medium text-ink"
         aria-busy={pending}
       >
+        <option value="v3">Version 3</option>
         <option value="proposed">Proposed</option>
         <option value="current">Current</option>
-        <option value="v3">Version 3</option>
       </select>
     </label>
   );
