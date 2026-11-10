@@ -5,6 +5,7 @@ import { occurrencesBetween } from "@/lib/schedule";
 import { todayISO } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { LessonMark } from "@/lib/lesson-mark-types";
+import { removeEmptyDraftLessons } from "@/lib/empty-lessons";
 
 /**
  * Lesson days for the practice calendars, keyed by date: lessons on record
@@ -18,6 +19,8 @@ export async function listLessonMarks(
   to: string,
   today = todayISO(),
 ): Promise<Record<string, LessonMark[]>> {
+  // An empty draft (a lesson started or added that never got a video) isn't a lesson day.
+  await removeEmptyDraftLessons(studentId).catch(() => {});
   const supabase = await createClient();
   const [lessonRes, student] = await Promise.all([
     supabase
