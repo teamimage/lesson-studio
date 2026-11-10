@@ -43,8 +43,6 @@ import { listScores } from "@/lib/scores";
 import { practiceJumps } from "@/lib/practice-jumps";
 import { formatClock } from "@/lib/lesson-moments";
 import { listenTracksFor } from "@/lib/reference-data";
-import { ReminderList } from "@/components/reminder-editor";
-import { listActiveReminders } from "@/lib/reminders";
 import { getUiVersion } from "@/lib/ui-version-server";
 import { getPracticeView } from "@/lib/practice-view-server";
 import { PracticeViewToggle } from "@/components/practice-view-toggle";
@@ -93,7 +91,7 @@ async function Body({
       ? sp.date
       : today;
 
-  const [plan, week, log, history, teacher, sessions, periods, consent, reminders] =
+  const [plan, week, log, history, teacher, sessions, periods, consent] =
     await Promise.all([
       getCurrentPlan(studentId),
       getPracticeWeek(studentId),
@@ -103,7 +101,6 @@ async function Body({
       listPracticeSessions(studentId, 20),
       listPeriods(studentId),
       getConsentStatus(studentId),
-      listActiveReminders(studentId),
     ]);
   const monthSpan = monthRange(monthOf(today));
   const [practiceDays, lessonDays] = await Promise.all([
@@ -304,14 +301,6 @@ async function Body({
             />
           </section>
 
-          {!plan && reminders.length > 0 && (
-            <Card tone="plum" className="flex flex-col gap-2">
-              <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
-                Remember every time
-              </div>
-              <ReminderList reminders={reminders} />
-            </Card>
-          )}
           {!plan ? (
             <Card className="text-sm text-muted">
               No approved lesson yet. When {teacher?.name || "the teacher"}{" "}
@@ -328,11 +317,6 @@ async function Body({
                 </div>
                 {plan.focus_points && (
                   <Row label="Focus">{plan.focus_points}</Row>
-                )}
-                {reminders.length > 0 && (
-                  <Row label="Remember every time">
-                    <ReminderList reminders={reminders} />
-                  </Row>
                 )}
                 {plan.summary && (
                   <Row label="In the lesson">{plan.summary}</Row>

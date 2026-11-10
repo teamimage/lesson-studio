@@ -89,7 +89,7 @@ export function LessonStoryProvider({
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
           <div
             ref={playerRef}
-            className="sticky top-24 z-[6] -mx-4 flex scroll-mt-24 flex-col bg-paper sm:mx-0 lg:top-28 lg:order-2"
+            className="-mx-4 flex scroll-mt-24 flex-col bg-paper sm:mx-0 lg:order-2"
           >
             <div className="overflow-hidden bg-black sm:rounded-2xl">
               <AngleVideo
