@@ -6,6 +6,7 @@ import { todayISO } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { LessonMark } from "@/lib/lesson-mark-types";
 import { removeEmptyDraftLessons } from "@/lib/empty-lessons";
+import { reconcileLengths } from "@/lib/lesson-length";
 
 /**
  * Lesson days for the practice calendars, keyed by date: lessons on record
@@ -36,8 +37,24 @@ export async function listLessonMarks(
   const out: Record<string, LessonMark[]> = {};
   const add = (m: LessonMark) => (out[m.date] ??= []).push(m);
 
-  for (const l of lessonRes.data ?? []) {
-    add({ date: l.lesson_date, lessonId: l.id, status: l.status, time: null, minutes: l.duration_minutes, upcoming: false });
+  // Lengths follow the lesson videos; ones nobody could read are flagged.
+  const lessons = lessonRes.data ?? [];
+  const checks = await reconcileLengths(
+    supabase,
+    lessons.map((l) => l.id),
+  ).catch(() => ({}) as Awaited<ReturnType<typeof reconcileLengths>>);
+  for (const l of lessons) {
+    const c = checks[l.id];
+    add({
+      date: l.lesson_date,
+      lessonId: l.id,
+      status: l.status,
+      time: null,
+      minutes: c ? c.minutes : l.duration_minutes,
+      lengthFlag: c?.flag ?? null,
+      videoMinutes: c?.videoMinutes ?? null,
+      upcoming: false,
+    });
   }
 
   if (student) {

@@ -234,6 +234,11 @@ function DayList({
                   .filter(Boolean)
                   .join(" · ") || (l.upcoming ? "from the schedule" : "")}
               </span>
+              {l.lengthFlag && (
+                <span className="block text-sm text-accent-ink">
+                  {l.lengthFlag === "unknown" ? "Video length not read. Set the length." : `Video is ${l.videoMinutes} min.`}
+                </span>
+              )}
             </span>
           </>
         );

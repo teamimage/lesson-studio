@@ -1,5 +1,6 @@
 import "server-only";
 import type { createClient } from "@/lib/supabase/server";
+import { getStreamState, streamingEnabled } from "@/lib/stream";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -102,4 +103,142 @@ export async function lengthFromVideos(db: Db, lessonId: string): Promise<number
   } catch {
     return null;
   }
+}
+
+/**
+ * What the calendars and the lesson page say about a lesson's length after
+ * checking it against its videos:
+ *   unknown  it has a video but no one could read the video's length
+ *   differs  the teacher typed a length far from the video's length
+ */
+export type LengthFlag = "unknown" | "differs";
+export type LengthCheck = { minutes: number | null; flag: LengthFlag | null; videoMinutes: number | null };
+
+type RecRow = {
+  id: string;
+  lesson_id: string;
+  status: string;
+  archived_at?: string | null;
+  duration_seconds: number | null;
+  started_at: string | null;
+  stream_uid: string | null;
+};
+
+const CF_CHECKS_PER_CALL = 8;
+
+/** Cloudflare's length for a video, or null when it doesn't know (yet). */
+async function cloudflareSeconds(uid: string): Promise<number | null> {
+  try {
+    if (!streamingEnabled()) return null;
+    const s = await Promise.race([
+      getStreamState(uid),
+      new Promise<null>((r) => setTimeout(() => r(null), 4000)),
+    ]);
+    return s?.durationSeconds ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** A typed length counts as off when it's 5+ minutes and a quarter away from the video's. */
+function farApart(typed: number, video: number): boolean {
+  const gap = Math.abs(typed - video);
+  return gap >= 5 && gap >= video * 0.25;
+}
+
+/**
+ * Brings lessons' lengths in line with their videos, then says which ones
+ * still need a person. For each lesson with an uploaded video:
+ *   - a video with no length yet (the browser couldn't read an iPhone file)
+ *     gets Cloudflare Stream's length; so does every video of a lesson whose
+ *     length hasn't been taken from its videos yet, or of every lesson when
+ *     `checkCloudflare` is set (the lesson page), since the browser's
+ *     reading can be wrong;
+ *   - the length becomes the videos' length, whatever wrote it before
+ *     (timer, schedule, older versions of the app), unless the teacher typed it;
+ *   - a typed length far from the video's is kept but flagged "differs";
+ *   - when no video length can be found at all, the lesson is flagged "unknown".
+ * Lessons without a video are left alone. Best effort: errors leave things as they were.
+ */
+export async function reconcileLengths(
+  db: Db,
+  lessonIds: string[],
+  { checkCloudflare = false }: { checkCloudflare?: boolean } = {},
+): Promise<Record<string, LengthCheck>> {
+  const out: Record<string, LengthCheck> = {};
+  if (!lessonIds.length) return out;
+  try {
+    let lessons: { id: string; duration_minutes: number | null; duration_source: string | null }[] = [];
+    const withSource = await db.from("lessons").select("id, duration_minutes, duration_source").in("id", lessonIds);
+    if (!withSource.error) lessons = withSource.data ?? [];
+    else {
+      const plain = await db.from("lessons").select("id, duration_minutes").in("id", lessonIds);
+      lessons = (plain.data ?? []).map((l) => ({ ...l, duration_source: null }));
+    }
+    // "*" because archived_at comes with archived-videos.sql.
+    const { data: recData } = await db.from("recordings").select("*").in("lesson_id", lessonIds);
+    const recs = ((recData ?? []) as RecRow[]).filter((r) => r.status === "ready" && !r.archived_at);
+    if (!recs.length) {
+      for (const l of lessons) out[l.id] = { minutes: l.duration_minutes, flag: null, videoMinutes: null };
+      return out;
+    }
+
+    const byLesson = new Map<string, RecRow[]>();
+    for (const r of recs) byLesson.set(r.lesson_id, [...(byLesson.get(r.lesson_id) ?? []), r]);
+
+    // Ask Cloudflare where the length is missing or not yet trusted.
+    const source = new Map(lessons.map((l) => [l.id, l.duration_source]));
+    const ask = recs
+      .filter((r) => {
+        if (!r.stream_uid) return false;
+        if (r.duration_seconds == null || !(Number(r.duration_seconds) > 0)) return true;
+        const s = source.get(r.lesson_id);
+        return checkCloudflare || (s !== "video" && s !== "manual");
+      })
+      .slice(0, CF_CHECKS_PER_CALL);
+    await Promise.all(
+      ask.map(async (r) => {
+        const seconds = await cloudflareSeconds(r.stream_uid!);
+        if (seconds == null) return;
+        if (r.duration_seconds != null && Math.abs(Number(r.duration_seconds) - seconds) < 1) return;
+        r.duration_seconds = seconds;
+        await db.from("recordings").update({ duration_seconds: seconds }).eq("id", r.id);
+      }),
+    );
+
+    for (const l of lessons) {
+      const clips = byLesson.get(l.id);
+      if (!clips?.length) {
+        out[l.id] = { minutes: l.duration_minutes, flag: null, videoMinutes: null };
+        continue;
+      }
+      const seconds = coveredSeconds(clips);
+      const video = seconds >= 30 ? Math.max(1, Math.round(seconds / 60)) : null;
+      if (l.duration_source === "manual") {
+        const off = video != null && l.duration_minutes != null && farApart(l.duration_minutes, video);
+        out[l.id] = { minutes: l.duration_minutes, flag: off ? "differs" : null, videoMinutes: video };
+        continue;
+      }
+      if (video == null) {
+        out[l.id] = { minutes: l.duration_minutes, flag: "unknown", videoMinutes: null };
+        continue;
+      }
+      if (video !== l.duration_minutes || l.duration_source !== "video") {
+        await writeLength(db, l.id, video, "video");
+      }
+      out[l.id] = { minutes: video, flag: null, videoMinutes: video };
+    }
+  } catch {
+    // Leave the lengths as they were.
+  }
+  return out;
+}
+
+/** "Use the video's length" on a lesson whose typed length is far off. */
+export async function takeVideoLength(db: Db, lessonId: string): Promise<number | null> {
+  const { lesson } = await readLesson(db, lessonId);
+  if (!lesson) return null;
+  if (lesson.duration_source === "manual") await writeLength(db, lessonId, lesson.duration_minutes, null);
+  const check = await reconcileLengths(db, [lessonId], { checkCloudflare: true });
+  return check[lessonId]?.minutes ?? null;
 }
