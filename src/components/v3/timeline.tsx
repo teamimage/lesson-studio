@@ -104,7 +104,7 @@ export function Timeline({
         id="student-section"
         role="tabpanel"
         aria-label={label}
-        className="flex min-w-0 flex-col gap-4 rounded-2xl border border-rule bg-paper p-3 sm:p-5"
+        className="flex min-w-0 flex-col gap-4 lg:rounded-2xl lg:border lg:border-rule lg:bg-paper lg:p-5"
       >
         <h2 className="font-display text-[22px] font-semibold">{label}
           {!extra && headingNote && <span className="font-sans text-[15px] font-normal text-muted"> · {headingNote}</span>}</h2>
@@ -115,15 +115,15 @@ export function Timeline({
             {days.length === 0 && <p className="text-[16px] text-muted">Nothing here yet.</p>}
             <ol className="flex flex-col gap-5">
               {days.map((d) => (
-                <li key={d.day} className="relative ml-1.5 border-l-2 border-rule pl-4">
-                  <div className="-ml-[1.4rem] mb-2 flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full border-2 border-paper bg-rule" aria-hidden />
+                <li key={d.day} className="relative lg:ml-1.5 lg:border-l-2 lg:border-rule lg:pl-4">
+                  <div className="mb-2 flex items-center gap-2 lg:-ml-[1.4rem]">
+                    <span className="hidden h-3 w-3 rounded-full border-2 border-paper bg-rule lg:block" aria-hidden />
                     <span className="text-[13px] font-semibold uppercase tracking-[0.1em] text-muted">{d.day}</span>
                   </div>
                   <div className="flex flex-col gap-2">
                     {d.items.map((e) => (
                       <div key={e.key} className="relative">
-                        <span className={cx("absolute top-5 -left-[1.38rem] h-2.5 w-2.5 rounded-full", DOT[e.kind])} aria-hidden />
+                        <span className={cx("absolute top-5 -left-[1.38rem] hidden h-2.5 w-2.5 rounded-full lg:block", DOT[e.kind])} aria-hidden />
                         {e.node}
                       </div>
                     ))}
@@ -187,7 +187,7 @@ export function Entry({
         tone === "amber" ? "border-amber/25 bg-amber-soft" : tone === "plum" ? "border-plum/20 bg-plum-soft" : "border-rule bg-sheet",
       )}
     >
-      <div className="px-4 pt-3 pb-2">
+      <div className="px-3 pt-3 sm:px-4 pb-2">
         <h3 className="text-[17px] font-semibold leading-snug">
           {href ? (
             <Link href={href} className="underline decoration-rule decoration-2 underline-offset-4 hover:decoration-accent">
@@ -205,7 +205,7 @@ export function Entry({
           <div
             ref={body}
             data-open={open ? "1" : "0"}
-            className={cx("flex flex-col gap-3 px-4 pb-3 text-[16px] leading-normal", !open && "max-h-[9.5rem] overflow-hidden")}
+            className={cx("flex flex-col gap-3 px-3 pb-3 sm:px-4 text-[16px] leading-normal", !open && "max-h-[9.5rem] overflow-hidden")}
           >
             {children}
           </div>
@@ -218,7 +218,7 @@ export function Entry({
         </div>
       )}
       {children && long && (
-        <div className="relative flex items-center justify-center px-4 pb-3">
+        <div className="relative flex items-center justify-center px-3 pb-3 sm:px-4">
           <span aria-hidden className="absolute inset-x-4 top-1/2 h-px -translate-y-1/2 bg-rule" />
           <button
             type="button"

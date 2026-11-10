@@ -98,7 +98,9 @@ async function Body({ params }: { params: Params }) {
         {sessions.length > 0 ? (
           <section className="flex flex-col gap-3">
             <h2 className="font-display text-[22px] font-semibold">Recorded practice</h2>
-            <PracticeSessionList sessions={sessions} teacherView />
+            <Card className="p-3 sm:p-4">
+              <PracticeSessionList sessions={sessions} teacherView flat />
+            </Card>
             <GradeLegend />
           </section>
         ) : (

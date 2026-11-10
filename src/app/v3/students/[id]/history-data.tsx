@@ -1,12 +1,9 @@
 import "server-only";
 import { Entry, type TimelineEntry } from "@/components/v3/timeline";
-import { AssignmentList } from "@/components/assignment-list";
-import { PracticeSessionList } from "@/components/practice-session-list";
 import { PeriodReviewWriter } from "@/components/period-review-writer";
-import { LocalDateTime } from "@/components/local-time";
-import { LinkButton, Pill } from "@/components/ui";
+import { Pill } from "@/components/ui";
 import { listLessons, listPracticeLogs } from "@/lib/data";
-import { capitalize, formatDate, formatDuration, humanize, relativeDay } from "@/lib/format";
+import { capitalize, formatDate, formatDuration, relativeDay } from "@/lib/format";
 import { listPracticeSessions, type PracticeSessionView } from "@/lib/practice/data";
 import { listPeriods, periodLabel } from "@/lib/practice/period";
 import { listRecordingsForStudent } from "@/lib/recordings";
@@ -69,44 +66,15 @@ export function buildEntries({
         <Entry
           title={`Lesson${l.lesson_pieces.length ? `: ${l.lesson_pieces.map((p) => p.title).join(", ")}` : ""}`}
           href={`/v3/lessons/${l.id}`}
-          meta={!l.summary && l.status === "draft" ? "Draft, not written up yet" : undefined}
+          meta={
+            [!l.summary && l.status === "draft" ? "Draft, not written up yet" : "", videos > 0 ? `${videos} video${videos === 1 ? "" : "s"}` : ""]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          }
           badge={<Pill tone={l.status === "draft" ? "amber" : "sage"}>{l.status === "draft" ? "Draft" : "Approved"}</Pill>}
           tone={l.status === "draft" ? "amber" : "sheet"}
         >
-          {l.summary && <p>{l.summary}</p>}
-          {l.focus_points && (
-            <p>
-              <span className="font-semibold">Focus: </span>
-              {l.focus_points}
-            </p>
-          )}
-          {l.lesson_pieces.length > 0 && (
-            <ul className="flex flex-col gap-1">
-              {l.lesson_pieces.map((p) => (
-                <li key={p.id}>
-                  <span className="font-medium">{p.title}</span>{" "}
-                  <span className="text-sm text-muted">{humanize(p.activity).toLowerCase()}</span>
-                  {p.notes && <span className="block text-sm text-muted">{p.notes}</span>}
-                </li>
-              ))}
-            </ul>
-          )}
-          {l.assignments.length > 0 && (
-            <div>
-              <div className="mb-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">Home practice</div>
-              <AssignmentList assignments={l.assignments} />
-            </div>
-          )}
-          <div className="flex flex-wrap items-center gap-3">
-            <LinkButton href={`/v3/lessons/${l.id}`} className="min-h-11">
-              {l.status === "draft" ? "Open and approve" : "Open the lesson story"}
-            </LinkButton>
-            {videos > 0 && (
-              <span className="text-sm text-muted">
-                {videos} video{videos === 1 ? "" : "s"}
-              </span>
-            )}
-          </div>
+          {l.summary ? <p>{l.summary}</p> : null}
         </Entry>
       ),
     });
@@ -140,22 +108,15 @@ export function buildEntries({
             log?.listened ? "listened" : "",
             daySessions.length ? `${daySessions.length} recorded` : "",
             log?.parent_note ? `“${log.parent_note}”` : "",
+            daySessions.length ? "" : "logged by hand",
           ]
             .filter(Boolean)
             .join(" · ")}
           badge={grades.length ? <Pill tone="sage">{grades.join(" ")}</Pill> : undefined}
         >
-          {log?.parent_note && (
-            <p className="rounded-xl bg-plum-soft px-3 py-2 text-[15px]">
-              <span className="font-medium text-plum">Parent: </span>
-              {log.parent_note}
-            </p>
-          )}
-          {daySessions.length > 0 ? (
-            <PracticeSessionList sessions={daySessions} teacherView />
-          ) : (
-            <p className="text-sm text-muted">Logged by hand, no recording.</p>
-          )}
+          {daySessions.map((s) => s.review?.summary).filter(Boolean).map((t, i) => (
+            <p key={i}>{t}</p>
+          ))}
         </Entry>
       ),
     });
@@ -177,14 +138,7 @@ export function buildEntries({
             .filter(Boolean)
             .join(" · ")}
         >
-          <p className="text-sm text-muted">
-            Uploaded <LocalDateTime iso={r.created_at} />.
-          </p>
-          {r.lesson_id && (
-            <LinkButton href={`/v3/lessons/${r.lesson_id}`} variant="secondary" className="min-h-11 self-start">
-              Watch in the lesson story
-            </LinkButton>
-          )}
+
         </Entry>
       ),
     });
@@ -207,9 +161,7 @@ export function buildEntries({
         >
           {p.needsWriting && <PeriodReviewWriter studentId={studentId} start={p.start} auto={autoWrite} quiet={autoWrite} />}
           {p.encouragement && <p>{p.encouragement}</p>}
-          <LinkButton href={`/family/${studentId}/review/${p.start}`} variant="secondary" className="min-h-11 self-start">
-            Open the full review
-          </LinkButton>
+
         </Entry>
       ),
     });
