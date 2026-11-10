@@ -3,9 +3,9 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { Me } from "@/components/v3/me";
-import { GradeLegend } from "@/components/grade-legend";
+import { GRADE_TONE, GradeLegend } from "@/components/grade-legend";
 import { PracticeSessionList } from "@/components/practice-session-list";
-import { Card, Pill } from "@/components/ui";
+import { Card, Pill, cx } from "@/components/ui";
 import { requireTeacher } from "@/lib/auth";
 import { getPracticeLog, getStudent } from "@/lib/data";
 import { capitalize, formatDate, relativeDay } from "@/lib/format";
@@ -49,7 +49,24 @@ async function Body({ params }: { params: Params }) {
 
   return (
     <Shell
-      title={`Practice, ${formatDate(date, "long")}`}
+      title={
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span>Practice, {formatDate(date, "long")}</span>
+          {grades.map((g, i) => (
+            <span
+              key={i}
+              className={cx(
+                "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-display text-[24px] font-semibold leading-none",
+                GRADE_TONE[g as string] ?? "bg-rule text-ink",
+              )}
+              aria-label={`Grade ${g}`}
+              title={`Grade ${g}`}
+            >
+              {g}
+            </span>
+          ))}
+        </span>
+      }
       eyebrow={`${first} · ${capitalize(relativeDay(date))}`}
       back={{ href: `/v3/students/${id}`, label: first }}
       v3Tab="students"
@@ -71,7 +88,6 @@ async function Body({ params }: { params: Params }) {
                 </Pill>
               )}
               {log?.listened && <Pill tone="plum">listened</Pill>}
-              {grades.length > 0 && <Pill tone="sage">grade {grades.join(" ")}</Pill>}
             </div>
             {(tickedRows ?? []).length > 0 && (
               <div className="flex flex-col gap-1.5">
