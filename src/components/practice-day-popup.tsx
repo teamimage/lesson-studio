@@ -16,6 +16,8 @@ import Link from "next/link";
 // opens a popup over the page with that day's sessions: a letter grade at
 // the top, then the details and breakdown of each session. A lesson day
 // opens the same popup with the lesson at the top (a link for the teacher).
+// With `practiceHref` (Version 3 student page) the popup is a short list of
+// what happened that day instead, each item opening its own page.
 
 export function PracticeDayCell({
   day,
@@ -24,8 +26,11 @@ export function PracticeDayCell({
   teacherView = false,
   className,
   title,
+  practiceHref,
   children,
 }: {
+  /** List mode: the page for this day's practice; lessons link to their lesson page. */
+  practiceHref?: string;
   day?: PracticeDay;
   /** The cell's date; needed when a lesson day has no practice. */
   date?: string;
@@ -63,6 +68,7 @@ export function PracticeDayCell({
           day={hasRecord ? day : undefined}
           lessons={lessons ?? []}
           teacherView={teacherView}
+          practiceHref={practiceHref}
           onClose={() => setOpen(false)}
         />
       )}
@@ -75,12 +81,14 @@ function DayPopup({
   day,
   lessons,
   teacherView,
+  practiceHref,
   onClose,
 }: {
   date: string;
   day?: PracticeDay;
   lessons: LessonMark[];
   teacherView: boolean;
+  practiceHref?: string;
   onClose: () => void;
 }) {
   useBackToClose(true, onClose);
@@ -123,6 +131,9 @@ function DayPopup({
           </button>
         </div>
 
+        {practiceHref ? (
+          <DayList day={day} lessons={lessons} practiceHref={practiceHref} dayGrade={dayGrade} />
+        ) : (
         <div className="flex flex-col gap-4 px-4 py-4 text-[16px]">
           {lessons.map((l, i) => (
             <LessonRow key={l.lessonId ?? `${l.date}-${i}`} lesson={l} teacherView={teacherView} />
@@ -134,6 +145,7 @@ function DayPopup({
             <DayBody day={day} sessions={sessions} dayGrade={dayGrade} teacherView={teacherView} />
           )}
         </div>
+        )}
       </div>
     </div>
   );
@@ -184,6 +196,83 @@ function DayBody({
             </div>
           )}
     </>
+  );
+}
+
+/** List mode: one tappable row per thing that happened that day. */
+function DayList({
+  day,
+  lessons,
+  practiceHref,
+  dayGrade,
+}: {
+  day?: PracticeDay;
+  lessons: LessonMark[];
+  practiceHref: string;
+  dayGrade: string | null;
+}) {
+  const row = "flex min-h-16 items-center gap-3 rounded-2xl border px-3 py-2.5";
+  const go = (
+    <span aria-hidden className="ml-auto text-2xl leading-none text-muted">
+      ›
+    </span>
+  );
+  return (
+    <ul className="flex flex-col gap-2 px-4 py-4 text-[16px]">
+      {lessons.map((l, i) => {
+        const body = (
+          <>
+            <LessonNote upcoming={l.upcoming} />
+            <span className="min-w-0">
+              <span className="block font-semibold">{l.upcoming ? "Lesson coming up" : "Lesson"}</span>
+              <span className="block text-sm text-muted">
+                {[
+                  l.time ? formatTime(l.time) : "",
+                  l.minutes ? `${l.minutes} min` : "",
+                  l.status === "draft" ? "draft to approve" : l.status === "approved" ? "approved" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || (l.upcoming ? "from the schedule" : "")}
+              </span>
+            </span>
+          </>
+        );
+        return (
+          <li key={l.lessonId ?? `${l.date}-${i}`}>
+            {l.lessonId ? (
+              <Link href={`/v3/lessons/${l.lessonId}`} className={cx(row, "border-accent/40 bg-accent-soft hover:border-accent")}>
+                {body}
+                {go}
+              </Link>
+            ) : (
+              <div className={cx(row, "border-dashed border-rule")}>{body}</div>
+            )}
+          </li>
+        );
+      })}
+      {day && (
+        <li>
+          <Link href={practiceHref} className={cx(row, "border-sage/40 bg-sage-soft hover:border-sage")}>
+            {dayGrade ? <GradeBadge grade={dayGrade} small /> : <span className="h-5 w-5 shrink-0 rounded-full bg-sage" aria-hidden />}
+            <span className="min-w-0">
+              <span className="block font-semibold">Practice{day.minutes ? `, ${day.minutes} min` : ""}</span>
+              <span className="block text-sm text-muted">
+                {[
+                  day.sessions.length ? `${day.sessions.length} recorded` : "logged by hand",
+                  day.ticked.length ? `${day.ticked.length} item${day.ticked.length === 1 ? "" : "s"} ticked` : "",
+                  day.listened ? "listened" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+              {day.parentNote && <span className="mt-0.5 block text-sm text-plum">“{day.parentNote}”</span>}
+            </span>
+            {go}
+          </Link>
+        </li>
+      )}
+      {!day && lessons.some((l) => !l.upcoming) && <li className="text-sm text-muted">No practice logged this day.</li>}
+    </ul>
   );
 }
 

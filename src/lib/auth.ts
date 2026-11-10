@@ -12,7 +12,8 @@ export type Viewer = {
 };
 
 // Reads the signed-in user and their roles. Redirects to /login when
-// signed out. A brand-new user with no parent invitations becomes a teacher.
+// signed out. A brand-new user with no parent invitations becomes a teacher
+// (unless they started a family invite with this email).
 export async function getViewer(): Promise<Viewer> {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
@@ -31,6 +32,16 @@ export async function getViewer(): Promise<Viewer> {
 
   let teacherRow = teacher ?? null;
   const parents = parentRows ?? [];
+
+  // Someone who started a family invite with this email (on the invite
+  // page) is a parent, not a new teacher: finish the invite instead.
+  if (!teacherRow && parents.length === 0) {
+    const { data: joined } = await supabase.rpc("accept_my_family_invites");
+    if (joined && joined > 0) {
+      const { data: linked } = await supabase.from("parents").select("*").eq("user_id", userId);
+      parents.push(...(linked ?? []));
+    }
+  }
 
   if (!teacherRow && parents.length === 0) {
     // Two components may race here on first load; the unique index on

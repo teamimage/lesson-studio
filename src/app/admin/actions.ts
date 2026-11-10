@@ -33,6 +33,8 @@ function parseField(fd: FormData, key: string, spec: FieldSpec): unknown {
   return raw;
 }
 
+const PRIVATE_FIELDS: Record<string, string[]> = { lessons: ["teacher_notes", "suggestions"], students: ["notes"] };
+
 export async function adminUpdate(fd: FormData) {
   const { db } = await requireAdmin();
   const table = str(fd, "_table");
@@ -46,6 +48,8 @@ export async function adminUpdate(fd: FormData) {
     if (!fd.has(key) && spec.kind !== "bool") continue;
     const v = parseField(fd, key, spec);
     if (v !== undefined) patch[key] = v;
+    // Teacher-only notes: "" (not null) clears them in the private table.
+    if (v === null && PRIVATE_FIELDS[table]?.includes(key)) patch[key] = "";
   }
   if (table === "lessons" && "status" in patch) {
     patch.approved_at = patch.status === "approved" ? new Date().toISOString() : null;

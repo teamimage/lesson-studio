@@ -30,6 +30,8 @@ export type LessonInput = {
   student_id: string;
   lesson_date: string;
   duration_minutes: number | null;
+  /** True when the teacher changed Minutes in the form: their length is kept over the video's. */
+  duration_touched?: boolean;
   summary: string;
   focus_points: string;
   suggestions: string;
@@ -59,6 +61,7 @@ function parsePayloadObject(raw: Partial<LessonInput>): LessonInput {
     lesson_date: clean(raw.lesson_date) || todayISO(),
     duration_minutes:
       raw.duration_minutes && Number.isFinite(Number(raw.duration_minutes)) ? Number(raw.duration_minutes) : null,
+    duration_touched: raw.duration_touched === true,
     summary: clean(raw.summary),
     focus_points: clean(raw.focus_points),
     suggestions: clean(raw.suggestions),
@@ -111,15 +114,22 @@ export async function saveLesson(fd: FormData) {
     duration_minutes: input.duration_minutes,
     summary: orNull(input.summary),
     focus_points: orNull(input.focus_points),
-    suggestions: orNull(input.suggestions),
-    teacher_notes: orNull(input.teacher_notes),
+    // Teacher-only: "" (not null) clears them in the private table.
+    suggestions: input.suggestions,
+    teacher_notes: input.teacher_notes,
     parent_message: orNull(input.parent_message),
     next_lesson_date: input.next_lesson_date,
   };
 
+  // Minutes left as they were keep the length the app set (from the video,
+  // the timer or the last lesson), even if the video changed it meanwhile.
+  const { duration_minutes, ...rest } = base;
   let id = lessonId;
   if (id) {
-    const { error } = await supabase.from("lessons").update(base).eq("id", id);
+    const { error } = await supabase
+      .from("lessons")
+      .update(input.duration_touched ? base : rest)
+      .eq("id", id);
     if (error) redirect(`/lessons/${id}/edit?error=save`);
     await supabase.from("lesson_pieces").delete().eq("lesson_id", id);
   } else {
@@ -127,6 +137,15 @@ export async function saveLesson(fd: FormData) {
     if (error || !data) redirect(`/students/${input.student_id}/lessons/new?error=save`);
     id = data.id;
   }
+  const source = input.duration_touched
+    ? duration_minutes != null
+      ? "manual"
+      : null
+    : !lessonId && duration_minutes != null
+      ? "schedule"
+      : undefined;
+  // Best effort: the column comes with lesson-length-source.sql.
+  if (source !== undefined) await supabase.from("lessons").update({ duration_source: source }).eq("id", id);
 
   await writePieces(supabase, id, input.pieces);
   await writeAssignments(supabase, id, input.student_id, input.assignments);
@@ -243,7 +262,12 @@ export async function saveLessonSection(
   } else if (isTextSection(proposal.section)) {
     const { error } = await supabase
       .from("lessons")
-      .update({ [proposal.section]: orNull(clean(proposal.text)) } as Partial<Record<TextSection, string | null>>)
+      .update({
+        [proposal.section]:
+          proposal.section === "teacher_notes" || proposal.section === "suggestions"
+            ? clean(proposal.text) // "" clears a teacher-only note (private-notes.sql)
+            : orNull(clean(proposal.text)),
+      } as Partial<Record<TextSection, string | null>>)
       .eq("id", lessonId);
     if (error) return { error: "Couldn't save. Try again." };
   }

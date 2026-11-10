@@ -21,6 +21,8 @@ type Props = {
   isApproved?: boolean;
   /** The studio's reference recordings, for Listening items. */
   recordings?: { id: string; title: string; label: string; book: string | null }[];
+  /** Where the saved length came from, for the note under Minutes. */
+  durationSource?: string | null;
 };
 
 const emptyPiece: PieceInput = { title: "", activity: "worked_on", notes: "" };
@@ -37,7 +39,14 @@ export function LessonForm({
   action,
   isApproved,
   recordings = [],
+  durationSource = null,
 }: Props) {
+  const durationNote =
+    durationSource === "manual"
+      ? "You set this length. Videos don't change it."
+      : durationSource === "video"
+        ? "From the lesson video. Type a length to keep your own."
+        : "Set from the video when one is added.";
   const [basics, setBasics] = useState({
     lesson_date: initial.lesson_date,
     duration_minutes: initial.duration_minutes?.toString() ?? "",
@@ -53,11 +62,13 @@ export function LessonForm({
     initial.assignments.length ? initial.assignments : [{ ...emptyAssignment }],
   );
   const [pending, start] = useTransition();
+  const [durationTouched, setDurationTouched] = useState(false);
 
   const payload: LessonInput = {
     student_id: studentId,
     lesson_date: basics.lesson_date,
     duration_minutes: basics.duration_minutes ? Number(basics.duration_minutes) : null,
+    duration_touched: durationTouched,
     next_lesson_date: basics.next_lesson_date || null,
     summary: basics.summary,
     focus_points: basics.focus_points,
@@ -149,9 +160,19 @@ export function LessonForm({
               min={5}
               max={180}
               value={basics.duration_minutes}
-              onChange={(e) => set("duration_minutes", e.target.value)}
+              onChange={(e) => {
+                set("duration_minutes", e.target.value);
+                setDurationTouched(true);
+              }}
               placeholder="30"
             />
+            <p className="mt-1 text-xs text-muted">
+              {durationTouched
+                ? basics.duration_minutes
+                  ? "Your length is kept, even when a video is added."
+                  : "Left empty, the video's length is used."
+                : durationNote}
+            </p>
           </Field>
         </div>
         <Field label="Next lesson">

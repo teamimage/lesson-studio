@@ -59,13 +59,20 @@ export function Shell({
                 <span className="text-sm font-medium">{back.label}</span>
               </Link>
             ) : (
-              <Link href="/downbeat" className="flex min-h-9 items-center font-display text-lg font-semibold">
-                Lesson Studio
-              </Link>
+              <>
+                <Link href="/downbeat" className="flex min-h-9 items-center font-display text-lg font-semibold family:hidden">
+                  Lesson Studio
+                </Link>
+                <Link href="/family" className="hidden min-h-9 items-center font-display text-lg font-semibold family:flex">
+                  Lesson Studio
+                </Link>
+              </>
             )}
             <div className="ml-auto flex items-center gap-2">
               {actions}
-              <VersionSwitch />
+              <span className="contents family:hidden">
+                <VersionSwitch />
+              </span>
               <Link
                 href="/v3/setup"
                 aria-current={v3 === "setup" ? "page" : undefined}
@@ -113,7 +120,12 @@ export function Shell({
               </Link>
             </div>
           </nav>
-          <nav aria-label="Sections" className="-mx-1 flex gap-1 overflow-x-auto pb-1.5 pt-0.5 v3:hidden sm:justify-center">
+          {/* Family accounts: only their side of the app. */}
+          <nav aria-label="Sections" className="-mx-1 hidden gap-1 overflow-x-auto pb-1.5 pt-0.5 family:flex sm:justify-center">
+            <TabLink href="/family" tab="family" current={tab} proposed={proposedTab ?? tab} label="Home practice" icon="⌂" />
+            <TabLink href="/settings" tab="settings" current={tab} proposed={proposedTab ?? tab} label="Account" icon="⚙" />
+          </nav>
+          <nav aria-label="Sections" className="-mx-1 flex gap-1 overflow-x-auto pb-1.5 pt-0.5 v3:hidden family:hidden sm:justify-center">
             <TabLink href="/downbeat" tab="downbeat" current={tab} proposed={proposedTab ?? tab} label="Downbeat" icon="♩" />
             <TabLink href="/teacher" tab="desk" current={tab} proposed={proposedTab ?? tab} label="Desk" icon="▦" />
             <TabLink href="/" tab="studio" current={tab} proposed={proposedTab ?? tab} label="Studio" proposedLabel="Students" icon="♪" />

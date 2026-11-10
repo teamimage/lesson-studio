@@ -23,6 +23,26 @@ export type ScoreSection = {
   status: SectionStatus;
 };
 
+/** Details printed on the music, read by Claude and checked by the teacher. */
+export type ScoreDetails = {
+  composer: string;
+  arranger: string;
+  publisher: string;
+  /** As printed: a year or a date, e.g. "1994". */
+  published: string;
+  /** Tempo marking at the start, e.g. "With motion", "Allegro ♩ = 120". */
+  tempo: string;
+};
+
+export const EMPTY_DETAILS: ScoreDetails = { composer: "", arranger: "", publisher: "", published: "", tempo: "" };
+
+/**
+ * New uploads wait for the teacher to check the digitized pages and the
+ * details before they go into the music library ("pending"); music added
+ * before this step existed counts as confirmed.
+ */
+export type ScoreReview = "pending" | "confirmed";
+
 export type ScoreAnalysis = {
   title: string;
   /** e.g. "Suzuki Cello School, Volume 3". "" if not a known book. */
@@ -36,6 +56,11 @@ export type ScoreAnalysis = {
   sections: ScoreSection[];
   pages_read: number;
   pages_total: number;
+  details: ScoreDetails;
+  review: ScoreReview;
+  /** When and by whom the details were checked. */
+  confirmed_at?: string;
+  confirmed_by?: string;
 };
 
 export type AnalysisStatus = "none" | "running" | "done" | "error";
@@ -44,6 +69,22 @@ const STATUSES: SectionStatus[] = ["current", "learned", "upcoming", "other"];
 
 function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
+}
+
+export function parseDetails(v: unknown): ScoreDetails {
+  const o = (v && typeof v === "object" && !Array.isArray(v) ? v : {}) as Record<string, unknown>;
+  return {
+    composer: str(o.composer).slice(0, 200),
+    arranger: str(o.arranger).slice(0, 200),
+    publisher: str(o.publisher).slice(0, 200),
+    published: str(o.published).slice(0, 60),
+    tempo: str(o.tempo).slice(0, 120),
+  };
+}
+
+/** True while an upload waits for the teacher to check it. */
+export function isPending(json: Json | null | undefined): boolean {
+  return !!json && typeof json === "object" && !Array.isArray(json) && (json as Record<string, unknown>).review === "pending";
 }
 
 export function parseAnalysis(json: Json | null | undefined): ScoreAnalysis | null {
@@ -79,6 +120,10 @@ export function parseAnalysis(json: Json | null | undefined): ScoreAnalysis | nu
     sections: sections.sort((a, b) => a.start_page - b.start_page),
     pages_read: Number(o.pages_read) || 0,
     pages_total: Number(o.pages_total) || 0,
+    details: parseDetails(o.details),
+    review: o.review === "pending" ? "pending" : "confirmed",
+    ...(typeof o.confirmed_at === "string" ? { confirmed_at: o.confirmed_at } : {}),
+    ...(typeof o.confirmed_by === "string" ? { confirmed_by: o.confirmed_by } : {}),
   };
 }
 

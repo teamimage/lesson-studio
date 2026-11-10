@@ -1,213 +1,118 @@
-import { GradeLegend } from "@/components/grade-legend";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
 import { Me } from "@/components/v3/me";
-import { WeekStrip } from "@/components/week-strip";
-import { listLessonMarks } from "@/lib/lesson-marks";
-import { PracticeRecorder } from "@/components/practice-recorder";
-import { ConsentNeeded } from "@/components/consent-needed";
-import { JumpButton, VideoPopupProvider } from "@/components/video-popup";
-import { Button, Card, Notice, cx } from "@/components/ui";
-import { savePractice } from "@/app/family/actions";
+import { Avatar } from "@/components/avatar";
+import { InstrumentTag } from "@/components/instrument-tag";
+import { GradeLegend } from "@/components/grade-legend";
+import { PracticeCalendarLegend, PracticeMonthCalendar } from "@/components/practice-month-calendar";
+import { Timeline } from "@/components/v3/timeline";
+import { Card, LinkButton, Pill } from "@/components/ui";
 import { getViewer } from "@/lib/auth";
-import { getCurrentPlan, getPracticeLog, getPracticeWeek, getStudent } from "@/lib/data";
-import { formatDate, todayISO } from "@/lib/format";
-import { formatClock } from "@/lib/lesson-moments";
-import { practiceJumps } from "@/lib/practice-jumps";
-import { getConsentStatus } from "@/lib/recording-consent-data";
-import { listScores } from "@/lib/scores";
+import { studentPhotoSrc } from "@/lib/constants";
+import { getPracticeWeek, getStudent, practiceSpanLabel, practiceTone } from "@/lib/data";
+import { addDays, capitalize, todayISO } from "@/lib/format";
+import { listLessonMarks } from "@/lib/lesson-marks";
 import { listPracticeDays } from "@/lib/practice/data";
-import { listenTracksFor } from "@/lib/reference-data";
-import { parsePlays } from "@/lib/reference-recordings";
-import { ListenPlayer } from "@/components/listen-player";
-import { ReminderList } from "@/components/reminder-editor";
-import { listActiveReminders } from "@/lib/reminders";
+import { monthOf, monthRange } from "@/lib/practice/month";
+import { loadHistory } from "@/app/v3/students/[id]/history-data";
 
 // Back to the "Who's practising?" picker. ?pick=1 keeps it from jumping
 // straight back here when the studio has only one student.
 const PICKER = { href: "/v3/family?pick=1", label: "Who's practising?" };
+const RECENT_DAYS = 10;
 
 type Params = Promise<{ studentId: string }>;
-type SP = Promise<{ saved?: string; error?: string }>;
 
-// Version 3 Family mode: only what a family needs at home, in big type.
-// Start practice, today's practice card with a Watch clip for each item,
-// and the week. No teacher tools. The basis for parent logins later.
-export default function V3FamilyStudent({ params, searchParams }: { params: Params; searchParams: SP }) {
+// Version 3 Family mode: the student's landing page, between "Who's
+// practising?" and the practice page. For now it is the teacher's student
+// page (calendar, last 10 days of history, See all history) with a big
+// Start practice at the top, which opens the practice page with the
+// repertoire lined up. Lessons still in draft are left out.
+export default function V3FamilyStudent({ params }: { params: Params }) {
   return (
-    <Suspense fallback={<Shell title=" " back={PICKER} v3Tab="family" me={<Me />} large>{null}</Shell>}>
-      <Body params={params} searchParams={searchParams} />
+    <Suspense fallback={<Shell title=" " back={PICKER} v3Tab="family" me={<Me />} wide>{null}</Shell>}>
+      <Body params={params} />
     </Suspense>
   );
 }
 
-async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
-  const viewer = await getViewer();
-  const { studentId } = await params;
-  const sp = await searchParams;
-  const student = await getStudent(studentId);
+async function Body({ params }: { params: Params }) {
+  await getViewer();
+  const { studentId: id } = await params;
+  const student = await getStudent(id);
   if (!student) notFound();
   const today = todayISO();
-  const [plan, week, log, consent, reminders] = await Promise.all([
-    getCurrentPlan(studentId),
-    getPracticeWeek(studentId),
-    getPracticeLog(studentId, today),
-    getConsentStatus(studentId),
-    listActiveReminders(studentId),
+  const monthSpan = monthRange(monthOf(today));
+  const [{ lessons, entries: all }, week, practiceDays, lessonDays] = await Promise.all([
+    loadHistory(id),
+    getPracticeWeek(id),
+    listPracticeDays(id, ...monthSpan),
+    listLessonMarks(id, ...monthSpan, today),
   ]);
-  const scores = plan ? await listScores(studentId, { includeArchived: true }) : [];
-  const watch = plan ? await practiceJumps(plan, scores) : { jumps: {}, recordings: [] };
-  const first = student.name.split(" ")[0];
-  const done = new Set(log?.completed_assignment_ids ?? []);
-  const listenTracks = plan ? await listenTracksFor(plan.assignments.map((a) => a.reference_recording_id)) : {};
-  const plays = parsePlays(log?.listen_plays);
-  const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
-  const [practiceDays, lessonDays] = week.days.length
-    ? await Promise.all([
-        listPracticeDays(studentId, week.days[0], week.days[week.days.length - 1]),
-        listLessonMarks(studentId, week.days[0], week.days[week.days.length - 1]),
-      ])
-    : [{}, {}];
+  const drafts = new Set(lessons.filter((l) => l.status === "draft").map((l) => `l-${l.id}`));
+  const shown = all.filter((e) => !drafts.has(e.key));
+  const since = addDays(today, -RECENT_DAYS);
+  const entries = shown.filter((e) => e.date >= since);
+  const older = shown.length - entries.length;
 
   return (
-    <Shell title={`${first}'s practice`} back={PICKER} eyebrow={formatDate(today, "long")} v3Tab="family" me={<Me />} large>
-      <VideoPopupProvider
-        fullQuality={false}
-        studentId={studentId}
-        scores={scores.map((s) => ({
-          id: s.id,
-          title: s.title,
-          pages: s.pages.map((p) => ({ url: p.url, w: p.w, h: p.h })),
-          sections: s.sections,
-        }))}
-        recordings={watch.recordings.map((r) => ({
-          id: r.id,
-          lessonId: r.lesson_id,
-          url: r.url,
-          streamReady: r.streamReady,
-          name: r.label || r.file_name,
-          startedAt: r.started_at,
-          isMain: r.isMain,
-        }))}
-      >
-        <div className="flex flex-col gap-6">
-          {sp.saved && <Notice tone="sage">Saved. Nice work!</Notice>}
-          {sp.error && <Notice tone="danger">Couldn&apos;t save that. Try again.</Notice>}
-
-          {consent.state === "signed" ? (
-            <div className="[&_button]:min-h-14 [&_button]:text-[19px]">
-              <PracticeRecorder studentId={studentId} hasPlan={!!plan} instrument={student.instrument} />
-            </div>
-          ) : (
-            <ConsentNeeded
-              studentId={studentId}
-              studentName={student.name}
-              state={consent.state}
-              next={`/v3/family/${studentId}`}
-              what="recording practice"
-              canCollect={isTeacher}
-            />
-          )}
-
-          {!plan ? (
-            <Card className="text-[19px]">No practice plan yet. It appears here once the teacher approves a lesson.</Card>
-          ) : (
-            <section className="flex flex-col gap-3">
-              <h2 className="font-display text-[26px] font-semibold">Today&apos;s practice</h2>
-              {plan.focus_points && (
-                <Card tone="plum" className="text-[19px] leading-relaxed">
-                  <span className="font-semibold">Focus: </span>
-                  {plan.focus_points}
-                </Card>
-              )}
-              {reminders.length > 0 && (
-                <Card className="flex flex-col gap-2">
-                  <div className="text-[15px] font-semibold uppercase tracking-[0.1em] text-accent-ink">
-                    Remember every time
-                  </div>
-                  <ReminderList reminders={reminders} large />
-                </Card>
-              )}
-              {plan.parent_message && <p className="px-1 text-[18px] italic text-muted">“{plan.parent_message}”</p>}
-              <form action={savePractice} className="flex flex-col gap-3">
-                <input type="hidden" name="student_id" value={studentId} />
-                <input type="hidden" name="practice_date" value={today} />
-                <input type="hidden" name="minutes" value={log?.minutes ?? ""} />
-                {log?.listened && <input type="hidden" name="listened" value="on" />}
-                <input type="hidden" name="parent_note" value={log?.parent_note ?? ""} />
-                <ol className="flex flex-col gap-3">
-                  {plan.assignments.map((a, i) => {
-                    const j = watch.jumps[a.id];
-                    const track = a.reference_recording_id ? listenTracks[a.reference_recording_id] : undefined;
-                    return (
-                      <li key={a.id}>
-                        <label
-                          className={cx(
-                            "flex cursor-pointer items-start gap-4 rounded-2xl border border-rule bg-sheet p-4",
-                            "has-[:checked]:border-sage has-[:checked]:bg-sage-soft",
-                          )}
-                        >
-                          <input
-                            key={`${a.id}-${done.has(a.id)}`}
-                            type="checkbox"
-                            name="done"
-                            value={a.id}
-                            defaultChecked={done.has(a.id)}
-                            className="mt-1 h-8 w-8 shrink-0 accent-[var(--sage)]"
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-[21px] font-semibold leading-snug">
-                              {i + 1}. {a.title}
-                            </span>
-                            {a.how && <span className="mt-0.5 block text-[18px] text-muted">{a.how}</span>}
-                            {j && (
-                              <JumpButton jump={j} className="mt-2 min-h-12 rounded-xl px-4 text-[18px]">
-                                ▶ Watch{" "}
-                                <span className="font-normal text-muted">
-                                  {j.earlier ? formatDate(j.lessonDate, "short") : formatClock(j.seconds)}
-                                </span>
-                              </JumpButton>
-                            )}
-                          </span>
-                        </label>
-                        {track && (
-                          <div className="mt-2 px-1">
-                            <ListenPlayer
-                              key={`${a.id}-${today}`}
-                              track={track}
-                              assignmentId={a.id}
-                              studentId={studentId}
-                              date={today}
-                              times={Math.max(1, a.listen_times ?? 1)}
-                              initialPlays={plays[a.id] ?? 0}
-                            />
-                          </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
-                <Button variant="plum" className="min-h-14 text-[20px]">
-                  {log ? "Update today's ticks" : "Save today's ticks"}
-                </Button>
-              </form>
-            </section>
-          )}
-
-          <section className="flex flex-col gap-2">
-            <h2 className="font-display text-[22px] font-semibold">Since the last lesson</h2>
-            <Card>
-              <WeekStrip week={week} large days={practiceDays} lessons={lessonDays} />
-              <p className="mt-3 text-[18px]">
-                {week.daysPracticed} of {week.days.length} days practised
-                {week.totalMinutes > 0 ? ` · ${week.totalMinutes} min` : ""}
-              </p>
-              <GradeLegend family className="mt-2" />
-            </Card>
-          </section>
+    <Shell
+      title={
+        <span className="flex items-center gap-3">
+          <Avatar name={student.name} instrument={student.instrument} photoSrc={studentPhotoSrc(student)} size="lg" />
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            {student.name}
+            <InstrumentTag instrument={student.instrument} />
+          </span>
+        </span>
+      }
+      eyebrow={student.current_book ?? undefined}
+      back={PICKER}
+      v3Tab="family"
+      me={<Me />}
+      wide
+    >
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-wrap gap-1.5">
+          <Pill tone={practiceTone(week)}>
+            practised {week.daysPracticed} of {week.days.length} days {practiceSpanLabel(week)}
+          </Pill>
         </div>
-      </VideoPopupProvider>
+
+        <LinkButton href={`/v3/family/${id}/practice`} variant="plum" className="min-h-14 w-full text-[20px]">
+          Start practice
+        </LinkButton>
+
+        <Card className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-display text-[20px] font-semibold">Practice calendar</h2>
+            <span className="text-sm text-muted">
+              {capitalize(practiceSpanLabel(week))}: {week.daysPracticed} of {week.days.length} days, {week.totalMinutes} min
+            </span>
+          </div>
+          <PracticeMonthCalendar
+            studentId={id}
+            today={today}
+            initialDays={practiceDays}
+            initialLessons={lessonDays}
+            teacherView
+            eventLinks
+          />
+          <PracticeCalendarLegend />
+          <GradeLegend family />
+        </Card>
+
+        <Timeline
+          entries={entries}
+          headingNote={`last ${RECENT_DAYS} days`}
+          footer={
+            <LinkButton href={`/v3/students/${id}/history`} variant="secondary" className="min-h-12 w-full">
+              See all history{older > 0 ? ` (${older} more)` : ""}
+            </LinkButton>
+          }
+        />
+      </div>
     </Shell>
   );
 }

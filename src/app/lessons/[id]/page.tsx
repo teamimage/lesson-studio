@@ -40,9 +40,10 @@ import { getUiVersion } from "@/lib/ui-version-server";
 import { Fold } from "@/components/fold";
 import { ReminderEditor } from "@/components/reminder-editor";
 import { listReminders } from "@/lib/reminders";
+import { LessonToPractice } from "@/components/switch-recording";
 
 type Params = Promise<{ id: string }>;
-type SP = Promise<{ approved?: string; upload?: string; video?: string }>;
+type SP = Promise<{ approved?: string; upload?: string; video?: string; switched?: string }>;
 
 export default function LessonPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
@@ -55,7 +56,7 @@ export default function LessonPage({ params, searchParams }: { params: Params; s
 async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
   await requireTeacher();
   const { id } = await params;
-  const { approved, upload, video } = await searchParams;
+  const { approved, upload, video, switched } = await searchParams;
   const [lesson, recordings, archived, standEvents, ai, ui] = await Promise.all([
     getLesson(id),
     listRecordingsForLesson(id),
@@ -164,6 +165,16 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               isDraft={isDraft}
               canUpload={consent.state === "signed"}
             />
+          )}
+          {switched && isDraft && (
+            <Card tone="plum" className="text-sm">
+              Switched from a practice session. {ai.transcript ? "Claude drafted it from what was said; read it over before approving." : "There was no talking to draft from, so fill it in by hand."} The practice recording was deleted after its review, so there&apos;s no video.
+            </Card>
+          )}
+          {isDraft && (
+            // Maaike also practises with the children: a recording saved as a
+            // lesson can be switched to a practice until it is approved.
+            <LessonToPractice lessonId={id} studentName={student.name} />
           )}
           {isDraft && !proposed && (
             <Card tone="amber" className="flex flex-col gap-3">
@@ -317,7 +328,9 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             )}
             {(lesson.duration_minutes || lesson.next_lesson_date) && (
               <Row label="Details">
-                {lesson.duration_minutes ? `${lesson.duration_minutes} minutes. ` : ""}
+                {lesson.duration_minutes
+                  ? `${lesson.duration_minutes} minutes${lesson.duration_source === "video" ? " (from the video)" : ""}. `
+                  : ""}
                 {lesson.next_lesson_date ? `Next lesson ${formatDate(lesson.next_lesson_date, "weekday")}.` : ""}
               </Row>
             )}

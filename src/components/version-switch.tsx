@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { UI_COOKIE, classicPathFor, parseUiVersion, v3PathFor, type UiVersion } from "@/lib/ui-version";
+import { DEFAULT_UI, UI_COOKIE, classicPathFor, parseUiVersion, v3PathFor, type UiVersion } from "@/lib/ui-version";
 
 // Dropdown in the header that flips the whole app between the current, the
 // proposed and the version 3 layout. Same data in all three; only views and
@@ -15,7 +15,7 @@ function subscribe(cb: () => void) {
   return () => window.removeEventListener(EVENT, cb);
 }
 const read = (): UiVersion => parseUiVersion(document.documentElement.dataset.ui);
-const readServer = (): UiVersion => "current";
+const readServer = (): UiVersion => DEFAULT_UI;
 
 export function VersionSwitch() {
   const router = useRouter();
@@ -42,9 +42,9 @@ export function VersionSwitch() {
         className="min-h-9 rounded-lg border border-rule bg-sheet px-2 text-sm font-medium text-ink"
         aria-busy={pending}
       >
-        <option value="current">Current</option>
-        <option value="proposed">Proposed</option>
         <option value="v3">Version 3</option>
+        <option value="proposed">Proposed</option>
+        <option value="current">Current</option>
       </select>
     </label>
   );

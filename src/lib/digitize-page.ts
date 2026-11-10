@@ -8,12 +8,13 @@
 // moved onto the clean page.
 
 import { homography, invert, mul, scale, type Mat3 } from "@/lib/page-fit";
+import { findMusicBox, flattenStaves, letterPage, type Ink } from "@/lib/page-tidy";
 
 const MAX_OUT = 2000; // long edge of the clean page, like the stored photos
 const JPEG_QUALITY = 0.85;
 
 export type DigitizeOptions = {
-  /** Don't look for the page edges: straighten and clean the whole photo. */
+  /** Don't look for the page edges or crop to the music: straighten and clean the whole photo. */
   wholePhoto?: boolean;
 };
 export type Digitized = { blob: Blob; w: number; h: number; fit: Mat3; cropped: boolean };
@@ -390,13 +391,57 @@ export async function digitizePage(
   const m = mul(flat, level);
 
   const page = warp(src, m, outW, outH);
-  const ink = clean(page);
+  const cleaned: Ink = { data: clean(page), w: outW, h: outH };
 
+  // Straighten curved staves, then crop to the music on a clean letter page.
+  const flat2 = flattenStaves(cleaned);
+  const music = opts.wholePhoto ? null : findMusicBox(flat2.ink, flat2.staves);
+  let final: Ink = flat2.ink;
+  // Final page (fractions) → cleaned page (fractions).
+  let place: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  if (music) {
+    const { box } = music;
+    const L = letterPage(box, MAX_OUT);
+    const data = new Uint8ClampedArray(L.pw * L.ph).fill(255);
+    const from: Ink = music.ink;
+    for (let y = 0; y < L.ph; y++) {
+      const sy = box.y + (y + 0.5 - L.oy) / L.k - 0.5;
+      if (sy < box.y - 0.5 || sy > box.y + box.h - 0.5) continue;
+      const y0 = Math.max(0, Math.floor(sy));
+      const y1 = Math.min(from.h - 1, y0 + 1);
+      const fy = sy - Math.floor(sy);
+      for (let x = 0; x < L.pw; x++) {
+        const sx = box.x + (x + 0.5 - L.ox) / L.k - 0.5;
+        if (sx < box.x - 0.5 || sx > box.x + box.w - 0.5) continue;
+        const x0 = Math.max(0, Math.floor(sx));
+        const x1 = Math.min(from.w - 1, x0 + 1);
+        const fx = sx - Math.floor(sx);
+        const d = from.data;
+        const a = d[y0 * from.w + x0] * (1 - fx) + d[y0 * from.w + x1] * fx;
+        const b = d[y1 * from.w + x0] * (1 - fx) + d[y1 * from.w + x1] * fx;
+        data[y * L.pw + x] = a * (1 - fy) + b * fy;
+      }
+    }
+    final = { data, w: L.pw, h: L.ph };
+    place = mul(scale(1 / outW, 1 / outH), [
+      L.pw / L.k,
+      0,
+      box.x - L.ox / L.k,
+      0,
+      L.ph / L.k,
+      box.y - L.oy / L.k,
+      0,
+      0,
+      1,
+    ]);
+  }
+
+  const ink = final.data;
   const canvas = document.createElement("canvas");
-  canvas.width = outW;
-  canvas.height = outH;
+  canvas.width = final.w;
+  canvas.height = final.h;
   const ctx = canvas.getContext("2d")!;
-  const img = ctx.createImageData(outW, outH);
+  const img = ctx.createImageData(final.w, final.h);
   for (let i = 0, j = 0; i < ink.length; i++, j += 4) {
     img.data[j] = img.data[j + 1] = img.data[j + 2] = ink[i];
     img.data[j + 3] = 255;
@@ -407,10 +452,11 @@ export async function digitizePage(
   );
 
   // Clean page (fractions) → photo (fractions), then turned round for `fit`.
-  const back = mul(scale(1 / W0, 1 / H0), mul(m, scale(outW, outH)));
+  // (Flattening the staves moves things a few pixels at most; boxes ignore it.)
+  const back = mul(mul(scale(1 / W0, 1 / H0), mul(m, scale(outW, outH))), place);
   const fit = invert(back);
   if (!fit) throw new Error("Couldn't straighten that page.");
-  return { blob, w: outW, h: outH, fit: fit.map((v) => +v.toPrecision(8)), cropped: !!found };
+  return { blob, w: final.w, h: final.h, fit: fit.map((v) => +v.toPrecision(8)), cropped: !!found || !!music };
 }
 
 /** Loads an image (a picked file or a downloaded page) upright, for digitizing. */
@@ -426,4 +472,16 @@ export async function loadForDigitize(blob: Blob): Promise<{ source: CanvasImage
     URL.revokeObjectURL(url);
     return { source: img, w: img.naturalWidth, h: img.naturalHeight };
   }
+}
+
+/**
+ * For the live camera guide: the sheet's four corners in a video frame
+ * (TL, TR, BR, BL as fractions of the frame), or null when no sheet stands
+ * out from what it lies on.
+ */
+export function detectSheet(source: CanvasImageSource, w: number, h: number): [number, number][] | null {
+  const k = 320 / Math.max(w, h);
+  const small = grayFrom(source, w, h, Math.max(8, Math.round(w * k)), Math.max(8, Math.round(h * k)));
+  const q = findPage(small);
+  return q ? q.map(([x, y]) => [x / small.w, y / small.h] as [number, number]) : null;
 }

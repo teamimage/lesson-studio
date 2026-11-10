@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { SCORES_BUCKET } from "@/lib/constants";
-import { parseAnalysis, type AnalysisStatus } from "@/lib/score-analysis";
+import { isPending, parseAnalysis, type AnalysisStatus } from "@/lib/score-analysis";
 import { parseBarMap } from "@/lib/bar-map";
 import { parsePages, parseRect, type StandEvent, type StandEventKind, type StandScore } from "@/lib/stand-timeline";
 
@@ -17,13 +17,14 @@ const READ_STALE_MS = 6 * 60 * 1000;
  */
 export async function listScores(
   studentId: string,
-  { includeArchived = false, withSourceLinks = false, withOriginals = false } = {},
+  { includeArchived = false, withSourceLinks = false, withOriginals = false, includePending = false } = {},
 ): Promise<StandScore[]> {
   const supabase = await createClient();
   let query = supabase.from("scores").select("*").eq("student_id", studentId);
   if (!includeArchived) query = query.eq("archived", false);
   const { data } = await query.order("sort_order").order("created_at");
-  const rows = (data ?? []).map((r) => ({ ...r, parsed: parsePages(r.pages), barMap: parseBarMap(r.pages) }));
+  // Uploads still waiting for the teacher's check stay out of everything but the music library.
+  const rows = (data ?? []).filter((r) => includePending || !isPending(r.analysis)).map((r) => ({ ...r, parsed: parsePages(r.pages), barMap: parseBarMap(r.pages) }));
   // The photos behind digitized pages are only signed when asked for ("Show original pictures").
   const paths = rows.flatMap((r) =>
     r.parsed.flatMap((p) => (withOriginals && p.original ? [p.path, p.original.path] : [p.path])),
@@ -112,7 +113,7 @@ export async function listScoreIndex(studentId: string): Promise<
     .eq("archived", false)
     .order("sort_order")
     .order("created_at");
-  return (data ?? []).map((r) => {
+  return (data ?? []).filter((r) => !isPending(r.analysis)).map((r) => {
     const a = parseAnalysis(r.analysis);
     return {
       id: r.id,

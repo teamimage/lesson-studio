@@ -57,6 +57,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         knownPieces={repertoire.map((r) => r.title)}
         books={booksFor(student.instrument)}
         recordings={recordings}
+        durationSource={lesson.duration_source ?? null}
         previousAssignments={(previous?.assignments ?? []).map((a) => ({
           kind: a.kind,
           title: a.title,

@@ -33,7 +33,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const sp = await searchParams;
   const student = await getStudent(id);
   if (!student) notFound();
-  const score = (await listScores(id, { includeArchived: true, withOriginals: true })).find((s) => s.id === scoreId);
+  const score = (await listScores(id, { includeArchived: true, withOriginals: true, includePending: true })).find((s) => s.id === scoreId);
   if (!score) notFound();
   const n = (v?: string) => (v && Number.isFinite(Number(v)) ? Math.round(Number(v)) : undefined);
   const from = n(sp.from);

@@ -1,6 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { ROLE_COOKIE } from "@/lib/role";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createMailerClient } from "@/lib/supabase/mailer";
@@ -36,7 +37,7 @@ export async function verifyCode(formData: FormData) {
   });
 
   if (error) redirect(`${back}&error=code`);
-  redirect("/downbeat");
+  redirect("/downbeat"); // the proxy sends family accounts on to Home practice
 }
 
 // Email + password sign-in. Accounts are still created by the email code;
@@ -73,5 +74,6 @@ export async function sendPasswordReset(formData: FormData) {
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  (await cookies()).delete(ROLE_COOKIE);
   redirect("/login");
 }

@@ -10,6 +10,7 @@ export function ConsentNeeded({
   next,
   what,
   canCollect = true,
+  selfSign = false,
 }: {
   studentId: string;
   studentName: string;
@@ -18,8 +19,10 @@ export function ConsentNeeded({
   next?: string;
   /** What is waiting, e.g. "the lesson" or "uploading a video". */
   what?: string;
-  /** False on a parent's own view (only the teacher collects it for now). */
+  /** False hides the form link (the teacher previewing as a family). */
   canCollect?: boolean;
+  /** A family account signing on their own device. */
+  selfSign?: boolean;
 }) {
   const firstName = studentName.split(" ")[0] || studentName;
   if (state === "setup") {
@@ -35,13 +38,15 @@ export function ConsentNeeded({
       <p className="text-[16px]">
         {consentNeededMessage(firstName)}
         {what ? ` Collect it before ${what}.` : ""}
-        {canCollect
-          ? " Open the form and hand this device to the parent or guardian. It takes a minute."
-          : " Ask the teacher for the form."}
+        {!canCollect
+          ? " Ask the teacher for the form."
+          : selfSign
+            ? " A parent or guardian can read and sign it here. It takes a minute."
+            : " Open the form and hand this device to the parent or guardian. It takes a minute."}
       </p>
       {canCollect && (
         <LinkButton href={consentPath(studentId, next)} className="min-h-12 self-start px-5">
-          Collect parent consent
+          {selfSign ? "Read and sign" : "Collect parent consent"}
         </LinkButton>
       )}
     </Card>

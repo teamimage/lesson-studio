@@ -6,6 +6,7 @@ import { AdminDeleteButton, AdminEditForm, AdminNotices, Fold } from "@/componen
 import { Card } from "@/components/ui";
 import { requireAdmin } from "@/lib/admin";
 import { formatDate } from "@/lib/format";
+import { withLessonPrivateOne } from "@/lib/private-notes";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ saved?: string; deleted?: string; error?: string }>;
@@ -22,11 +23,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const { db } = await requireAdmin();
   const { id } = await params;
   const sp = await searchParams;
-  const { data: lesson } = await db
+  const { data: found } = await db
     .from("lessons")
     .select("*, students(id, name), lesson_pieces(*), assignments(*)")
     .eq("id", id)
     .maybeSingle();
+  const lesson = await withLessonPrivateOne(db, found);
   if (!lesson) notFound();
 
   const back = `/admin/lessons/${id}`;

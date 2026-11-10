@@ -37,7 +37,11 @@ export async function savePractice(fd: FormData) {
   revalidatePath(`/family/${studentId}`);
   revalidatePath(`/students/${studentId}`);
   revalidatePath(`/students/${studentId}/brief`);
-  redirect(`/family/${studentId}?date=${date}${error ? "&error=save" : "&saved=1"}`);
+  revalidatePath(`/v3/family/${studentId}`);
+  // Version 3 Family mode saves from its own practice page and goes back there.
+  const v3Practice = `/v3/family/${studentId}/practice`;
+  const back = String(fd.get("return_to") ?? "") === v3Practice ? v3Practice : `/family/${studentId}`;
+  redirect(`${back}?date=${date}${error ? "&error=save" : "&saved=1"}`);
 }
 
 // One day's practice log, for switching days on Home practice without

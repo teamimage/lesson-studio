@@ -5,8 +5,8 @@ import { Card, LinkButton, Notice, SectionTitle, Textarea } from "@/components/u
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { ConsentForm } from "@/components/consent-form";
 import { LocalDateTime } from "@/components/local-time";
-import { requireTeacher } from "@/lib/auth";
-import { getStudent } from "@/lib/data";
+import { getViewer } from "@/lib/auth";
+import { getStudent, getTeacherForStudent } from "@/lib/data";
 import { CONSENT_RELATIONSHIPS, CONSENT_SETUP_MESSAGE, CONSENT_VERSION, consentHeading, consentPoints } from "@/lib/recording-consent";
 import { getConsentStatus, listConsents } from "@/lib/recording-consent-data";
 import { withdrawConsent } from "@/app/students/consent-actions";
@@ -26,7 +26,8 @@ const ERRORS: Record<string, string> = {
 };
 
 // Recording consent for one student: the teacher hands the iPad or phone to
-// the parent, who reads the points, signs, and hands it back. Also where the
+// the parent, who reads the points, signs, and hands it back. A family
+// account can also open it and sign on their own device. Also where the
 // consent is shown and withdrawn.
 export default function ConsentPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
@@ -41,14 +42,21 @@ function relationshipLabel(v: string): string {
 }
 
 async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
-  const { teacher } = await requireTeacher();
+  const viewer = await getViewer();
   const { id } = await params;
   const sp = await searchParams;
+  // Only the student's teacher or their linked family can read the student.
   const student = await getStudent(id);
   if (!student) notFound();
-  const [status, history] = await Promise.all([getConsentStatus(id), listConsents(id)]);
+  const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
+  const [status, history, teacher] = await Promise.all([
+    getConsentStatus(id),
+    listConsents(id),
+    isTeacher ? Promise.resolve(viewer.teacher) : getTeacherForStudent(student),
+  ]);
   const firstName = student.name.split(" ")[0] || student.name;
-  const teacherName = teacher.name || teacher.studio_name || "";
+  const teacherName = teacher?.name || teacher?.studio_name || "";
+  const home = isTeacher ? `/students/${id}` : `/family/${id}`;
   const next = typeof sp.next === "string" ? sp.next : "";
   const error = sp.error ? (ERRORS[sp.error] ?? ERRORS.save) : null;
 
@@ -56,12 +64,16 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     <Shell
       title={student.name}
       eyebrow="Recording consent"
-      back={{ href: `/students/${id}`, label: student.name }}
-      tab="studio"
+      back={{ href: home, label: isTeacher ? student.name : `${firstName}'s practice` }}
+      tab={isTeacher ? "studio" : "family"}
     >
       <div className="flex flex-col gap-5">
         {error && <Notice tone="danger">{error}</Notice>}
-        {sp.signed && <Notice tone="sage">Signed. Thank you. You can hand the device back to the teacher.</Notice>}
+        {sp.signed && (
+          <Notice tone="sage">
+            Signed. Thank you.{isTeacher ? " You can hand the device back to the teacher." : ""}
+          </Notice>
+        )}
         {sp.withdrawn && <Notice tone="amber">Consent withdrawn. {firstName} can&apos;t be recorded until a new consent is signed.</Notice>}
 
         {status.state === "setup" && <Notice tone="amber">{CONSENT_SETUP_MESSAGE}</Notice>}
@@ -75,7 +87,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               {status.consent.collectedEmail ? `, collected by ${status.consent.collectedEmail}` : ""}.
             </p>
             <div className="flex flex-wrap gap-2">
-              <LinkButton href={`/students/${id}`} className="min-h-10 px-4">
+              <LinkButton href={home} className="min-h-10 px-4">
                 Back to {firstName}
               </LinkButton>
             </div>
@@ -93,8 +105,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               <Notice tone="amber">The wording has changed since the last signature. Please read it and sign again.</Notice>
             ) : (
               <Notice tone="amber">
-                Before {firstName} can be recorded, a parent or guardian needs to read and sign this. Hand them this
-                screen.
+                Before {firstName} can be recorded, a parent or guardian needs to read and sign this.
+                {isTeacher ? " Hand them this screen." : ""}
               </Notice>
             )}
           </>
@@ -122,8 +134,9 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             <SectionTitle>Withdraw consent</SectionTitle>
             <Card className="flex flex-col gap-3">
               <p className="text-sm text-muted">
-                If the family asks to stop, withdraw here. New recordings and AI notes stop straight away. Videos already
-                recorded stay until you delete them from the lesson pages. The signed record is kept.
+                {isTeacher
+                  ? "If the family asks to stop, withdraw here. New recordings and AI notes stop straight away. Videos already recorded stay until you delete them from the lesson pages. The signed record is kept."
+                  : `To stop recordings of ${firstName}, withdraw here. New recordings and AI notes stop straight away, and ${teacherName || "the teacher"} sees that you withdrew. Ask them to delete videos already recorded. The signed record is kept.`}
               </p>
               <form action={withdrawConsent} className="flex flex-col gap-3">
                 <input type="hidden" name="student_id" value={id} />

@@ -2,9 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireTeacher } from "@/lib/auth";
+import { getViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { getStudent } from "@/lib/data";
+import { getStudent, getTeacherForStudent } from "@/lib/data";
 import { CONSENT_VERSION, consentStatement, isRelationship } from "@/lib/recording-consent";
 
 // A drawn signature, saved as a small PNG. Anything bigger than this is not
@@ -31,9 +31,12 @@ function revalidateStudent(studentId: string) {
   revalidatePath("/");
 }
 
-/** Saves a parent's or guardian's signed consent, collected on the teacher's device. */
+/**
+ * Saves a parent's or guardian's signed consent: collected on the teacher's
+ * device, or signed by the family on their own account.
+ */
 export async function signConsent(fd: FormData) {
-  const viewer = await requireTeacher();
+  const viewer = await getViewer();
   const studentId = String(fd.get("student_id") ?? "");
   const next = String(fd.get("next") ?? "");
   const back = `/students/${studentId}/consent${next ? `?next=${encodeURIComponent(next)}&` : "?"}`;
@@ -56,7 +59,9 @@ export async function signConsent(fd: FormData) {
     redirect(`${back}error=signature`);
   }
 
-  const teacherName = viewer.teacher.name || viewer.teacher.studio_name || "";
+  const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
+  const teacher = isTeacher ? viewer.teacher : await getTeacherForStudent(student);
+  const teacherName = teacher?.name || teacher?.studio_name || "";
   const supabase = await createClient();
   const { error } = await supabase.from("recording_consents").insert({
     teacher_id: student.teacher_id,
@@ -68,7 +73,7 @@ export async function signConsent(fd: FormData) {
     signature_png: signature,
     collected_by: viewer.userId,
     collected_email: viewer.email,
-    collected_how: "teacher_device",
+    collected_how: isTeacher ? "teacher_device" : "parent_account",
     statement_version: CONSENT_VERSION,
     statement: consentStatement(student.name, teacherName),
   });
@@ -82,7 +87,7 @@ export async function signConsent(fd: FormData) {
 
 /** Withdraws consent. The record is kept, stamped with who withdrew it and when. */
 export async function withdrawConsent(fd: FormData) {
-  const viewer = await requireTeacher();
+  const viewer = await getViewer();
   const studentId = String(fd.get("student_id") ?? "");
   const consentId = String(fd.get("consent_id") ?? "");
   const reason = String(fd.get("reason") ?? "").trim().slice(0, 500);

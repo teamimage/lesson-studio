@@ -9,6 +9,7 @@ import { teachingStyleFor } from "./teaching-style";
 import { DraftError, draftLesson, timeLesson, type LessonDraft } from "./draft-lesson";
 import { claudeCost, TRANSCRIPTION_MODEL, transcriptionCost, type ClaudeUsage } from "./pricing";
 import { lessonConsentBlock } from "@/lib/recording-consent-data";
+import { withLessonPrivateOne, withStudentPrivateOne } from "@/lib/private-notes";
 
 // Lesson video → transcript → drafted lesson record.
 //
@@ -50,7 +51,7 @@ export function stateOf(row: Transcript | null): ProcessState {
   return {
     status: row.status as ProcessState["status"],
     error: row.error,
-    recordingId: row.recording_id,
+    recordingId: row.recording_id ?? undefined,
     applied: draft?.applied,
     since: row.updated_at,
   };
@@ -345,11 +346,13 @@ async function applyDraft(
   replace: boolean,
   audioSeconds: number,
 ): Promise<boolean> {
-  const { data: lesson } = await db
+  const { data: found } = await db
     .from("lessons")
     .select("*, lesson_pieces(id), assignments(id)")
     .eq("id", lessonId)
     .maybeSingle();
+  // The teacher's own notes, so the AI only fills them when empty.
+  const lesson = await withLessonPrivateOne(db, found);
   if (!lesson || lesson.status !== "draft") return false;
 
   const pick = (current: string | null, next: string) => {
@@ -444,9 +447,10 @@ async function suggestReminders(db: Db, lessonId: string, d: LessonDraft, replac
 }
 
 async function draftContext(db: Db, row: Transcript) {
-  const { data: lesson } = await db.from("lessons").select("*").eq("id", row.lesson_id).single();
+  const { data: found } = await db.from("lessons").select("*").eq("id", row.lesson_id).single();
+  const lesson = await withLessonPrivateOne(db, found);
   if (!lesson) throw new Error("That lesson wasn't found.");
-  const [{ data: student }, { data: rep }, { data: prev }, { data: reminders }] = await Promise.all([
+  const [{ data: studentRow }, { data: rep }, { data: prev }, { data: reminders }] = await Promise.all([
     db.from("students").select("*").eq("id", lesson.student_id).single(),
     db.from("repertoire").select("title, status").eq("student_id", lesson.student_id).order("started_on"),
     db
@@ -465,6 +469,7 @@ async function draftContext(db: Db, row: Transcript) {
       .eq("student_id", lesson.student_id)
       .in("status", ["active", "suggested"]),
   ]);
+  const student = await withStudentPrivateOne(db, studentRow);
   if (!student) throw new Error("That student wasn't found.");
   const style = await teachingStyleFor(db, student.teacher_id);
   return {
@@ -519,4 +524,66 @@ function now() {
 }
 function round(n: number) {
   return Math.round(n * 1_000_000) / 1_000_000;
+}
+
+/**
+ * A practice switched to a lesson (src/lib/convert.ts): Claude drafts the
+ * lesson from the practice's transcript. The transcript is saved as the
+ * lesson's (with no video behind it) so Draft again works later; before
+ * convert-lesson-practice.sql is run that save fails and the draft is still
+ * written into the lesson.
+ */
+export async function draftFromTranscript(
+  teacherId: string,
+  lessonId: string,
+  transcript: string,
+  audioSeconds: number,
+): Promise<ProcessState> {
+  const blocked = await lessonConsentBlock(lessonId);
+  if (blocked) return { status: "error", error: blocked };
+  const db = await createClient();
+  const stamp = now();
+  const { data: saved } = await db
+    .from("lesson_transcripts")
+    .insert({
+      teacher_id: teacherId,
+      lesson_id: lessonId,
+      recording_id: null,
+      status: "drafting",
+      transcript,
+      audio_seconds: audioSeconds || null,
+      updated_at: stamp,
+    })
+    .select("*")
+    .maybeSingle();
+  if (saved) return runDraft(db, teacherId, saved, false);
+
+  // No row to keep it on: draft straight into the lesson.
+  const row = {
+    id: "",
+    teacher_id: teacherId,
+    lesson_id: lessonId,
+    recording_id: null,
+    status: "drafting",
+    provider_job_id: null,
+    audio_seconds: audioSeconds,
+    transcript,
+    draft: null,
+    error: null,
+    created_at: stamp,
+    updated_at: stamp,
+  } as Transcript;
+  let usage: ClaudeUsage[] = [];
+  try {
+    const out = await draftLesson(await draftContext(db, row));
+    usage = out.usage;
+    await logClaude(db, teacherId, row, usage);
+    await applyDraft(db, lessonId, out.draft, false, audioSeconds);
+    await suggestReminders(db, lessonId, out.draft, false);
+    return { status: "done" };
+  } catch (e) {
+    if (e instanceof DraftError) usage = e.usage;
+    await logClaude(db, teacherId, row, usage);
+    return { status: "error", error: messageOf(e) };
+  }
 }

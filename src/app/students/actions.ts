@@ -20,7 +20,7 @@ function studentFields(fd: FormData) {
     method: str(fd, "method") ?? "Suzuki",
     current_book: str(fd, "current_book"),
     goals: str(fd, "goals"),
-    notes: str(fd, "notes"),
+    notes: String(fd.get("notes") ?? "").trim(), // teacher-only; "" clears it (private-notes.sql)
     lesson_day: str(fd, "lesson_day"),
     lesson_time: str(fd, "lesson_time"),
     active: fd.has("active") ? fd.getAll("active").includes("on") : true,

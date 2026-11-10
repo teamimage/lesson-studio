@@ -11,6 +11,7 @@ import { latestTranscript, start as startProcessing } from "@/lib/ai/process-les
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { CONSENT_SETUP_MESSAGE, consentNeededMessage } from "@/lib/recording-consent";
 import { lessonMainId, setLessonMain } from "@/lib/main-camera";
+import { lengthFromVideos } from "@/lib/lesson-length";
 
 export type StartRecordingInput = {
   lessonId: string;
@@ -91,6 +92,8 @@ export async function finishRecording(id: string): Promise<{ ok: boolean }> {
   const { data: exists } = await supabase.storage.from(RECORDINGS_BUCKET).exists(rec.storage_path);
   if (!exists) return { ok: false };
   await supabase.from("recordings").update({ status: "ready" }).eq("id", id);
+  // The lesson is as long as its video (unless the teacher typed a length).
+  await lengthFromVideos(supabase, rec.lesson_id);
   // Start the fast streaming copy right away. Best effort: if it fails, the
   // lesson page shows why and offers Try again; the original still plays.
   await syncStream({ ...rec, status: "ready" });
@@ -135,6 +138,7 @@ export async function deleteRecording(fd: FormData) {
   // is touched, so the video stays as it was.
   if (error) redirect(`/lessons/${rec.lesson_id}?video=setup#recordings`);
   if (rec.stream_uid) await deleteStream(rec.stream_uid);
+  await lengthFromVideos(supabase, rec.lesson_id);
   revalidateRecording(rec);
 }
 
@@ -153,6 +157,7 @@ export async function restoreRecording(fd: FormData) {
   // Best effort, as on upload: if it fails, the lesson page offers Try again
   // and the original plays meanwhile.
   await syncStream(rec);
+  await lengthFromVideos(supabase, rec.lesson_id);
   revalidateRecording(rec);
 }
 
@@ -193,6 +198,8 @@ export async function setRecordingStart(
     .select("lesson_id")
     .maybeSingle();
   if (!rec) return { ok: false };
+  // Start times decide whether two videos overlap (angles) or follow on.
+  await lengthFromVideos(supabase, rec.lesson_id);
   revalidatePath(`/lessons/${rec.lesson_id}`);
   return { ok: true };
 }

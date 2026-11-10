@@ -10,6 +10,7 @@ import { findTodayLesson } from "@/lib/lesson-today";
 import { pageFiles, parsePages, parseRect, type ScorePage } from "@/lib/stand-timeline";
 import { isMat3, mapBars, mapRect, refit, type Mat3 } from "@/lib/page-fit";
 import { parseMusicLinks } from "@/lib/music-links";
+import { parseDetails, type ScoreDetails } from "@/lib/score-analysis";
 import type { Json } from "@/lib/supabase/types";
 import { saveBarPages } from "@/lib/ai/number-bars";
 import { MUSIC_RIGHTS_STATEMENT, MUSIC_RIGHTS_VERSION, type RightsConfirmation } from "@/lib/music-rights";
@@ -166,7 +167,8 @@ export async function finishScore(
       source_path: src?.path ?? null,
       source_name: src ? String(src.name).slice(0, 200) : null,
       source_size: src ? Math.max(0, Math.round(Number(src.size) || 0)) : null,
-      analysis: null,
+      // Waits for the teacher to check the pages and details (confirmScore).
+      analysis: { review: "pending" },
       analysis_status: "none",
       analysis_error: null,
       // Also stops a read of the old file from saving over this one.
@@ -395,4 +397,43 @@ async function moveMarks(scoreId: string, studentId: string, moves: Map<number, 
         .eq("id", row.id);
     }),
   );
+}
+
+/**
+ * The teacher has checked a new upload: the digitized pages look right and
+ * the details are corrected. It goes into the music library (and onto the
+ * stand) from here.
+ */
+export async function confirmScore(
+  scoreId: string,
+  input: { title: string; details: ScoreDetails },
+): Promise<{ ok: boolean; error?: string }> {
+  const { email } = await requireTeacher();
+  const supabase = await createClient();
+  const { data: score } = await supabase.from("scores").select("*").eq("id", String(scoreId)).maybeSingle();
+  if (!score) return { ok: false, error: "That music wasn't found." };
+  if (score.analysis_status === "running") return { ok: false, error: "Claude is still reading the music. One moment." };
+  const title = String(input?.title ?? "").trim().slice(0, 120) || score.title;
+  const raw = (score.analysis && typeof score.analysis === "object" && !Array.isArray(score.analysis)
+    ? score.analysis
+    : {}) as Record<string, unknown>;
+  const analysis = {
+    ...raw,
+    details: parseDetails(input?.details),
+    review: "confirmed",
+    confirmed_at: new Date().toISOString(),
+    confirmed_by: email,
+  };
+  const { error } = await supabase
+    .from("scores")
+    .update({
+      analysis: analysis as unknown as Json,
+      title,
+      title_auto: title === score.title ? score.title_auto : false,
+    })
+    .eq("id", score.id);
+  if (error) return { ok: false, error: "Couldn't save. Try again." };
+  revalidatePath(`/students/${score.student_id}/music`);
+  revalidatePath(`/students/${score.student_id}`);
+  return { ok: true };
 }

@@ -28,6 +28,8 @@ type CfVideo = {
   readyToStream?: boolean;
   status?: { state?: string; errorReasonCode?: string; errorReasonText?: string; pctComplete?: string };
   playback?: { hls?: string };
+  /** Seconds; -1 or missing until Cloudflare has read the file. */
+  duration?: number;
 };
 
 type CfResponse<T> = { success: boolean; result: T; errors?: { message?: string }[] };
@@ -55,6 +57,8 @@ export type StreamState = {
   error: string | null;
   /** Cloudflare's own progress while encoding, 0 to 100, when it says. */
   percent: number | null;
+  /** The video's length in seconds, once Cloudflare knows it. */
+  durationSeconds: number | null;
 };
 
 function toState(v: CfVideo): StreamState {
@@ -65,6 +69,7 @@ function toState(v: CfVideo): StreamState {
       hlsUrl: null,
       error: v.status?.errorReasonText || v.status?.errorReasonCode || "Cloudflare couldn't prepare this video.",
       percent: null,
+      durationSeconds: null,
     };
   }
   const pct = Number(v.status?.pctComplete);
@@ -73,6 +78,7 @@ function toState(v: CfVideo): StreamState {
     hlsUrl: v.playback?.hls ?? null,
     error: null,
     percent: Number.isFinite(pct) ? Math.round(pct) : null,
+    durationSeconds: typeof v.duration === "number" && v.duration > 0 ? v.duration : null,
   };
 }
 

@@ -51,7 +51,7 @@ import { PracticeViewToggle } from "@/components/practice-view-toggle";
 import { DayPractice, type DayItem, type DayLog } from "@/components/day-practice";
 
 type Params = Promise<{ studentId: string }>;
-type SP = Promise<{ date?: string; saved?: string; error?: string }>;
+type SP = Promise<{ date?: string; saved?: string; error?: string; welcome?: string }>;
 
 // The parent's page for one child: the practice plan from the approved
 // lesson, and a one-tap practice log for a chosen day (today by default).
@@ -210,6 +210,12 @@ async function Body({
       >
         <div className="flex flex-col gap-6">
           {toggle && <PracticeViewToggle view={view} />}
+          {sp.welcome && (
+            <Notice tone="plum">
+              Welcome! This is {firstName}&apos;s practice page. Start practice records a session for{" "}
+              {teacher?.name || "the teacher"} to see; the plan from the last lesson is below.
+            </Notice>
+          )}
           {sp.saved && <Notice tone="sage">Saved. Nice work.</Notice>}
           {sp.error && (
             <Notice tone="danger">Couldn&apos;t save that. Try again.</Notice>
@@ -228,7 +234,8 @@ async function Body({
               state={consent.state}
               next={`/family/${studentId}`}
               what="recording practice"
-              canCollect={isTeacher}
+              canCollect={isTeacher || !viewer.teacher}
+              selfSign={!isTeacher}
             />
           )}
 
@@ -278,11 +285,12 @@ async function Body({
           </section>
 
           {recentSessions.length > 0 && (
-            <section>
+            <section id="practice-reviews" className="scroll-mt-4">
               <SectionTitle>Practice reviews</SectionTitle>
               <PracticeSessionList
                 sessions={recentSessions}
                 teacherView={isTeacher}
+                canSwitch={ownTeacher}
               />
             </section>
           )}

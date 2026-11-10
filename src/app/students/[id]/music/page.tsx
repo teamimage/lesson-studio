@@ -5,6 +5,9 @@ import { Button, Card, EmptyState, Pill, SectionTitle, cx } from "@/components/u
 import { ReplaceScoreFile, ScoreUploader } from "@/components/score-uploader";
 import { DeleteScoreButton, ReadMusicButton, RefreshWhileReading } from "@/components/score-actions";
 import { ScanButton, type ScanSource } from "@/components/scan-music";
+import { ConfirmScore } from "@/components/confirm-score";
+import { ScoreTitleField } from "@/components/score-title-field";
+import { EMPTY_DETAILS } from "@/lib/score-analysis";
 import { requireTeacher } from "@/lib/auth";
 import { getStudent } from "@/lib/data";
 import { listScores } from "@/lib/scores";
@@ -44,12 +47,15 @@ async function Body({ params }: { params: Params }) {
       includeArchived: true,
       withSourceLinks: true,
       withOriginals: true,
+      includePending: true,
     }),
     melodyProgressFor(id),
     listReferenceRecordings({ withUrls: true }),
   ]);
-  const active = scores.filter((s) => !s.archived);
-  const archived = scores.filter((s) => s.archived);
+  const pending = scores.filter((s) => s.analysis?.review === "pending");
+  const inLibrary = scores.filter((s) => s.analysis?.review !== "pending");
+  const active = inLibrary.filter((s) => !s.archived);
+  const archived = inLibrary.filter((s) => s.archived);
   const books = bookChoices(
     suzukiBookTitles(student.instrument),
     booksFor(student.instrument),
@@ -116,9 +122,29 @@ async function Body({ params }: { params: Params }) {
 
         <section>
           <SectionTitle>Add sheet music</SectionTitle>
-          <Card>
-            <ScoreUploader studentId={id} />
-          </Card>
+          <div className="flex flex-col gap-3">
+            {pending.map((s) => (
+              <ConfirmScore
+                key={s.id}
+                score={{
+                  id: s.id,
+                  title: s.title,
+                  pages: s.pages.map((p, i) => ({ n: i + 1, url: p.url, w: p.w, h: p.h })),
+                  scan: scanSources(s),
+                  status: s.analysisStatus,
+                  error: s.analysisError,
+                  book: s.analysis?.book ?? "",
+                  details: s.analysis?.details ?? EMPTY_DETAILS,
+                  sections: s.sections,
+                  viewer: viewerHref(id, s.id),
+                  hasOriginals: s.pages.some((p) => p.original),
+                }}
+              />
+            ))}
+            <Card>
+              <ScoreUploader studentId={id} />
+            </Card>
+          </div>
         </section>
 
         {archived.length > 0 && (
@@ -208,10 +234,12 @@ function ScoreRow({
   const cover = score.pages[0];
   const kind = SCORE_KINDS.find((k) => k.value === score.kind)?.label ?? score.kind;
   return (
-    <li className="flex gap-3 rounded-2xl border border-rule bg-sheet p-3">
+    // Phones: the cover floats top-left and the text wraps around it, then runs full width
+    // underneath (no empty strip below the cover). Wider screens keep two columns.
+    <li className="flow-root rounded-2xl border border-rule bg-sheet p-3 sm:flex sm:gap-3">
       <Link
         href={viewerHref(studentId, score.id)}
-        className="h-24 w-[72px] shrink-0 overflow-hidden rounded-lg border border-rule bg-white"
+        className="float-left mb-2 mr-3 block h-24 w-[72px] shrink-0 overflow-hidden rounded-lg border border-rule bg-white sm:float-none sm:mb-0 sm:mr-0"
         aria-label={`View ${score.title}`}
       >
         {cover?.url && (
@@ -219,21 +247,30 @@ function ScoreRow({
           <img src={cover.url} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
         )}
       </Link>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <form action={renameScore} className="flex items-center gap-2">
+      <div className="space-y-2 sm:min-w-0 sm:flex-1">
+        <form action={renameScore} className="flex items-start gap-2">
           <input type="hidden" name="score_id" value={score.id} />
-          <input
-            name="title"
-            defaultValue={score.title}
-            className="min-h-9 min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-1 font-semibold hover:border-rule focus:border-accent focus:bg-paper"
-          />
-          <button className="text-sm font-medium text-accent-ink">Save</button>
+          <ScoreTitleField defaultValue={score.title} />
+          <button className="min-h-9 text-sm font-medium text-accent-ink">Save</button>
         </form>
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
           <Pill tone="accent">{kind}</Pill>
           {score.pages.length} page{score.pages.length === 1 ? "" : "s"}
           {score.pages.length === 0 && <Pill tone="amber">Upload didn&apos;t finish</Pill>}
         </div>
+        {score.analysis && Object.values(score.analysis.details).some(Boolean) && (
+          <p className="text-sm text-muted">
+            {[
+              score.analysis.details.composer,
+              score.analysis.details.arranger && `arr. ${score.analysis.details.arranger}`,
+              score.analysis.details.publisher,
+              score.analysis.details.published,
+              score.analysis.details.tempo && `“${score.analysis.details.tempo}”`,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        )}
         {score.source && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <span className="min-w-0 truncate text-muted">
@@ -257,7 +294,7 @@ function ScoreRow({
           </p>
         )}
         {score.pages.length > 0 && (
-          <Link href={viewerHref(studentId, score.id)} className="text-sm font-medium text-accent-ink underline">
+          <Link href={viewerHref(studentId, score.id)} className="block w-fit text-sm font-medium text-accent-ink underline">
             View the music (doesn&apos;t open the stand)
           </Link>
         )}
@@ -404,7 +441,7 @@ function MusicReading({
   }
   const current = a.sections.filter((s) => s.status === "current");
   return (
-    <details className="group rounded-xl border border-rule bg-paper px-3 py-2 text-sm" open={a.sections.length <= 12}>
+    <details className="group flow-root rounded-xl border border-rule bg-paper px-3 py-2 text-sm" open={a.sections.length <= 12}>
       <summary className="cursor-pointer list-none">
         <span className="font-semibold">
           {a.sections.length} piece{a.sections.length === 1 ? "" : "s"} found
