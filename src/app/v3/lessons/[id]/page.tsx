@@ -10,6 +10,9 @@ import { Button, Card, LinkButton, Pill, Row, SectionTitle } from "@/components/
 import { approveLesson, deleteLesson, unapproveLesson } from "@/app/lessons/actions";
 import { requireTeacher } from "@/lib/auth";
 import { getLesson, getStudent } from "@/lib/data";
+import { createClient } from "@/lib/supabase/server";
+import { reconcileLengths } from "@/lib/lesson-length";
+import { LengthFlag } from "@/components/length-flag";
 import { daysBetween, formatDate, humanize, todayISO } from "@/lib/format";
 import { listPeriods } from "@/lib/practice/period";
 import { PeriodReviewWriter } from "@/components/period-review-writer";
@@ -55,6 +58,8 @@ export default function V3LessonPage({ params, searchParams }: { params: Params;
 async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
   await requireTeacher();
   const { id } = await params;
+  // The length follows the video (Cloudflare's reading is trusted); flagged when it can't be read.
+  const lengthCheck = (await reconcileLengths(await createClient(), [id], { checkCloudflare: true }))[id];
   const { approved, upload, video } = await searchParams;
   const [lesson, recordings, archived, standEvents, ai] = await Promise.all([
     getLesson(id),
@@ -193,6 +198,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             </Link>
           </Card>
         )}
+        <LengthFlag check={lengthCheck} lessonId={id} studentId={student.id} />
         {closedPeriod && <PeriodReviewWriter studentId={student.id} start={closedPeriod.start} auto quiet />}
 
         {/* The summary */}
