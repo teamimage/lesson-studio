@@ -27,8 +27,11 @@ export function PracticeSessionList({
   teacherView = false,
   compact = false,
   canSwitch = teacherView,
+  flat = false,
 }: {
   sessions: PracticeSessionView[];
+  /** Everything shown at once, no open/close of its own (inside a card that already has Show more). */
+  flat?: boolean;
   teacherView?: boolean;
   /** Show "This was a lesson" (needs the teacher's account, also in Family mode). */
   canSwitch?: boolean;
@@ -37,9 +40,9 @@ export function PracticeSessionList({
 }) {
   if (!sessions.length) return null;
   return (
-    <div className="flex flex-col gap-2">
+    <div className={flat ? "flex flex-col gap-4 [&>*+*]:border-t [&>*+*]:border-rule [&>*+*]:pt-4" : "flex flex-col gap-2"}>
       {sessions.map((s) => (
-        <SessionCard key={s.id} s={s} teacherView={teacherView} compact={compact} canSwitch={canSwitch} />
+        <SessionCard key={s.id} s={s} teacherView={teacherView} compact={compact} canSwitch={canSwitch} flat={flat} />
       ))}
     </div>
   );
@@ -50,11 +53,13 @@ function SessionCard({
   teacherView,
   compact,
   canSwitch,
+  flat,
 }: {
   s: PracticeSessionView;
   teacherView: boolean;
   compact: boolean;
   canSwitch: boolean;
+  flat: boolean;
 }) {
   const r = s.review;
   const working = s.status === "transcribing" || s.status === "analyzing";
@@ -62,8 +67,53 @@ function SessionCard({
   const checks = r ? checklist(r, s.titles) : [];
   const done = checks.filter((c) => c.practiced).length;
 
+  // Flat: no frame and no open/close of its own, so the text runs the full
+  // width of the card it sits in (a history card that already has Show more).
+  if (flat) {
+    return (
+      <div className="flex flex-col gap-3">
+        {working && <PracticePoller id={s.id} />}
+        <div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-medium">
+                {formatDate(s.practice_date, "weekday")}, <LocalTime iso={s.started_at} />
+              </span>
+              {s.media === "video" && <Pill>video</Pill>}
+              {(s as { recording_missing?: boolean }).recording_missing && (
+                <Pill tone="danger">! no recording</Pill>
+              )}
+              {s.status === "done" && s.counted === false && <Pill tone="amber">not counted</Pill>}
+              {working && <Pill tone="plum">listening…</Pill>}
+              {s.status === "uploading" && <Pill>{stuckUpload ? "upload didn't finish" : "sending…"}</Pill>}
+              {s.status === "error" && <Pill tone="danger">review didn&apos;t finish</Pill>}
+            </div>
+            <div className="text-sm text-muted">
+              {minutes(s.duration_seconds)} session · {minutes(s.playing_seconds)} playing
+              {checks.length > 0 ? ` · ${done} of ${checks.length} checked` : ""}
+            </div>
+            {r?.summary && (
+              // The whole summary: the card around it does the folding.
+              <div className="mt-1 text-[16px]">
+                {r.summary}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 text-[16px]">
+          {s.status === "error" && <div className="text-sm text-danger">{s.error || "The review didn't finish."}</div>}
+          {working && <div className="text-sm text-muted">Listening back to the practice. This takes a minute or two.</div>}
+          {r && <PracticeReviewBody review={r} titles={s.titles} compact={compact} teacherView={teacherView} />}
+          <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canRedo={teacherView && s.status === "done" && !!r}
+            canSwitch={canSwitch && (s.status === "done" || s.status === "error")}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Card className="p-0">
+    <Card className="!p-0">
       {working && <PracticePoller id={s.id} />}
       <details className="group">
         <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-2.5">
