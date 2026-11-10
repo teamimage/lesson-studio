@@ -5,7 +5,6 @@ import { LessonSheet } from "@/components/lesson-sheet";
 import { PrintButton } from "@/components/print-button";
 import { getViewer } from "@/lib/auth";
 import { getLesson, getStudent, getTeacherForStudent } from "@/lib/data";
-import { listActiveReminders } from "@/lib/reminders";
 
 type Params = Promise<{ id: string }>;
 
@@ -25,7 +24,7 @@ async function Body({ params }: { params: Params }) {
   if (!lesson) notFound();
   const student = await getStudent(lesson.student_id);
   if (!student) notFound();
-  const [teacher, reminders] = await Promise.all([getTeacherForStudent(student), listActiveReminders(student.id)]);
+  const teacher = await getTeacherForStudent(student);
   const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
   const backHref = isTeacher ? `/lessons/${id}` : `/family/${student.id}`;
 
@@ -43,7 +42,7 @@ async function Body({ params }: { params: Params }) {
         </div>
       </div>
 
-      <LessonSheet lesson={lesson} student={student} teacher={teacher} reminders={reminders} />
+      <LessonSheet lesson={lesson} student={student} teacher={teacher} />
     </div>
   );
 }

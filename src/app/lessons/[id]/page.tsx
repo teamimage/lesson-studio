@@ -38,8 +38,6 @@ import { applyBarMap } from "@/lib/bar-map";
 import { pageRange } from "@/lib/score-analysis";
 import { getUiVersion } from "@/lib/ui-version-server";
 import { Fold } from "@/components/fold";
-import { ReminderEditor } from "@/components/reminder-editor";
-import { listReminders } from "@/lib/reminders";
 import { LessonToPractice } from "@/components/switch-recording";
 
 type Params = Promise<{ id: string }>;
@@ -70,12 +68,11 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   // A new lesson closes the practice period before it: write that review now
   // (quietly, in the background) so it is ready for the teacher and family.
   const fresh = lesson.status === "draft" && Math.abs(daysBetween(lesson.lesson_date, todayISO())) <= 1;
-  const [student, scores, periods, consent, reminders] = await Promise.all([
+  const [student, scores, periods, consent] = await Promise.all([
     getStudent(lesson.student_id),
     listScores(lesson.student_id, { includeArchived: true }),
     fresh ? listPeriods(lesson.student_id, 2) : Promise.resolve([]),
     getConsentStatus(lesson.student_id),
-    listReminders(lesson.student_id),
   ]);
   if (!student) notFound();
   const isDraft = lesson.status === "draft";
@@ -367,16 +364,6 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 <AssignmentList assignments={lesson.assignments} jumps={jumps} />
               )}
             </VoiceEditSection>
-          </section>
-
-          <section id="reminders" className="scroll-mt-4">
-            <SectionTitle>Technique &amp; posture reminders</SectionTitle>
-            <ReminderEditor
-              studentId={student.id}
-              reminders={reminders}
-              back={`/lessons/${id}#reminders`}
-              lessonId={id}
-            />
           </section>
 
           <section id="timeline" className="scroll-mt-4">

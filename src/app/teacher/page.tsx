@@ -12,7 +12,6 @@ import { listLessonMarks } from "@/lib/lesson-marks";
 import { monthOf, monthRange } from "@/lib/practice/month";
 import { DeskPanels } from "@/components/desk-panels";
 import { LessonSheet } from "@/components/lesson-sheet";
-import { listActiveReminders } from "@/lib/reminders";
 import { PreLessonBrief } from "@/components/pre-lesson-brief";
 import { Shell } from "@/components/shell";
 import { StudentPicker } from "@/components/student-picker";
@@ -91,7 +90,7 @@ async function Desk({ searchParams }: { searchParams: SearchParams }) {
 async function StudentPanel({ student }: { student: Student }) {
   const id = student.id;
   const today = todayISO();
-  const [lessons, week, month, repertoire, recordings, music, teacher, practiceDays, consent, ui, reminders, lessonDays] = await Promise.all([
+  const [lessons, week, month, repertoire, recordings, music, teacher, practiceDays, consent, ui, lessonDays] = await Promise.all([
     listLessons(id, 20),
     getPracticeWeek(id),
     listPracticeRange(id, 28),
@@ -102,7 +101,6 @@ async function StudentPanel({ student }: { student: Student }) {
     listPracticeDays(id, ...monthRange(monthOf(today))),
     getConsentStatus(id),
     getUiVersion(),
-    listActiveReminders(id),
     listLessonMarks(id, ...monthRange(monthOf(today)), today),
   ]);
   const proposed = ui === "proposed";
@@ -208,7 +206,7 @@ async function StudentPanel({ student }: { student: Student }) {
               showRecordButton={false}
             />
           }
-          sheet={plan ? <LessonSheet lesson={plan} student={student} teacher={teacher} reminders={reminders} /> : null}
+          sheet={plan ? <LessonSheet lesson={plan} student={student} teacher={teacher} /> : null}
         />
         <div className="text-sm">
           <span className="text-muted">Last lesson:</span>{" "}
