@@ -34,6 +34,11 @@ async function Body({ searchParams }: { searchParams: SP }) {
           <AdminBody searchParams={searchParams} />
         </Fold>
       )}
+      <Link href="/craft" className="flex min-h-12 items-center gap-3 rounded-2xl border border-rule bg-sheet/60 px-4 py-2 text-ink no-underline">
+        <span className="font-display text-[19px] font-semibold">Craft</span>
+        <span className="text-sm text-muted">programs and reading for your own teaching</span>
+        <span aria-hidden className="ml-auto text-xl text-muted">›</span>
+      </Link>
       <p className="px-1 text-sm text-muted">
         Students are added and edited from the{" "}
         <Link href="/v3/students" className="text-accent-ink underline">
