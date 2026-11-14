@@ -80,6 +80,7 @@ function SessionCard({
                 {formatDate(s.practice_date, "weekday")}, <LocalTime iso={s.started_at} />
               </span>
               {s.media === "video" && <Pill>video</Pill>}
+              {s.with_helper && <Pill>with a helper</Pill>}
               {(s as { recording_missing?: boolean }).recording_missing && (
                 <Pill tone="danger">! no recording</Pill>
               )}
@@ -123,6 +124,7 @@ function SessionCard({
                 {formatDate(s.practice_date, "weekday")}, <LocalTime iso={s.started_at} />
               </span>
               {s.media === "video" && <Pill>video</Pill>}
+              {s.with_helper && <Pill>with a helper</Pill>}
               {(s as { recording_missing?: boolean }).recording_missing && (
                 <Pill tone="danger">! no recording</Pill>
               )}

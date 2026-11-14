@@ -368,6 +368,7 @@ async function contextFor(db: Db, s: PracticeSession) {
     currentPieces: currentPieces(repertoire ?? [], assignments.map((a) => a.title)),
     durationSeconds: s.duration_seconds,
     playingSeconds: s.playing_seconds,
+    withHelper: !!s.with_helper,
     activity: activityText(activity),
     transcript: s.transcript ?? "",
     scales,

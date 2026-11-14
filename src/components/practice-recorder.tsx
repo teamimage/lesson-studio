@@ -85,18 +85,50 @@ function saveChecks(studentId: string, checks: StoredCheck[]) {
   } catch {}
 }
 
+function helperKey(studentId: string) {
+  return `ls-with-helper:${studentId}`;
+}
+
 export function PracticeRecorder({
   studentId,
   hasPlan,
   instrument,
+  helperDefault,
 }: {
   studentId: string;
   hasPlan: boolean;
   instrument: string;
+  /** How "Practicing with someone else?" was set for this student's last practice. */
+  helperDefault?: { value: boolean; at: string | null };
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
   const [withVideo, setWithVideo] = useState(false);
+  // "Practicing with someone else?": a parent or helper is giving instruction.
+  // Comes up as last time for this student: the last practice's setting, or a
+  // newer change made on this device.
+  const [withHelper, setWithHelperState] = useState(!!helperDefault?.value);
+  const withHelperRef = useRef(!!helperDefault?.value);
+  const setWithHelper = (v: boolean) => {
+    withHelperRef.current = v;
+    setWithHelperState(v);
+    try {
+      window.localStorage.setItem(helperKey(studentId), JSON.stringify({ v, at: Date.now() }));
+    } catch {}
+  };
+  useEffect(() => {
+    let local: { v?: unknown; at?: unknown } | null = null;
+    try {
+      local = JSON.parse(window.localStorage.getItem(helperKey(studentId)) ?? "null");
+    } catch {}
+    const serverAt = helperDefault?.at ? Date.parse(helperDefault.at) : 0;
+    if (local && typeof local.v === "boolean" && typeof local.at === "number" && local.at > serverAt) {
+      withHelperRef.current = local.v;
+      // Reading browser storage has to wait until after the first render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setWithHelperState(local.v);
+    }
+  }, [studentId, helperDefault?.at]);
   const [camera, setCamera] = useState<"user" | "environment">("user");
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(-100);
@@ -440,6 +472,7 @@ export function PracticeRecorder({
       tuning: checksRef.current
         .map((c): TuningCheck => ({ t: Math.round((c.wall - t0.wall.getTime()) / 1000), s: c.s, ok: c.ok }))
         .filter((c) => c.t >= -TUNING_VALID_SECONDS),
+      withHelper: withHelperRef.current,
     };
     await upload(blob, input);
   }
@@ -623,6 +656,15 @@ export function PracticeRecorder({
             Start practice
           </Button>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[16px]">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={withHelper}
+                onChange={(e) => setWithHelper(e.target.checked)}
+                className="h-5 w-5 accent-[var(--plum)]"
+              />
+              Practicing with someone else?
+            </label>
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
