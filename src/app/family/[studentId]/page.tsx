@@ -47,6 +47,10 @@ import { getUiVersion } from "@/lib/ui-version-server";
 import { getPracticeView } from "@/lib/practice-view-server";
 import { PracticeViewToggle } from "@/components/practice-view-toggle";
 import { DayPractice, type DayItem, type DayLog } from "@/components/day-practice";
+import { Fold } from "@/components/fold";
+import { StoreView } from "@/components/store-view";
+import { storeForStudent } from "@/lib/store-data";
+import { layoutOf } from "@/lib/store";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ date?: string; saved?: string; error?: string; welcome?: string }>;
@@ -102,6 +106,7 @@ async function Body({
       listPeriods(studentId),
       getConsentStatus(studentId),
     ]);
+  const storeItems = teacher ? await storeForStudent(teacher.id, student.instrument) : [];
   const monthSpan = monthRange(monthOf(today));
   const [practiceDays, lessonDays] = await Promise.all([
     listPracticeDays(studentId, ...monthSpan),
@@ -342,6 +347,21 @@ async function Body({
               <SectionTitle>Lesson video</SectionTitle>
               <RecordingList recordings={recordings} />
             </section>
+          )}
+
+          {teacher && storeItems.length > 0 && (
+            <Fold
+              id="store"
+              title="Studio store"
+              meta={`${storeItems.length} item${storeItems.length === 1 ? "" : "s"} from ${teacher.name || "your teacher"}`}
+            >
+              <StoreView
+                products={storeItems}
+                teacherId={teacher.id}
+                layout={layoutOf(teacher)}
+                note={teacher.store_note}
+              />
+            </Fold>
           )}
         </div>
       </VideoPopupProvider>
