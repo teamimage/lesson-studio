@@ -1352,6 +1352,36 @@ export type Database = {
         Update: { id?: string; product_id?: string | null; teacher_id?: string | null; user_id?: string | null; created_at?: string };
         Relationships: [];
       };
+      quote_history: {
+        Row: {
+          id: string;
+          user_id: string;
+          shown_on: string;
+          quote_id: string;
+          vote: number | null;
+          voted_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          shown_on: string;
+          quote_id: string;
+          vote?: number | null;
+          voted_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          shown_on?: string;
+          quote_id?: string;
+          vote?: number | null;
+          voted_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       student_reminders: {
         Row: {
           id: string;
