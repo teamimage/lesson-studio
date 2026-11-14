@@ -24,7 +24,7 @@ export type StylePurpose = "practice" | "period" | "lesson";
 const TONE_RULES: Record<ReviewTone, Record<StylePurpose, string>> = {
   strict: {
     practice:
-      "Review tone: STRICT. Praise only what the evidence clearly earns; when nothing earned it, say nothing positive rather than invent it. Name poor practice method (restarting from the top and stalling, play-throughs without fixing anything, skipped assignments, noodling) plainly, with the numbers. Grade without any curve. Never harsh, sarcastic or shaming: a child reads this. Factual, short, kind in manner, firm in substance.",
+      "Review tone: STRICT. Praise only what the evidence clearly earns; when nothing earned it, say nothing positive rather than invent it. Name poor practice method (restarting from the top and stalling, play-throughs without fixing anything, skipped assignments) plainly, with the numbers. Grade without any curve. Never harsh, sarcastic or shaming: a child reads this. Factual, short, kind in manner, firm in substance.",
     period:
       "Review tone: STRICT. Praise only what the period clearly earned. Name missed days, skipped assignments, poor practice method and intonation plainly with the numbers. Never harsh or shaming.",
     lesson:

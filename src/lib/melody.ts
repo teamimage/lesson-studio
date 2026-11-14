@@ -166,7 +166,9 @@ export function matchMusic(notes: Note[], sources: MelodySource[], skip: { start
     const flush = () => {
       const bars = [...new Set(cluster.flatMap((c) => c.bars))];
       if (cluster.length >= MIN_HITS && bars.length >= 2) {
-        const total = new Set(sources[src].section.bars.map((b) => b.bar)).size;
+        // The number of the last bar, so it agrees with the method summary
+        // (bars with only rests are missing from the melody).
+        const total = Math.max(...sources[src].section.bars.map((b) => b.bar));
         out.push({
           title: sources[src].section.display,
           score_title: sources[src].scoreTitle,
@@ -187,14 +189,16 @@ export function matchMusic(notes: Note[], sources: MelodySource[], skip: { start
     flush();
   }
 
-  // Where two pieces claim the same stretch, keep the surer one.
-  out.sort((a, b) => b.hits - a.hits);
-  const kept: MusicMatch[] = [];
-  for (const m of out) {
-    const clash = kept.find((k) => m.start < k.end && k.start < m.end && k.title !== m.title);
-    if (clash && clash.hits >= m.hits * 2) continue;
-    kept.push(m);
-  }
+  // Where two or more pieces claim the same stretch, it is usually something
+  // else entirely (a scale the scale finder missed matches every piece with
+  // a run in that key). Keep a match only when it is far surer than every
+  // other piece claiming that time; otherwise drop them all rather than
+  // name a piece that wasn't played.
+  const overlaps = (a: MusicMatch, b: MusicMatch) => {
+    const shared = Math.min(a.end, b.end) - Math.max(a.start, b.start);
+    return shared > 0 && shared >= Math.min(a.end - a.start, b.end - b.start) / 2;
+  };
+  const kept = out.filter((m) => !out.some((o) => o.title !== m.title && overlaps(m, o) && o.hits * 3 > m.hits));
   return kept.sort((a, b) => a.start - b.start);
 }
 
