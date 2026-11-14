@@ -12,7 +12,7 @@ import { tunedWithTuner } from "./tuner";
 import { extractNotes } from "./notes";
 import { findScales, scaleLabel, summarizeScales, type ScaleSummary } from "./scales";
 import { addPieceGroups, intonationText, sessionIntonation, withPrevious } from "./intonation";
-import type { SessionIntonation } from "./review-types";
+import { workOnTexts, type SessionIntonation } from "./review-types";
 import { matchMusic, musicByPiece, type MusicMatch } from "@/lib/melody";
 import { studentMelodies } from "@/lib/ai/transcribe-melody";
 import { methodText, practiceMethod } from "./method";
@@ -428,6 +428,23 @@ async function contextFor(db: Db, s: PracticeSession) {
     const i = (e.analysis as PracticeAnalysis | null)?.intonation;
     return i ? [{ date: e.practice_date, intonation: i as SessionIntonation }] : [];
   });
+  // What the family was already told, so this review can lead with what
+  // changed. Counted sessions only, and at most three: enough to count a
+  // problem to its 4th practice running.
+  const told = (earlier ?? []).flatMap((e) => {
+    const a = e.analysis as PracticeAnalysis | null;
+    if (!a || a.counted === false || !a.summary) return [];
+    return [
+      {
+        date: e.practice_date,
+        summary: a.summary,
+        goingWell: (a.going_well ?? []).map((x) => x.text),
+        workOn: workOnTexts(a),
+        methodNote: a.method_note ?? "",
+      },
+    ];
+  });
+  const sinceLesson = lesson ? told.filter((t) => t.date >= lesson.lesson_date).length + 1 : undefined;
   const base = sessionIntonation(notes, student.instrument, scales, tunedWithTuner(tuningChecksOf(s.activity)));
   const intonation = base ? withPrevious(base, earlierIntonation) : null;
   const knownTitles = [
@@ -454,6 +471,8 @@ async function contextFor(db: Db, s: PracticeSession) {
     transcript: s.transcript ?? "",
     scales,
     scalesText: scalesText(scales),
+    earlierReviews: told.slice(0, 3),
+    practiceNumber: sinceLesson,
     musicText: musicText(music, melodies.length),
     methodText: methodText(method),
     style,
