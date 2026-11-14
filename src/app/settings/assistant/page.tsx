@@ -5,6 +5,8 @@ import { Button, Card, Field, Notice, SectionTitle, Textarea } from "@/component
 import { updateTeachingProfile } from "@/app/settings/actions";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { loadPlaybook } from "@/lib/playbook/data";
+import { PlaybookSection } from "@/components/playbook";
 import {
   PROFILE_SECTIONS,
   QUESTIONS,
@@ -38,6 +40,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
     .eq("teacher_id", teacher.id)
     .order("created_at", { ascending: true })
     .limit(200);
+  const playbook = await loadPlaybook(teacher.id);
   const profile = parseProfile(teacher.teaching_profile as Json | null | undefined);
   const tone = toneOf(teacher.review_tone);
   const answered = answeredCount(profile);
@@ -79,6 +82,8 @@ async function Body({ searchParams }: { searchParams: SP }) {
             />
           </section>
         )}
+
+        <PlaybookSection data={playbook} />
 
         <section id="profile" className="scroll-mt-6">
           <SectionTitle>Your teaching profile</SectionTitle>

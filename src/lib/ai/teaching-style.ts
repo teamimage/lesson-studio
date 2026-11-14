@@ -1,6 +1,8 @@
 import "server-only";
 import type { createClient } from "@/lib/supabase/server";
 import { parseProfile, profileText, toneOf, type ReviewTone, type TeachingProfile } from "@/lib/assistant/profile";
+import { keptLines } from "@/lib/playbook/data";
+import { playbookText, type PlaybookLine } from "@/lib/playbook/types";
 
 // The teacher's review tone and teaching profile, added to the system prompt
 // of every review and draft. It sits in its own system block marked for
@@ -9,14 +11,23 @@ import { parseProfile, profileText, toneOf, type ReviewTone, type TeachingProfil
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
-export type TeachingStyle = { tone: ReviewTone; profile: TeachingProfile };
+export type TeachingStyle = {
+  tone: ReviewTone;
+  profile: TeachingProfile;
+  /** Cards the teacher kept from their own lesson recordings (the playbook). */
+  playbook?: PlaybookLine[];
+};
 
 export async function teachingStyleFor(db: Db, teacherId: string | null | undefined): Promise<TeachingStyle> {
   if (!teacherId) return { tone: toneOf(null), profile: parseProfile(null) };
   // select("*") so this still works before teaching-assistant.sql adds the columns.
   const { data } = await db.from("teachers").select("*").eq("id", teacherId).maybeSingle();
   const row = (data ?? {}) as { review_tone?: unknown; teaching_profile?: unknown };
-  return { tone: toneOf(row.review_tone), profile: parseProfile(row.teaching_profile as never) };
+  return {
+    tone: toneOf(row.review_tone),
+    profile: parseProfile(row.teaching_profile as never),
+    playbook: await keptLines(db, teacherId),
+  };
 }
 
 export type StylePurpose = "practice" | "period" | "lesson";
@@ -52,6 +63,11 @@ export function styleText(style: TeachingStyle, purpose: StylePurpose): string {
   if (profile)
     parts.push(
       `This teacher's own teaching profile, from their interview with their teaching assistant. Their standards, terms and methods come first: where they differ from the general guidance above, follow the teacher (except never invent evidence, and never praise intonation the code doesn't rate in tune). Use their terms.\n<teaching_profile>\n${profile}\n</teaching_profile>`,
+    );
+  const playbook = style.playbook?.length ? playbookText(style.playbook) : "";
+  if (playbook)
+    parts.push(
+      `Drawn from this teacher's own lesson recordings, and accepted by the teacher line by line. Follow these the same way as the profile: judge practice by these rules, and when a comment touches one of these cues or words, say it the teacher's way. A cue belongs only to the instrument named beside it. Never invent evidence to fit them.\n<teacher_playbook>\n${playbook}\n</teacher_playbook>`,
     );
   return parts.join("\n\n");
 }
