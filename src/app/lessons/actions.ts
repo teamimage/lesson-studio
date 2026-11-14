@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { deleteStream } from "@/lib/stream";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { reviewAgainstNewList } from "@/lib/practice/process";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Enums } from "@/lib/supabase/types";
@@ -319,6 +321,9 @@ async function approveById(id: string) {
     .update({ status: "approved", approved_at: new Date().toISOString() })
     .eq("id", id);
   await syncRepertoire(id);
+  // Practices since that lesson were checked against the list before it;
+  // review them again against this one once the response has gone out.
+  after(() => reviewAgainstNewList(id).catch(() => {}));
 }
 
 // Every piece named in the lesson gets (or updates) a repertoire row.

@@ -476,7 +476,7 @@ function periodInput(student: Tables<"students">, p: PeriodData, prev: PeriodRev
             );
           if (r.method?.length)
             parts.push(
-              `  Practice method (code): ${r.method.map((m) => `${m.title}: ${m.attempts.length} attempts, ${m.completed} start to end${m.stall_bars.length ? `, stopped at ${m.stall_bars.map((x) => `bar ${x.bar} ${x.times}x`).join(", ")}` : ""}${m.drills.length ? `, spot loops on ${m.drills.map((d) => `bars ${d.from_bar}-${d.to_bar}`).join(", ")}` : ", no spot loops"}${m.slowed ? ", slowed down" : ""}; ${VERDICT_WORDS[m.verdict]}`).join("; ")}`,
+              `  Practice method (code): ${r.method.map((m) => `${m.title}: ${m.attempts.length} attempts, ${m.completed} from the first bar to the last${m.stall_bars.length ? `, stopped at ${m.stall_bars.map((x) => `bar ${x.bar} ${x.times}x`).join(", ")}` : ""}${m.drills.length ? `, spot loops on ${m.drills.map((d) => `bars ${d.from_bar}-${d.to_bar}`).join(", ")}` : ", no spot loops"}${m.slowed ? ", slowed down" : ""}; ${VERDICT_WORDS[m.verdict]}`).join("; ")}`,
             );
           if (r.method_note) parts.push(`  How it was practised: ${r.method_note}`);
           if (r.going_well?.length) parts.push(`  Going well: ${r.going_well.map((x) => x.text).join("; ")}`);

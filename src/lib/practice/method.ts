@@ -337,13 +337,36 @@ export function barsLabel(a: { from_bar: number; to_bar: number }): string {
   return a.from_bar === a.to_bar ? `bar ${a.from_bar}` : `bars ${a.from_bar}-${a.to_bar}`;
 }
 
+/**
+ * How many times the piece was really played from its first bar to its last,
+ * written by code so the review can't count a run from bar 25 to the end as
+ * "through to the end".
+ */
+export function runThroughSentence(m: Pick<PieceMethod, "completed" | "attempts" | "first_bar" | "last_bar">): string {
+  const partial = m.attempts.filter((a) => a.reached_end && a.from_bar > m.first_bar + 1);
+  const whole =
+    m.completed === 0
+      ? "Not played from the first bar to the last"
+      : `Played from the first bar to the last ${m.completed === 1 ? "once" : `${m.completed} times`}`;
+  if (!partial.length) return `${whole}.`;
+  const from = partial.map((a) => a.from_bar);
+  return `${whole}; got to the last bar ${partial.length === 1 ? "once more" : `${partial.length} more times`} starting from bar${from.length === 1 ? "" : "s"} ${from.join(", ")}.`;
+}
+
 /** Plain counts per piece, for Claude and the teacher. */
 export function methodText(methods: PieceMethod[]): string {
   return methods
     .map((m) => {
+      const ends = m.attempts.filter((a) => a.reached_end);
+      const partial = ends.filter((a) => a.from_bar > m.first_bar + 1);
       const lines = [
-        `${m.title} (bars ${m.first_bar}-${m.last_bar}): ${m.attempts.length} attempt${m.attempts.length === 1 ? "" : "s"}, ${m.starts_from_top} from the top, ${m.completed} played start to end. Furthest bar reached: ${m.furthest_bar}.`,
+        `${m.title} (bars ${m.first_bar}-${m.last_bar}): ${m.attempts.length} attempt${m.attempts.length === 1 ? "" : "s"}, ${m.starts_from_top} from the top. Furthest bar reached: ${m.furthest_bar}.`,
+        `Say this, in these words: ${runThroughSentence(m)}`,
       ];
+      if (partial.length)
+        lines.push(
+          `"Reached the end" on an attempt below only means it got to the last bar. ${partial.length} of the ${ends.length} that did started partway (bar${partial.length === 1 ? "" : "s"} ${partial.map((a) => a.from_bar).join(", ")}), so they are not run-throughs of the piece.`,
+        );
       if (m.stall_bars.length)
         lines.push(`Stopped and went back at: ${m.stall_bars.map((s) => `bar ${s.bar} (${s.times}x)`).join(", ")}.`);
       if (m.drills.length)

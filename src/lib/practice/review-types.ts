@@ -66,6 +66,11 @@ export type PracticeAnalysis = {
   work_on?: ReviewPoint[];
   teacher_note: string;
   /**
+   * The lesson whose list this review was checked against, chosen when the
+   * review was written (Nov 14 2026 on).
+   */
+  checked_against?: { lesson_id: string; lesson_date: string };
+  /**
    * Scales and arpeggios found by code from the notes (not by Claude).
    * Missing on reviews written before Nov 3 2026.
    */

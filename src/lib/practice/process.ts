@@ -235,6 +235,7 @@ async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
     analysis = {
       ...out.analysis,
       scales: ctx.scales,
+      ...(ctx.lessonId && ctx.lessonDate ? { checked_against: { lesson_id: ctx.lessonId, lesson_date: ctx.lessonDate } } : {}),
       ...(ctx.music.length ? { music: ctx.music } : {}),
       ...(ctx.method.length ? { method: ctx.method } : {}),
     };
@@ -267,8 +268,27 @@ async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
   });
   const row = done ?? s;
   if (!row.applied) await applyToLog(db, row, analysis);
+  else await tickLog(db, row, analysis);
   await deleteRecording(db, row);
   return stateOf(row);
+}
+
+/**
+ * A review written again (often against a newer list): ticks the rows it
+ * found practised without adding the minutes a second time.
+ */
+async function tickLog(db: Db, s: PracticeSession, a: PracticeAnalysis) {
+  if (!a.counted) return;
+  const ticked = a.items.filter((i) => i.practiced && i.confidence !== "low").map((i) => i.assignment_id);
+  if (!ticked.length) return;
+  const [{ data: valid }, { data: log }] = await Promise.all([
+    db.from("assignments").select("id").eq("student_id", s.student_id).in("id", ticked),
+    db.from("practice_logs").select("*").eq("student_id", s.student_id).eq("practice_date", s.practice_date).maybeSingle(),
+  ]);
+  if (!log) return;
+  const completed = [...new Set([...(log.completed_assignment_ids ?? []), ...(valid ?? []).map((v) => v.id)])];
+  if (completed.length === (log.completed_assignment_ids ?? []).length) return;
+  await db.from("practice_logs").update({ completed_assignment_ids: completed }).eq("id", log.id);
 }
 
 /**
@@ -317,12 +337,72 @@ export async function deleteRecording(db: Db, s: PracticeSession) {
   if (!error) await db.from("practice_sessions").update({ storage_path: null }).eq("id", s.id);
 }
 
+/**
+ * The list a practice is checked against: the newest approved lesson up to
+ * the practice day, looked up when the review is written. The link saved at
+ * Stop can be stale, because a lesson record is often approved a day or two
+ * after the lesson, and practices in between were being checked against the
+ * week before. Falls back to the saved link (a list dated after the
+ * practice is better than none).
+ */
+async function planFor(db: Db, s: PracticeSession) {
+  const { data: plan } = await db
+    .from("lessons")
+    .select("*, lesson_pieces(*), assignments(*)")
+    .eq("student_id", s.student_id)
+    .eq("status", "approved")
+    .lte("lesson_date", s.practice_date)
+    .order("lesson_date", { ascending: false })
+    .order("approved_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (plan) {
+    if (plan.id !== s.lesson_id) await db.from("practice_sessions").update({ lesson_id: plan.id }).eq("id", s.id);
+    return { data: plan };
+  }
+  if (!s.lesson_id) return { data: null };
+  return db.from("lessons").select("*, lesson_pieces(*), assignments(*)").eq("id", s.lesson_id).maybeSingle();
+}
+
+/**
+ * A lesson record was just approved: practices from that lesson day on that
+ * were reviewed against an older list are reviewed again against this one.
+ * Minutes aren't logged twice; the new list's rows are ticked.
+ */
+export async function reviewAgainstNewList(lessonId: string): Promise<void> {
+  const db = await createClient();
+  const { data: lesson } = await db.from("lessons").select("id, student_id, lesson_date, status").eq("id", lessonId).maybeSingle();
+  if (!lesson || lesson.status !== "approved") return;
+  const { data: later } = await db
+    .from("lessons")
+    .select("lesson_date")
+    .eq("student_id", lesson.student_id)
+    .eq("status", "approved")
+    .gt("lesson_date", lesson.lesson_date)
+    .order("lesson_date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  let q = db
+    .from("practice_sessions")
+    .select("id, lesson_id, analysis")
+    .eq("student_id", lesson.student_id)
+    .eq("status", "done")
+    .eq("counted", true)
+    .gte("practice_date", lesson.lesson_date)
+    .order("practice_date", { ascending: true })
+    .limit(6);
+  if (later) q = q.lt("practice_date", later.lesson_date);
+  const { data: sessions } = await q;
+  const stale = (sessions ?? []).filter(
+    (p) => ((p.analysis as PracticeAnalysis | null)?.checked_against?.lesson_id ?? p.lesson_id) !== lesson.id,
+  );
+  await Promise.all(stale.map((p) => retry(p.id).catch(() => null)));
+}
+
 async function contextFor(db: Db, s: PracticeSession) {
   const [{ data: student }, { data: lesson }, { data: repertoire }, { data: earlier }, melodies] = await Promise.all([
     db.from("students").select("*").eq("id", s.student_id).single(),
-    s.lesson_id
-      ? db.from("lessons").select("*, lesson_pieces(*), assignments(*)").eq("id", s.lesson_id).maybeSingle()
-      : Promise.resolve({ data: null }),
+    planFor(db, s),
     db.from("repertoire").select("title, status").eq("student_id", s.student_id),
     db
       .from("practice_sessions")
@@ -361,6 +441,7 @@ async function contextFor(db: Db, s: PracticeSession) {
     age: student.age,
     currentBook: student.current_book,
     bookPieces: bookPieces(student.instrument, student.current_book),
+    lessonId: lesson?.id ?? null,
     lessonDate: lesson?.lesson_date ?? null,
     focus: lesson?.focus_points ?? null,
     assignments: assignments.map((a) => ({ id: a.id, kind: a.kind, title: a.title, how: a.how })),
@@ -393,7 +474,7 @@ function musicText(music: MusicMatch[], pieces: number): string {
   if (!music.length) return `None of the ${pieces} pieces with notes read from the student's uploaded music matched.`;
   const lines = music.map(
     (m) =>
-      `${clock(m.start)}-${clock(m.end)}: ${m.title} (${m.score_title}), bars ${m.bars} of ${m.bars_total}, ${m.hits >= 12 ? "strong" : m.hits >= 7 ? "good" : "possible"} match`,
+      `${clock(m.start)}-${clock(m.end)}: ${m.title} (${m.score_title}), bars ${m.bars} (the piece ends at bar ${m.bars_total}), ${m.hits >= 12 ? "strong" : m.hits >= 7 ? "good" : "possible"} match`,
   );
   const pieceLines = musicByPiece(music).map((p) => `${p.title}: bars ${p.bars}, about ${Math.max(1, Math.round(p.seconds / 60))} min`);
   return `${lines.join("\n")}\nBy piece:\n${pieceLines.join("\n")}`;

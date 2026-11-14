@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cx } from "@/components/ui";
+import { formatDate } from "@/lib/format";
 import { workOnTexts, type PracticeAnalysis } from "@/lib/practice/review-types";
 import { scaleLine } from "@/lib/practice/scales";
 import { musicByPiece } from "@/lib/melody";
@@ -221,6 +222,11 @@ export function PracticeReviewBody({
           {r.teacher_note}
         </div>
       )}
+      {!compact && r.checked_against && (
+        <div className="text-sm text-muted">
+          Checked against the {formatDate(r.checked_against.lesson_date)} lesson list.
+        </div>
+      )}
     </>
   );
 }
@@ -419,7 +425,7 @@ function MethodBlock({ note, methods }: { note: string; methods: PieceMethod[] }
                 {[
                   `${m.attempts.length} attempt${m.attempts.length === 1 ? "" : "s"}`,
                   `${m.starts_from_top} from the top`,
-                  `${m.completed} start to end`,
+                  `${m.completed} first bar to last`,
                   `furthest bar ${m.furthest_bar} of ${m.last_bar}`,
                   ...(m.stall_bars.length ? [`stopped at ${m.stall_bars.map((s) => `bar ${s.bar} ×${s.times}`).join(", ")}`] : []),
                   ...(m.drills.length

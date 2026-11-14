@@ -53,11 +53,12 @@ export async function createPracticeSession(input: NewPracticeInput): Promise<{ 
   if (consent.state === "setup") return { error: CONSENT_SETUP_MESSAGE };
   if (consent.state !== "signed") return { error: consentNeededMessage("this student") };
 
-  const { data: plan } = await db
-    .from("lessons")
-    .select("id")
-    .eq("student_id", student.id)
-    .eq("status", "approved")
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(input.practiceDate) ? input.practiceDate : undefined;
+  // The newest approved lesson up to the practice day. The review looks
+  // again when it is written, in case a record was approved in between.
+  let planQuery = db.from("lessons").select("id").eq("student_id", student.id).eq("status", "approved");
+  if (date) planQuery = planQuery.lte("lesson_date", date);
+  const { data: plan } = await planQuery
     .order("lesson_date", { ascending: false })
     .order("approved_at", { ascending: false })
     .limit(1)
@@ -65,7 +66,6 @@ export async function createPracticeSession(input: NewPracticeInput): Promise<{ 
 
   const activity = parseActivity(input.activity).slice(0, 4 * 3600);
   const ext = /^[a-z0-9]{2,5}$/.test(input.extension) ? input.extension : "webm";
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(input.practiceDate) ? input.practiceDate : undefined;
   const fields = {
     student_id: student.id,
     teacher_id: student.teacher_id,
