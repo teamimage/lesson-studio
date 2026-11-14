@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cx } from "@/components/ui";
 import { formatDate } from "@/lib/format";
+import { CHANGE_WORDS, type ChangeLine } from "@/lib/focus/types";
 import { workOnTexts, type PracticeAnalysis } from "@/lib/practice/review-types";
 import { scaleLine } from "@/lib/practice/scales";
 import { musicByPiece } from "@/lib/melody";
@@ -124,6 +125,7 @@ export function PracticeReviewBody({
       {r.counted === false && r.not_counted_reason && (
         <div className="rounded-xl bg-amber-soft px-3 py-2 text-sm">{r.not_counted_reason}</div>
       )}
+      {!compact && <ChangedLines lines={r.changed} />}
       {r.encouragement && !compact && <div className="font-medium text-plum">{r.encouragement}</div>}
 
       {compact ? (
@@ -228,6 +230,34 @@ export function PracticeReviewBody({
         </div>
       )}
     </>
+  );
+}
+
+const CHANGE_TONE: Record<ChangeLine["tag"], string> = {
+  first_time: "bg-plum-soft text-plum",
+  better: "bg-sage-soft text-sage",
+  same: "bg-rule/60 text-muted",
+  went_back: "bg-amber-soft text-amber",
+  left: "bg-rule/60 text-muted",
+};
+
+/**
+ * The "what changed" card: at most three tagged lines, shown above the full
+ * review. Nothing on reviews written before Nov 14 2026.
+ */
+export function ChangedLines({ lines, className }: { lines?: ChangeLine[]; className?: string }) {
+  if (!lines?.length) return null;
+  return (
+    <ul className={cx("flex flex-col gap-1.5", className)}>
+      {lines.map((l, i) => (
+        <li key={i} className="flex items-baseline gap-2">
+          <span className={cx("shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[13px] font-medium", CHANGE_TONE[l.tag])}>
+            {CHANGE_WORDS[l.tag]}
+          </span>
+          <span className="min-w-0">{l.text}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

@@ -22,6 +22,8 @@ export const POINT_TOPICS = [
   "routine",
   "other",
 ] as const;
+import type { ChangeLine } from "@/lib/focus/types";
+
 export type PointTopic = (typeof POINT_TOPICS)[number];
 
 export type ReviewPoint = {
@@ -70,6 +72,15 @@ export type PracticeAnalysis = {
    * review was written (Nov 14 2026 on).
    */
   checked_against?: { lesson_id: string; lesson_date: string };
+  /**
+   * The "what changed" card: at most three tagged lines on what is different
+   * about this practice (Nov 14 2026 on). A "same" line about a focus point
+   * that hasn't moved in three practices is left off by code, and goes to
+   * the teacher instead.
+   */
+  changed?: ChangeLine[];
+  /** What this practice showed about each open focus point. */
+  focus?: { id: string; verdict: "first_time" | "better" | "same" | "went_back" | "not_heard"; note: string }[];
   /**
    * Scales and arpeggios found by code from the notes (not by Claude).
    * Missing on reviews written before Nov 3 2026.

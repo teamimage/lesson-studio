@@ -2,6 +2,7 @@ import "server-only";
 import { Entry, type TimelineEntry } from "@/components/v3/timeline";
 import { PeriodReviewWriter } from "@/components/period-review-writer";
 import { Pill } from "@/components/ui";
+import { ChangedLines } from "@/components/practice-review";
 import { listLessons, listPracticeLogs } from "@/lib/data";
 import { capitalize, formatDate, formatDuration, relativeDay } from "@/lib/format";
 import { listPracticeSessions, type PracticeSessionView } from "@/lib/practice/data";
@@ -114,6 +115,9 @@ export function buildEntries({
             .join(" · ")}
           badge={grades.length ? <Pill tone="sage">{grades.join(" ")}</Pill> : undefined}
         >
+          {daySessions.map((s) => (
+            <ChangedLines key={s.id} lines={s.review?.changed} />
+          ))}
           {daySessions.map((s) => s.review?.summary).filter(Boolean).map((t, i) => (
             <p key={i}>{t}</p>
           ))}

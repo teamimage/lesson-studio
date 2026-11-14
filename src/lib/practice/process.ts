@@ -16,6 +16,8 @@ import { workOnTexts, type SessionIntonation } from "./review-types";
 import { matchMusic, musicByPiece, type MusicMatch } from "@/lib/melody";
 import { studentMelodies } from "@/lib/ai/transcribe-melody";
 import { methodText, practiceMethod } from "./method";
+import { focusDb, openFocus } from "@/lib/focus/data";
+import { QUIET_AFTER, STATUS_WORDS, type FocusItem } from "@/lib/focus/types";
 import { teachingStyleFor } from "@/lib/ai/teaching-style";
 
 // A practice session after Stop:
@@ -249,6 +251,7 @@ async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
       const withPieces = addPieceGroups(ctx.intonation, ctx.notes, timeline, [...ctx.knownTitles, ...ctx.music.map((m) => m.title)]);
       analysis.intonation = withPrevious(withPieces, ctx.earlierIntonation);
     }
+    quietFocus(analysis, ctx.focusRows);
     usage = out.usage;
   } catch (e) {
     if (e instanceof DraftError) usage = e.usage;
@@ -269,8 +272,53 @@ async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
   const row = done ?? s;
   if (!row.applied) await applyToLog(db, row, analysis);
   else await tickLog(db, row, analysis);
+  await recordFocus(db, row, analysis);
   await deleteRecording(db, row);
   return stateOf(row);
+}
+
+/**
+ * The family's card goes quiet about a focus point that hasn't moved: after
+ * three practices with no change, a fourth "same" line is left off and a
+ * plain note goes to the teacher instead ("your rule: change something").
+ */
+function quietFocus(a: PracticeAnalysis, items: FocusItem[]) {
+  a.focus = (a.focus ?? []).filter((f) => items.some((i) => i.id === f.id));
+  const notes: string[] = [];
+  a.changed = (a.changed ?? []).slice(0, 3).filter((line) => {
+    const item = items.find((i) => i.id === line.focus_id);
+    if (!item) return true;
+    if (line.tag !== "same" && line.tag !== "went_back") return true;
+    const run = item.sameRun + 1;
+    if (line.tag === "same" && run > QUIET_AFTER) {
+      notes.push(`"${item.title}": no change for ${run} practices running, so it was left off the family's card.`);
+      return false;
+    }
+    return true;
+  });
+  if (notes.length) a.teacher_note = [a.teacher_note, ...notes].filter(Boolean).join(" ");
+}
+
+/**
+ * Saves what the practice showed about each focus point, replacing the rows
+ * of an earlier review of the same session. Quietly does nothing before
+ * working-on.sql has run.
+ */
+async function recordFocus(db: Db, s: PracticeSession, a: PracticeAnalysis) {
+  const f = focusDb(db);
+  const { error } = await f.from("focus_events").delete().eq("practice_session_id", s.id).eq("source", "practice");
+  if (error || !a.counted || !a.focus?.length) return;
+  await f.from("focus_events").insert(
+    a.focus.map((x) => ({
+      focus_item_id: x.id,
+      student_id: s.student_id,
+      event_date: s.practice_date,
+      source: "practice",
+      practice_session_id: s.id,
+      verdict: x.verdict,
+      note: x.note.slice(0, 200),
+    })),
+  );
 }
 
 /**
@@ -415,6 +463,8 @@ async function contextFor(db: Db, s: PracticeSession) {
       .limit(20),
     studentMelodies(db, s.student_id),
   ]);
+  // As the list stood before this practice (a review can be written again).
+  const focusItems = await openFocus(db, s.student_id, { before: s.practice_date, notSession: s.id });
   const style = await teachingStyleFor(db, s.teacher_id);
   if (!student) throw new Error("That student wasn't found.");
   const activity = parseActivity(s.activity);
@@ -472,6 +522,8 @@ async function contextFor(db: Db, s: PracticeSession) {
     scales,
     scalesText: scalesText(scales),
     earlierReviews: told.slice(0, 3),
+    focusItems: focusItems.map((f) => ({ id: f.id, title: f.title, piece: f.piece, status: STATUS_WORDS[f.status] })),
+    focusRows: focusItems,
     practiceNumber: sinceLesson,
     musicText: musicText(music, melodies.length),
     methodText: methodText(method),

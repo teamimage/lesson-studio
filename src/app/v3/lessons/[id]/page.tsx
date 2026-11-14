@@ -1,3 +1,5 @@
+import { checklistTags, lessonFocusEvents } from "@/lib/focus/data";
+import { sinceLastLesson } from "@/lib/focus/tags";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -77,6 +79,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
     getConsentStatus(lesson.student_id),
   ]);
   if (!student) notFound();
+  const [tags, focusSaid] = await Promise.all([checklistTags(lesson), lessonFocusEvents(id)]);
+  const sinceLine = sinceLastLesson(lesson.assignments, tags, focusSaid);
   const isDraft = lesson.status === "draft";
   const closedPeriod = periods.find((p) => p.nextLesson === lesson.lesson_date && p.needsWriting);
 
@@ -205,6 +209,16 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         {(lesson.summary || lesson.focus_points || lesson.lesson_pieces.length > 0 || lesson.parent_message) && (
           <section>
             <SectionTitle>What happened</SectionTitle>
+            {sinceLine.length > 0 && (
+              <p className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1 text-[16px]">
+                {sinceLine.map((part) => (
+                  <span key={part.label}>
+                    <span className="font-semibold">{part.label}: </span>
+                    {part.text}
+                  </span>
+                ))}
+              </p>
+            )}
             <Card className="divide-y divide-rule text-[17px]">
               {lesson.summary && (
                 <VoiceEditSection lessonId={id} section="summary" current={lesson.summary}>
@@ -285,7 +299,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             {lesson.assignments.length === 0 ? (
               <p className="py-1 text-[16px] text-muted">No assignments yet. Hold here to add some by voice.</p>
             ) : (
-              <AssignmentList assignments={lesson.assignments} jumps={jumps} />
+              <AssignmentList assignments={lesson.assignments} jumps={jumps} tags={tags} />
             )}
           </VoiceEditSection>
         </section>
