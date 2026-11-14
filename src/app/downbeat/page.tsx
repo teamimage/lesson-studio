@@ -29,8 +29,6 @@ import {
   weekStart,
 } from "@/lib/schedule";
 import { loadSchedule } from "@/lib/schedule-data";
-import { loadTodayQuote } from "@/lib/quotes-data";
-import { DailyQuote } from "@/components/daily-quote";
 import { CraftLine } from "@/components/craft-line";
 import { type TodayRow, loadTodayRow } from "@/lib/v3-data";
 
@@ -55,9 +53,6 @@ export default function DownbeatPage({ searchParams }: { searchParams: SP }) {
     >
       <div className="flex flex-col gap-7">
         <Suspense fallback={null}>
-          <QuoteOfTheDay />
-        </Suspense>
-        <Suspense fallback={null}>
           <Focus />
         </Suspense>
         <Suspense fallback={<Skeleton />}>
@@ -71,12 +66,6 @@ export default function DownbeatPage({ searchParams }: { searchParams: SP }) {
 async function DateLine() {
   await requireTeacher();
   return formatDate(todayISO(), "long");
-}
-
-async function QuoteOfTheDay() {
-  const { userId } = await requireTeacher();
-  const q = await loadTodayQuote(userId);
-  return <DailyQuote quote={q.quote} day={q.day} vote={q.vote} canRate={q.ready} />;
 }
 
 async function Focus() {
