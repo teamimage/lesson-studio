@@ -13,6 +13,7 @@ import { getLesson, getStudent } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { endLesson } from "@/app/lessons/live-actions";
+import { CraftLine } from "@/components/craft-line";
 
 type Params = Promise<{ id: string }>;
 
@@ -27,7 +28,7 @@ export default function LiveLessonPage({ params }: { params: Params }) {
 }
 
 async function Body({ params }: { params: Params }) {
-  await requireTeacher();
+  const { teacher } = await requireTeacher();
   const { id } = await params;
   const lesson = await getLesson(id);
   if (!lesson) notFound();
@@ -71,6 +72,11 @@ async function Body({ params }: { params: Params }) {
     >
       {!ended && <AutoRefresh />}
       <div className="flex flex-col gap-5">
+        {!ended && (
+          <Suspense fallback={null}>
+            <CraftLine teacherId={teacher.id} compact />
+          </Suspense>
+        )}
         <Card className="flex items-end justify-between gap-3">
           <div>
             <div className="text-sm text-muted">

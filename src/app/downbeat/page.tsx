@@ -31,6 +31,7 @@ import {
 import { loadSchedule } from "@/lib/schedule-data";
 import { loadTodayQuote } from "@/lib/quotes-data";
 import { DailyQuote } from "@/components/daily-quote";
+import { CraftLine } from "@/components/craft-line";
 import { type TodayRow, loadTodayRow } from "@/lib/v3-data";
 
 type SP = Promise<{ w?: string }>;
@@ -56,6 +57,9 @@ export default function DownbeatPage({ searchParams }: { searchParams: SP }) {
         <Suspense fallback={null}>
           <QuoteOfTheDay />
         </Suspense>
+        <Suspense fallback={null}>
+          <Focus />
+        </Suspense>
         <Suspense fallback={<Skeleton />}>
           <Body searchParams={searchParams} />
         </Suspense>
@@ -73,6 +77,11 @@ async function QuoteOfTheDay() {
   const { userId } = await requireTeacher();
   const q = await loadTodayQuote(userId);
   return <DailyQuote quote={q.quote} day={q.day} vote={q.vote} canRate={q.ready} />;
+}
+
+async function Focus() {
+  const { teacher } = await requireTeacher();
+  return <CraftLine teacherId={teacher.id} />;
 }
 
 async function Body({ searchParams }: { searchParams: SP }) {
