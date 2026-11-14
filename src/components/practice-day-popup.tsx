@@ -424,6 +424,7 @@ function SessionBlock({
       <div className="text-sm text-muted">
         Started <LocalTime iso={s.started_at} /> · {minutesText(s.duration_seconds)} session ·{" "}
         {minutesText(s.playing_seconds)} playing{s.media === "video" ? " · video" : ""}
+        {s.with_helper ? " · with a helper" : ""}
       </div>
       {r?.summary && <div>{r.summary}</div>}
       {r && <PracticeReviewBody review={r} titles={titles} teacherView={teacherView} />}

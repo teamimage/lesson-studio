@@ -25,6 +25,8 @@ export type PracticeContext = {
   currentPieces: string[];
   durationSeconds: number;
   playingSeconds: number;
+  /** "Practicing with someone else?" was ticked: a parent or helper was giving instruction. */
+  withHelper?: boolean;
   activity: string;
   transcript: string;
   /** Scales and arpeggios found by code from the notes. */
@@ -171,6 +173,10 @@ function contextText(c: PracticeContext): string {
     `Student: ${c.studentName}${c.age ? `, age ${c.age}` : ""}. Instrument: ${c.instrument}. Current book: ${c.currentBook || "not set"}.`,
     `Session length: ${Math.round(c.durationSeconds / 60)} min. Seconds with pitched sound: ${c.playingSeconds}.`,
   ];
+  if (c.withHelper)
+    lines.push(
+      "This was home practice with someone else giving instruction, usually a parent (who may also be a music teacher). It is a practice session, not a lesson: treat any adult voice in the transcript as that helper, never as the student's teacher, and review it as the student's practice. Their instructions show what was worked on and how; credit the work to the practice. Grade the student's practice as usual. In teacher_note, say it was practised with a helper and name anything the helper asked for that differs from the assignments.",
+    );
   if (c.lessonDate) lines.push(`These assignments come from the lesson on ${c.lessonDate}.`);
   if (c.focus) lines.push(`The teacher's focus for this week:\n${c.focus}`);
   if (c.assignments.length) {

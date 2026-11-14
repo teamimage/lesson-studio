@@ -17,7 +17,7 @@ import { formatClock } from "@/lib/lesson-moments";
 import { practiceJumps } from "@/lib/practice-jumps";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { listScores } from "@/lib/scores";
-import { listPracticeDays } from "@/lib/practice/data";
+import { lastPracticeWithHelper, listPracticeDays } from "@/lib/practice/data";
 import { listenTracksFor } from "@/lib/reference-data";
 import { parsePlays } from "@/lib/reference-recordings";
 import { ListenPlayer } from "@/components/listen-player";
@@ -45,11 +45,12 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const student = await getStudent(studentId);
   if (!student) notFound();
   const today = todayISO();
-  const [plan, week, log, consent] = await Promise.all([
+  const [plan, week, log, consent, helperDefault] = await Promise.all([
     getCurrentPlan(studentId),
     getPracticeWeek(studentId),
     getPracticeLog(studentId, today),
     getConsentStatus(studentId),
+    lastPracticeWithHelper(studentId),
   ]);
   const scores = plan ? await listScores(studentId, { includeArchived: true }) : [];
   const watch = plan ? await practiceJumps(plan, scores) : { jumps: {}, recordings: [] };
@@ -92,7 +93,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
           {consent.state === "signed" ? (
             <div className="[&_button]:min-h-14 [&_button]:text-[19px]">
-              <PracticeRecorder studentId={studentId} hasPlan={!!plan} instrument={student.instrument} />
+              <PracticeRecorder studentId={studentId} hasPlan={!!plan} instrument={student.instrument} helperDefault={helperDefault} />
             </div>
           ) : (
             <ConsentNeeded

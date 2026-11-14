@@ -188,6 +188,11 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 label: "Write up by hand",
                 hint: "A lesson without a recording, or one from an earlier day",
               },
+              {
+                href: `/v3/family/${id}/practice`,
+                label: "Start practice instead",
+                hint: "Home practice, also when a parent is guiding it. Saved as a practice, never a lesson",
+              },
             ]}
           >
             {consent.state === "signed" ? (

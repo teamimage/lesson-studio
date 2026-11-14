@@ -25,6 +25,8 @@ export type NewPracticeInput = {
   activity: unknown;
   /** Tuner checks done before Start or during the session. */
   tuning?: unknown;
+  /** "Practicing with someone else?": a parent or helper was giving instruction. Still a practice, never a lesson. */
+  withHelper?: boolean;
 };
 
 const SETUP_ERROR = "Practice sessions aren't set up yet. Run practice-sessions.sql in the Supabase SQL Editor.";
@@ -35,6 +37,10 @@ function revalidate(studentId: string) {
   revalidatePath(`/teacher/${studentId}`);
   revalidatePath("/family");
   revalidatePath("/");
+}
+
+function isMissingColumn(e: { code?: string; message?: string }): boolean {
+  return e.code === "42703" || e.code === "PGRST204" || /with_helper/.test(e.message ?? "");
 }
 
 /** Called at Stop: saves the session and says where to upload the recording. */
@@ -60,25 +66,30 @@ export async function createPracticeSession(input: NewPracticeInput): Promise<{ 
   const activity = parseActivity(input.activity).slice(0, 4 * 3600);
   const ext = /^[a-z0-9]{2,5}$/.test(input.extension) ? input.extension : "webm";
   const date = /^\d{4}-\d{2}-\d{2}$/.test(input.practiceDate) ? input.practiceDate : undefined;
-  const { data: row, error } = await db
-    .from("practice_sessions")
-    .insert({
-      student_id: student.id,
-      teacher_id: student.teacher_id,
-      lesson_id: plan?.id ?? null,
-      ...(date ? { practice_date: date } : {}),
-      started_at: input.startedAt,
-      ended_at: input.endedAt,
-      duration_seconds: Math.max(0, Math.round(input.durationSeconds)),
-      playing_seconds: playingSeconds(activity),
-      media: input.media === "video" ? "video" : "audio",
-      mime_type: input.mimeType.split(";")[0] || null,
-      size_bytes: Math.round(input.sizeBytes) || null,
-      activity: withTuningChecks(activity, parseTuningChecks(input.tuning)) as unknown as Json,
-      created_by: viewer.userId,
-    })
-    .select("id")
-    .single();
+  const fields = {
+    student_id: student.id,
+    teacher_id: student.teacher_id,
+    lesson_id: plan?.id ?? null,
+    ...(date ? { practice_date: date } : {}),
+    started_at: input.startedAt,
+    ended_at: input.endedAt,
+    duration_seconds: Math.max(0, Math.round(input.durationSeconds)),
+    playing_seconds: playingSeconds(activity),
+    media: input.media === "video" ? "video" : "audio",
+    mime_type: input.mimeType.split(";")[0] || null,
+    size_bytes: Math.round(input.sizeBytes) || null,
+    activity: withTuningChecks(activity, parseTuningChecks(input.tuning)) as unknown as Json,
+    created_by: viewer.userId,
+  };
+  const insert = (withHelper: boolean) =>
+    db
+      .from("practice_sessions")
+      .insert({ ...fields, ...(withHelper ? { with_helper: true } : {}) })
+      .select("id")
+      .single();
+  let { data: row, error } = await insert(!!input.withHelper);
+  // practice-with-helper.sql not run yet: still save the practice, without the flag.
+  if (error && input.withHelper && isMissingColumn(error)) ({ data: row, error } = await insert(false));
   if (error || !row) return { error: error?.code === "42P01" || error?.code === "PGRST205" ? SETUP_ERROR : "Couldn't save the session." };
 
   const path = `${student.id}/${row.id}.${ext}`;

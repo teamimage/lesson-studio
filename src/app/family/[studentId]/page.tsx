@@ -35,7 +35,7 @@ import { PracticeRecorder } from "@/components/practice-recorder";
 import { ConsentNeeded } from "@/components/consent-needed";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { PracticeSessionList } from "@/components/practice-session-list";
-import { listPracticeDays, listPracticeSessions } from "@/lib/practice/data";
+import { lastPracticeWithHelper, listPracticeDays, listPracticeSessions } from "@/lib/practice/data";
 import { listPeriods } from "@/lib/practice/period";
 import { PeriodReviewList } from "@/components/period-review-list";
 import { VideoPopupProvider } from "@/components/video-popup";
@@ -223,6 +223,7 @@ async function Body({
               studentId={studentId}
               hasPlan={!!plan}
               instrument={student.instrument}
+              helperDefault={await lastPracticeWithHelper(studentId)}
             />
           ) : (
             <ConsentNeeded

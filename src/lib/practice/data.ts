@@ -41,6 +41,8 @@ export type DaySession = {
   review: PracticeAnalysis | null;
   /** Start/Stop was pressed but the recording never uploaded. */
   recording_missing: boolean;
+  /** "Practicing with someone else?" was ticked. */
+  with_helper: boolean;
 };
 
 /** Everything the practice chart's popup shows for one day. */
@@ -116,7 +118,25 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
       counted: s.counted,
       review: (s.analysis as PracticeAnalysis | null) ?? null,
       recording_missing: missing,
+      with_helper: !!s.with_helper,
     });
   }
   return days;
+}
+
+/**
+ * "Practicing with someone else?" comes up the way it was set for this
+ * student's last practice. False before practice-with-helper.sql is run.
+ */
+export async function lastPracticeWithHelper(studentId: string): Promise<{ value: boolean; at: string | null }> {
+  const db = await createClient();
+  const { data, error } = await db
+    .from("practice_sessions")
+    .select("with_helper, created_at")
+    .eq("student_id", studentId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return { value: false, at: null };
+  return { value: !!data.with_helper, at: data.created_at };
 }
