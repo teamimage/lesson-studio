@@ -21,10 +21,13 @@ const KIND_TONE: Record<Assignment["kind"], "accent" | "sage" | "plum" | "amber"
 export function AssignmentList({
   assignments,
   jumps,
+  tags,
   className,
 }: {
   assignments: Assignment[];
   jumps?: Record<string, Jump>;
+  /** Small tags by row id: Do first, New, Changed, 3rd lesson. */
+  tags?: Record<string, { label: string; tone: "accent" | "sage" | "amber" | "plum" }>;
   className?: string;
 }) {
   return (
@@ -44,6 +47,7 @@ export function AssignmentList({
                   <span className="font-medium">{a.title}</span>
                   {a.how && <span className="text-muted group-open:hidden"> · {a.how}</span>}
                 </span>
+                {tags?.[a.id] && <Pill tone={tags[a.id].tone}>{tags[a.id].label}</Pill>}
                 {jump && <JumpButton jump={jump} />}
                 <span className="shrink-0 text-xs text-muted transition-transform group-open:rotate-90" aria-hidden>
                   ›

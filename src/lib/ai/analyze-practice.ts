@@ -47,6 +47,8 @@ export type PracticeContext = {
   earlierReviews?: { date: string; summary: string; goingWell: string[]; workOn: string[]; methodNote: string }[];
   /** Which practice this is since that lesson: 1 for the first. */
   practiceNumber?: number;
+  /** The open points on "What we're working on", most important first. */
+  focusItems?: { id: string; title: string; piece: string; status: string }[];
 };
 
 const POINT = {
@@ -132,6 +134,32 @@ const SCHEMA = {
     work_on: { type: "array", items: POINT },
     teacher_note: { type: "string" },
     method_note: { type: "string" },
+    changed: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["tag", "text", "focus_id"],
+        properties: {
+          tag: { type: "string", enum: ["first_time", "better", "same", "went_back", "left"] },
+          text: { type: "string" },
+          focus_id: { type: "string" },
+        },
+      },
+    },
+    focus: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "verdict", "note"],
+        properties: {
+          id: { type: "string" },
+          verdict: { type: "string", enum: ["first_time", "better", "same", "went_back", "not_heard"] },
+          note: { type: "string" },
+        },
+      },
+    },
   },
 } as const;
 
@@ -177,7 +205,9 @@ Everything the family reads (summary, encouragement, going_well, work_on, method
   When the intonation section is missing (piano, or too few held notes) say nothing about intonation. Without the section, fall back to the per-second cents in the timeline (far from 0 on the same note again and again).
   Each bullet has a topic (intonation, rhythm, tempo, tone, notes, technique, memory, focus, routine or other) and piece: the piece, scale or exercise it is about, or empty.
 - method_note: one plain, honest sentence for the family on how the practising was done, with the numbers ("Gavotte: 7 starts from the top, played from the first bar to the last once, stopped at bar 9 five times. Next time loop bars 8-10 slowly first."). Praise the method only when it was good. Kind but factual: no "great job" unless the evidence earns it. Empty when nothing was matched or the session wasn't counted.
-- teacher_note: one or two factual sentences for the teacher only (what was and wasn't covered, anything that may need attention). Empty if nothing to add.`;
+- teacher_note: one or two factual sentences for the teacher only (what was and wasn't covered, anything that may need attention). Empty if nothing to add.
+- changed: the card the family reads first: what is different about this practice, in at most three lines, each under 14 words and each with one tag. first_time: something done for the first time (a piece reached its last line, a scale played in tune, an assignment never practised before). better: clearly better than the last practice, with the comparison in plain numbers when you have them ("Stopped once in Gavotte's last line. Sunday it stopped five times"). went_back: clearly worse than the last practice. same: a known problem that has not moved, named in a few words with no explanation. left: assigned things not touched today, all named together in ONE line ("Scales, arpeggios, Silent Night"); they are left for tomorrow, never "skipped" or "missed". Most important first, and a line about one of the focus points comes before the rest. Compare only with the earlier reviews you were given; with none, use first_time and left only, or leave the list empty. A few cents of intonation either way inside one band is "same", not better or went_back. Describes the playing only. Do not repeat these lines in summary. focus_id is the id of the focus point the line is about, or empty.
+- focus: when you are given "What we're working on", one entry for every point, by its id: what THIS practice showed about it. not_heard when the recording can't show it (posture, arm weight, anything not audible in the notes or named in the speech) or it wasn't practised; never guess. Otherwise first_time, better, same or went_back against the earlier reviews (same when there is nothing to compare with). note: at most twelve words of evidence, empty for not_heard. Empty list when you were given no focus points.`;
 
 function contextText(c: PracticeContext): string {
   const lines = [
@@ -193,6 +223,12 @@ function contextText(c: PracticeContext): string {
       `These assignments come from the lesson on ${c.lessonDate}.${c.practiceNumber ? ` This is recorded practice number ${c.practiceNumber} since that lesson.` : ""}`,
     );
   if (c.focus) lines.push(`The teacher's focus for this week:\n${c.focus}`);
+  if (c.focusItems?.length)
+    lines.push(
+      `What we're working on (the teacher's short lasting list; id | point | piece | status so far):\n${c.focusItems
+        .map((f) => `${f.id} | ${f.title} | ${f.piece} | ${f.status}`)
+        .join("\n")}`,
+    );
   if (c.assignments.length) {
     lines.push(
       `Assignments (id | kind | title | how):\n${c.assignments

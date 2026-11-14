@@ -16,6 +16,8 @@ import { listLessonMarks } from "@/lib/lesson-marks";
 import { listPracticeDays } from "@/lib/practice/data";
 import { monthOf, monthRange } from "@/lib/practice/month";
 import { loadHistory } from "@/app/v3/students/[id]/history-data";
+import { getWorkingOn } from "@/lib/focus/data";
+import { WorkingOnCard } from "@/components/working-on";
 
 // Back to the "Who's practising?" picker. ?pick=1 keeps it from jumping
 // straight back here when the studio has only one student.
@@ -44,11 +46,12 @@ async function Body({ params }: { params: Params }) {
   if (!student) notFound();
   const today = todayISO();
   const monthSpan = monthRange(monthOf(today));
-  const [{ lessons, entries: all }, week, practiceDays, lessonDays] = await Promise.all([
+  const [{ lessons, entries: all }, week, practiceDays, lessonDays, workingOn] = await Promise.all([
     loadHistory(id),
     getPracticeWeek(id),
     listPracticeDays(id, ...monthSpan),
     listLessonMarks(id, ...monthSpan, today),
+    getWorkingOn(id),
   ]);
   const drafts = new Set(lessons.filter((l) => l.status === "draft").map((l) => `l-${l.id}`));
   const shown = all.filter((e) => !drafts.has(e.key));
@@ -83,6 +86,8 @@ async function Body({ params }: { params: Params }) {
         <LinkButton href={`/v3/family/${id}/practice`} variant="plum" className="min-h-14 w-full text-[20px]">
           Start practice
         </LinkButton>
+
+        <WorkingOnCard data={workingOn} studentId={id} />
 
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">

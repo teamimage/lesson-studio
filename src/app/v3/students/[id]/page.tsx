@@ -34,6 +34,8 @@ import { listPracticeDays } from "@/lib/practice/data";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { consentPath } from "@/lib/recording-consent";
 import { listScoreIndex } from "@/lib/scores";
+import { getWorkingOn } from "@/lib/focus/data";
+import { WorkingOnCard } from "@/components/working-on";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ show?: string; consent?: string }>;
@@ -60,12 +62,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const sp = await searchParams;
   const student = await getStudent(id);
   if (!student) notFound();
-  const [{ lessons, entries: all }, week, repertoire, music, consent] = await Promise.all([
+  const [{ lessons, entries: all }, week, repertoire, music, consent, workingOn] = await Promise.all([
     loadHistory(id),
     getPracticeWeek(id),
     listRepertoire(id),
     listScoreIndex(id),
     getConsentStatus(id),
+    getWorkingOn(id),
   ]);
   const today = todayISO();
   const monthSpan = monthRange(monthOf(today));
@@ -213,6 +216,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             </Button>
           </form>
         </div>
+
+        <WorkingOnCard
+          data={workingOn}
+          studentId={id}
+          teacherView
+          hasApprovedLesson={lessons.some((l) => l.status === "approved")}
+        />
 
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">

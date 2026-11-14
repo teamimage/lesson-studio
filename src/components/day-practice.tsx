@@ -28,6 +28,8 @@ export type DayItem = {
   jumpLabel?: string;
   track?: ListenTrack;
   listenTimes: number;
+  /** A small tag from the lesson lists: Do first, New, Changed, 3rd lesson. */
+  tag?: { label: string; tone: "accent" | "sage" | "amber" | "plum" };
 };
 
 // Today's practice: the plan's items to tick off for one day, with arrows to
@@ -182,6 +184,7 @@ export function DayPractice({
                       <span className="font-medium">
                         {i + 1}. {a.title}
                       </span>
+                      {a.tag && <Pill tone={a.tag.tone}>{a.tag.label}</Pill>}
                       {a.kind === "listening" && <Pill tone="plum">listening</Pill>}
                       {a.kind === "review" && <Pill tone="sage">review</Pill>}
                       {a.kind === "game" && <Pill tone="amber">game</Pill>}

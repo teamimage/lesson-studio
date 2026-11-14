@@ -5,6 +5,7 @@ import { deleteStream } from "@/lib/stream";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { reviewAgainstNewList } from "@/lib/practice/process";
+import { proposeFromLesson } from "@/lib/focus/propose";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Enums } from "@/lib/supabase/types";
@@ -324,6 +325,9 @@ async function approveById(id: string) {
   // Practices since that lesson were checked against the list before it;
   // review them again against this one once the response has gone out.
   after(() => reviewAgainstNewList(id).catch(() => {}));
+  // And the app suggests "What we're working on" from this lesson, for the
+  // teacher to accept on the student's page.
+  after(() => proposeFromLesson(id).catch(() => {}));
 }
 
 // Every piece named in the lesson gets (or updates) a repertoire row.

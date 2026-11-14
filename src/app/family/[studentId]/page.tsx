@@ -1,3 +1,5 @@
+import { checklistTags, getWorkingOn } from "@/lib/focus/data";
+import { WorkingOnCard } from "@/components/working-on";
 import { GradeLegend } from "@/components/grade-legend";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -147,10 +149,15 @@ async function Body({
   const dayLogs: DayLog[] = [...history, ...(log && !history.some((h) => h.id === log.id) ? [log] : [])];
   const knownFrom =
     history.length < 30 ? "0000-01-01" : history[history.length - 1].practice_date;
+  const [tags, workingOn] = await Promise.all([
+    plan ? checklistTags(plan) : Promise.resolve({} as Awaited<ReturnType<typeof checklistTags>>),
+    getWorkingOn(studentId),
+  ]);
   const dayItems: DayItem[] = (plan?.assignments ?? []).map((a) => {
     const jump = watch.jumps[a.id];
     return {
       id: a.id,
+      tag: tags[a.id],
       title: a.title,
       kind: a.kind,
       how: a.how,
@@ -241,6 +248,8 @@ async function Body({
               selfSign={!isTeacher}
             />
           )}
+
+          <WorkingOnCard data={workingOn} studentId={studentId} />
 
           {plan && (
             <DayPractice
