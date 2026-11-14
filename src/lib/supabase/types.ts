@@ -1259,6 +1259,9 @@ export type Database = {
           /** Missing until teaching-assistant.sql has run. */
           review_tone?: string;
           teaching_profile?: Json | null;
+          /** Missing until studio-store.sql has run. */
+          store_layout?: string;
+          store_note?: string;
         };
         Insert: {
           created_at?: string;
@@ -1268,6 +1271,9 @@ export type Database = {
           user_id: string;
           review_tone?: string;
           teaching_profile?: Json | null;
+          /** Missing until studio-store.sql has run. */
+          store_layout?: string;
+          store_note?: string;
         };
         Update: {
           created_at?: string;
@@ -1277,7 +1283,73 @@ export type Database = {
           user_id?: string;
           review_tone?: string;
           teaching_profile?: Json | null;
+          /** Missing until studio-store.sql has run. */
+          store_layout?: string;
+          store_note?: string;
         };
+        Relationships: [];
+      };
+      store_products: {
+        Row: {
+          id: string;
+          category: string;
+          name: string;
+          description: string;
+          retailer: string;
+          url: string;
+          image_url: string | null;
+          price_note: string;
+          instruments: string[];
+          affiliate: boolean;
+          active: boolean;
+          sort_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          category: string;
+          name: string;
+          description?: string;
+          retailer?: string;
+          url: string;
+          image_url?: string | null;
+          price_note?: string;
+          instruments?: string[];
+          affiliate?: boolean;
+          active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          category?: string;
+          name?: string;
+          description?: string;
+          retailer?: string;
+          url?: string;
+          image_url?: string | null;
+          price_note?: string;
+          instruments?: string[];
+          affiliate?: boolean;
+          active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      teacher_store_items: {
+        Row: { teacher_id: string; product_id: string; created_at: string };
+        Insert: { teacher_id: string; product_id: string; created_at?: string };
+        Update: { teacher_id?: string; product_id?: string; created_at?: string };
+        Relationships: [];
+      };
+      store_clicks: {
+        Row: { id: string; product_id: string | null; teacher_id: string | null; user_id: string | null; created_at: string };
+        Insert: { id?: string; product_id?: string | null; teacher_id?: string | null; user_id?: string | null; created_at?: string };
+        Update: { id?: string; product_id?: string | null; teacher_id?: string | null; user_id?: string | null; created_at?: string };
         Relationships: [];
       };
       student_reminders: {

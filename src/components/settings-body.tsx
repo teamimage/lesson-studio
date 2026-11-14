@@ -65,6 +65,19 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
         </section>
       )}
 
+      {viewer.teacher && (
+        <Link
+          href="/store"
+          className="flex min-h-12 items-center justify-between rounded-2xl border border-rule bg-sheet px-4 font-semibold hover:border-accent/50"
+        >
+          <span>
+            Studio store
+            <span className="block text-sm font-normal text-muted">Books, supplies and gear for your families to buy</span>
+          </span>
+          <span aria-hidden className="text-accent-ink">›</span>
+        </Link>
+      )}
+
       {viewer.teacher && <TeachingAssistant teacher={viewer.teacher} notice={assistant} />}
 
       {viewer.teacher && <AiCosts teacherId={viewer.teacher.id} />}

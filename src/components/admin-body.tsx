@@ -44,6 +44,20 @@ export async function AdminBody({ searchParams }: { searchParams: AdminSP }) {
         </Card>
       </Link>
 
+      <Link href="/admin/store" className="block">
+        <Card className="flex items-center gap-3 transition hover:border-accent/50">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold">Store products</div>
+            <div className="text-sm text-muted">
+              The affiliate catalogue teachers pick from for their studio stores.
+            </div>
+          </div>
+          <span className="text-accent-ink" aria-hidden>
+            ›
+          </span>
+        </Card>
+      </Link>
+
       <section>
         <SectionTitle>Teachers</SectionTitle>
         <div className="flex flex-col gap-3">
