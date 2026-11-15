@@ -19,6 +19,7 @@ import { methodText, practiceMethod } from "./method";
 import { focusDb, openFocus } from "@/lib/focus/data";
 import { QUIET_AFTER, STATUS_WORDS, type FocusItem } from "@/lib/focus/types";
 import { teachingStyleFor } from "@/lib/ai/teaching-style";
+import { gradingForStudent } from "@/lib/grading-server";
 
 // A practice session after Stop:
 //
@@ -467,6 +468,7 @@ async function contextFor(db: Db, s: PracticeSession) {
   const focusItems = await openFocus(db, s.student_id, { before: s.practice_date, notSession: s.id });
   const style = await teachingStyleFor(db, s.teacher_id);
   if (!student) throw new Error("That student wasn't found.");
+  const grading = await gradingForStudent(db, { ...(student as Record<string, unknown>), teacher_id: s.teacher_id });
   const activity = parseActivity(s.activity);
   const notes = extractNotes(activity);
   const scales = summarizeScales(findScales(notes));
@@ -528,6 +530,7 @@ async function contextFor(db: Db, s: PracticeSession) {
     musicText: musicText(music, melodies.length),
     methodText: methodText(method),
     style,
+    grading,
     intonationText: intonation ? intonationText(intonation, notes) : "",
     // Used after the review, not sent to Claude.
     notes,

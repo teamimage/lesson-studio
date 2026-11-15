@@ -425,7 +425,7 @@ function PracticeRow({ row }: { row: TodayRow }) {
           {lastSession && (
             <div className="text-sm text-muted">
               Last recorded {relativeDay(lastSession.practice_date)}
-              {grade ? ` · grade ${grade}` : ""}
+              {grade ? ` · ${grade === "Pass" || grade === "Fail" ? grade.toLowerCase() : `grade ${grade}`}` : ""}
             </div>
           )}
         </div>

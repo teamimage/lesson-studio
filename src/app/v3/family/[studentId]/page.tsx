@@ -5,6 +5,7 @@ import { Me } from "@/components/v3/me";
 import { Avatar } from "@/components/avatar";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { GradeLegend } from "@/components/grade-legend";
+import { gradingOfStudent } from "@/lib/grading";
 import { PracticeCalendarLegend, PracticeMonthCalendar } from "@/components/practice-month-calendar";
 import { Timeline } from "@/components/v3/timeline";
 import { Card, LinkButton, Pill } from "@/components/ui";
@@ -105,7 +106,7 @@ async function Body({ params }: { params: Params }) {
             eventLinks
           />
           <PracticeCalendarLegend />
-          <GradeLegend family />
+          <GradeLegend family grading={gradingOfStudent(student)} instrument={student.instrument} />
         </Card>
 
         <Timeline
