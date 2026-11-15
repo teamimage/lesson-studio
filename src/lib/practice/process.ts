@@ -4,6 +4,7 @@ import { PRACTICE_BUCKET } from "@/lib/constants";
 import type { Json, Tables } from "@/lib/supabase/types";
 import { getTranscription, MissingKeyError, submitTranscription } from "@/lib/ai/assemblyai";
 import { analyzePractice, type PracticeAnalysis } from "@/lib/ai/analyze-practice";
+import { handTicked, heardIds } from "./hand-ticks";
 import { DraftError } from "@/lib/ai/draft-lesson";
 import { bookPieces } from "@/lib/ai/process-lesson";
 import { claudeCost, TRANSCRIPTION_MODEL, transcriptionCost, type ClaudeUsage } from "@/lib/ai/pricing";
@@ -272,7 +273,8 @@ async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
   });
   const row = done ?? s;
   if (!row.applied) await applyToLog(db, row, analysis);
-  else await tickLog(db, row, analysis);
+  // A tick the last review made that has since been taken off by hand stays off.
+  else await tickLog(db, row, analysis, heardIds(s.analysis as PracticeAnalysis | null));
   await recordFocus(db, row, analysis);
   await deleteRecording(db, row);
   return stateOf(row);
@@ -326,15 +328,21 @@ async function recordFocus(db: Db, s: PracticeSession, a: PracticeAnalysis) {
  * A review written again (often against a newer list): ticks the rows it
  * found practised without adding the minutes a second time.
  */
-async function tickLog(db: Db, s: PracticeSession, a: PracticeAnalysis) {
+async function tickLog(db: Db, s: PracticeSession, a: PracticeAnalysis, heardBefore: string[] = []) {
   if (!a.counted) return;
-  const ticked = a.items.filter((i) => i.practiced && i.confidence !== "low").map((i) => i.assignment_id);
-  if (!ticked.length) return;
-  const [{ data: valid }, { data: log }] = await Promise.all([
-    db.from("assignments").select("id").eq("student_id", s.student_id).in("id", ticked),
-    db.from("practice_logs").select("*").eq("student_id", s.student_id).eq("practice_date", s.practice_date).maybeSingle(),
-  ]);
+  const heard = a.items.filter((i) => i.practiced && i.confidence !== "low").map((i) => i.assignment_id);
+  if (!heard.length) return;
+  const { data: log } = await db
+    .from("practice_logs")
+    .select("*")
+    .eq("student_id", s.student_id)
+    .eq("practice_date", s.practice_date)
+    .maybeSingle();
   if (!log) return;
+  const unticked = new Set(heardBefore.filter((id) => !(log.completed_assignment_ids ?? []).includes(id)));
+  const ticked = heard.filter((id) => !unticked.has(id));
+  if (!ticked.length) return;
+  const { data: valid } = await db.from("assignments").select("id").eq("student_id", s.student_id).in("id", ticked);
   const completed = [...new Set([...(log.completed_assignment_ids ?? []), ...(valid ?? []).map((v) => v.id)])];
   if (completed.length === (log.completed_assignment_ids ?? []).length) return;
   await db.from("practice_logs").update({ completed_assignment_ids: completed }).eq("id", log.id);
@@ -449,7 +457,7 @@ export async function reviewAgainstNewList(lessonId: string): Promise<void> {
 }
 
 async function contextFor(db: Db, s: PracticeSession) {
-  const [{ data: student }, { data: lesson }, { data: repertoire }, { data: earlier }, melodies] = await Promise.all([
+  const [{ data: student }, { data: lesson }, { data: repertoire }, { data: earlier }, melodies, offRecording] = await Promise.all([
     db.from("students").select("*").eq("id", s.student_id).single(),
     planFor(db, s),
     db.from("repertoire").select("title, status").eq("student_id", s.student_id),
@@ -463,6 +471,7 @@ async function contextFor(db: Db, s: PracticeSession) {
       .order("started_at", { ascending: false })
       .limit(20),
     studentMelodies(db, s.student_id),
+    doneOffRecording(db, s),
   ]);
   // As the list stood before this practice (a review can be written again).
   const focusItems = await openFocus(db, s.student_id, { before: s.practice_date, notSession: s.id });
@@ -527,6 +536,7 @@ async function contextFor(db: Db, s: PracticeSession) {
     focusItems: focusItems.map((f) => ({ id: f.id, title: f.title, piece: f.piece, status: STATUS_WORDS[f.status] })),
     focusRows: focusItems,
     practiceNumber: sinceLesson,
+    doneOffRecording: offRecording,
     musicText: musicText(music, melodies.length),
     methodText: methodText(method),
     style,
@@ -540,6 +550,30 @@ async function contextFor(db: Db, s: PracticeSession) {
     earlierIntonation,
     knownTitles,
   };
+}
+
+/**
+ * That day's ticks that came by hand, not from a recording: the log's ticks
+ * less what the other counted sessions that day heard and what this
+ * session's own earlier review heard (a review written again).
+ */
+async function doneOffRecording(db: Db, s: PracticeSession): Promise<string[]> {
+  const [{ data: log }, { data: others }] = await Promise.all([
+    db
+      .from("practice_logs")
+      .select("completed_assignment_ids")
+      .eq("student_id", s.student_id)
+      .eq("practice_date", s.practice_date)
+      .maybeSingle(),
+    db
+      .from("practice_sessions")
+      .select("analysis, counted")
+      .eq("student_id", s.student_id)
+      .eq("practice_date", s.practice_date)
+      .neq("id", s.id),
+  ]);
+  const own = new Set(heardIds(s.analysis as PracticeAnalysis | null));
+  return handTicked(log?.completed_assignment_ids, others ?? []).filter((id) => !own.has(id));
 }
 
 /** The code's matches against the uploaded music, as lines for Claude. */

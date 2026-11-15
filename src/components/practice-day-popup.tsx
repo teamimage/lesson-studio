@@ -28,10 +28,13 @@ export function PracticeDayCell({
   className,
   title,
   practiceHref,
+  editHref,
   children,
 }: {
   /** List mode: the page for this day's practice; lessons link to their lesson page. */
   practiceHref?: string;
+  /** The day's own page, where the family or teacher can change what was done. */
+  editHref?: string;
   day?: PracticeDay;
   /** The cell's date; needed when a lesson day has no practice. */
   date?: string;
@@ -70,6 +73,7 @@ export function PracticeDayCell({
           lessons={lessons ?? []}
           teacherView={teacherView}
           practiceHref={practiceHref}
+          editHref={editHref}
           onClose={() => setOpen(false)}
         />
       )}
@@ -83,6 +87,7 @@ function DayPopup({
   lessons,
   teacherView,
   practiceHref,
+  editHref,
   onClose,
 }: {
   date: string;
@@ -90,6 +95,7 @@ function DayPopup({
   lessons: LessonMark[];
   teacherView: boolean;
   practiceHref?: string;
+  editHref?: string;
   onClose: () => void;
 }) {
   useBackToClose(true, onClose);
@@ -145,6 +151,11 @@ function DayPopup({
           {day && (
             <DayBody day={day} sessions={sessions} dayGrade={dayGrade} teacherView={teacherView} />
           )}
+          {editHref && (day || lessons.some((l) => !l.upcoming)) && (
+            <Link href={editHref} className="text-[16px] font-medium text-accent-ink underline">
+              {day ? "Change what was done this day" : "Log practice for this day"}
+            </Link>
+          )}
         </div>
         )}
       </div>
@@ -187,6 +198,7 @@ function DayBody({
               key={s.id}
               s={s}
               titles={day.titles}
+              handTicked={day.handTicked}
               teacherView={teacherView}
               heading={sessions.length > 1 ? `Session ${i + 1}` : null}
             />
@@ -393,11 +405,13 @@ function DayTotals({ day }: { day: PracticeDay }) {
 function SessionBlock({
   s,
   titles,
+  handTicked,
   teacherView,
   heading,
 }: {
   s: DaySession;
   titles: Record<string, string>;
+  handTicked: string[];
   teacherView: boolean;
   heading: string | null;
 }) {
@@ -427,7 +441,7 @@ function SessionBlock({
         {s.with_helper ? " · with a helper" : ""}
       </div>
       {r?.summary && <div>{r.summary}</div>}
-      {r && <PracticeReviewBody review={r} titles={titles} teacherView={teacherView} />}
+      {r && <PracticeReviewBody review={r} titles={titles} teacherView={teacherView} handTicked={handTicked} />}
     </section>
   );
 }

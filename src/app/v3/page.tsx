@@ -238,7 +238,7 @@ async function LessonDay({
             <div className="flex flex-col gap-3">
               <Card>
                 <div className="mb-2 text-sm font-medium text-muted">{capitalize(practiceSpanLabel(next.week))}</div>
-                <WeekStrip week={next.week} days={days} lessons={lessonDays} teacherView />
+                <WeekStrip week={next.week} days={days} lessons={lessonDays} teacherView studentId={next.student.id} />
                 <GradeLegend className="mt-2" />
                 <div className="mt-2 text-sm text-muted">
                   {next.week.totalMinutes} min · listened {next.week.daysListened} of {next.week.days.length} days

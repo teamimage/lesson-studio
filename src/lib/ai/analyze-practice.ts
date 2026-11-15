@@ -52,6 +52,11 @@ export type PracticeContext = {
   practiceNumber?: number;
   /** The open points on "What we're working on", most important first. */
   focusItems?: { id: string; title: string; piece: string; status: string }[];
+  /**
+   * Assignment ids the family or teacher ticked off by hand that day and no
+   * recording heard: done off the recording (often before it was started).
+   */
+  doneOffRecording?: string[];
 };
 
 const POINT = {
@@ -240,6 +245,13 @@ function contextText(c: PracticeContext): string {
   } else {
     lines.push("There is no assignment list yet; describe what was practised.");
   }
+  const offRec = c.assignments.filter((a) => c.doneOffRecording?.includes(a.id));
+  if (offRec.length)
+    lines.push(
+      `Ticked off by hand that day by the family or teacher, done off this recording (often before the recording was started):\n${offRec
+        .map((a) => `${a.id} | ${a.title}`)
+        .join("\n")}\nYou did not hear these. In items, mark them practiced only if you really hear them; otherwise practiced false with the note "done off the recording". They were done, so never call them skipped, missed or left (no "left" line, no skipped bullet), and count them as covered for the grade; judge the quality of the work only from what you heard.`,
+    );
   if (c.pieces.length)
     lines.push(`Pieces worked on in that lesson:\n${c.pieces.map((p) => (p.notes ? `${p.title}: ${p.notes}` : p.title)).join("\n")}`);
   if (c.currentPieces.length) lines.push(`Current pieces not on the assignment list:\n${c.currentPieces.join("\n")}`);

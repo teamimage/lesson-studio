@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { todayISO } from "@/lib/format";
 
 // Saves one day of practice for a student. Works for a parent or the teacher;
 // row-level security decides who may write.
@@ -56,4 +57,56 @@ export async function loadPracticeLog(studentId: string, date: string) {
     .eq("practice_date", date)
     .maybeSingle();
   return data;
+}
+
+/**
+ * The practice day page: the family or the teacher changes what was done
+ * that day after the fact (ticks off work the recording missed because it
+ * started late, fixes the minutes, the listening and the note). Only the
+ * fields given are changed; the listening plays stay. Row-level security
+ * decides who may write.
+ */
+export async function savePracticeDay(input: {
+  studentId: string;
+  date: string;
+  done: string[];
+  minutes: number | null;
+  listened: boolean;
+  note: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { studentId, date } = input;
+  if (!studentId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "That day couldn't be found." };
+  if (date > todayISO()) return { ok: false, error: "That day hasn't happened yet." };
+  const viewer = await getViewer();
+  const supabase = await createClient();
+  const minutes =
+    input.minutes == null || !Number.isFinite(input.minutes) ? null : Math.max(0, Math.min(600, Math.round(input.minutes)));
+  const { data: existing } = await supabase
+    .from("practice_logs")
+    .select("id, logged_by")
+    .eq("student_id", studentId)
+    .eq("practice_date", date)
+    .maybeSingle();
+  const { error } = await supabase.from("practice_logs").upsert(
+    {
+      student_id: studentId,
+      practice_date: date,
+      minutes,
+      listened: input.listened,
+      completed_assignment_ids: [...new Set(input.done.filter(Boolean))],
+      parent_note: input.note.trim() || null,
+      logged_by: existing?.logged_by ?? viewer.userId,
+    },
+    { onConflict: "student_id,practice_date" },
+  );
+  if (error) return { ok: false, error: "Couldn't save that. Try again." };
+  revalidatePath("/");
+  revalidatePath("/family");
+  revalidatePath(`/family/${studentId}`);
+  revalidatePath(`/students/${studentId}`);
+  revalidatePath(`/v3/students/${studentId}`);
+  revalidatePath(`/v3/students/${studentId}/practice/${date}`);
+  revalidatePath(`/v3/family/${studentId}`);
+  revalidatePath(`/v3/family/${studentId}/practice`);
+  return { ok: true };
 }
