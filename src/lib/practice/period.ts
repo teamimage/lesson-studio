@@ -11,6 +11,7 @@ import { MissingKeyError } from "@/lib/ai/assemblyai";
 import { claudeCost, type ClaudeUsage } from "@/lib/ai/pricing";
 import type { PracticeAnalysis, PeriodReview } from "./review-types";
 import type { PracticeSessionView } from "./data";
+import { handTicked } from "./hand-ticks";
 import { scaleLine } from "./scales";
 import { INTONATION_VERSION, tendencyText, verdictText } from "./intonation";
 import { regradeIntonation } from "./regrade";
@@ -212,6 +213,10 @@ export async function getPeriod(studentId: string, day: string, today = todayISO
     activity: null,
     review: (s.analysis as PracticeAnalysis | null) ?? null,
     titles,
+    handTicked: handTicked(
+      logs.find((l) => l.practice_date === s.practice_date)?.completed_assignment_ids,
+      periodSess.filter((x) => x.practice_date === s.practice_date),
+    ),
   }));
 
   // Check marks per day: ticks in the practice log (from sessions or by hand).

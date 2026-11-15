@@ -143,6 +143,7 @@ export function PracticeMonthCalendar({
                   lessons={lessons}
                   teacherView={teacherView}
                   practiceHref={eventLinks ? `/v3/students/${studentId}/practice/${d}` : undefined}
+                  editHref={d <= today ? `/v3/students/${studentId}/practice/${d}` : undefined}
                   title={`${parseISODate(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${minutes ? ` · ${minutes} min` : ""}${day?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}${noRecording ? " · no recording" : ""}`}
                   className={cx(
                     "relative flex h-11 flex-col items-center justify-center rounded-lg",

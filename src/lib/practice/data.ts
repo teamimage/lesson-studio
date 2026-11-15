@@ -3,11 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import type { PracticeAnalysis } from "@/lib/ai/analyze-practice";
 import type { PracticeSession } from "./process";
 import { regradeIntonation } from "./regrade";
+import { handTicked } from "./hand-ticks";
 
 export type PracticeSessionView = PracticeSession & {
   review: PracticeAnalysis | null;
   /** Assignment titles by id, for the items in the review. */
   titles: Record<string, string>;
+  /** Items ticked off that day by the family or teacher that no recording heard. */
+  handTicked: string[];
 };
 
 /** Recent practice sessions for a student (or one day of them), newest first, with assignment titles. */
@@ -20,13 +23,36 @@ export async function listPracticeSessions(studentId: string, limit = 10, day?: 
   if (error || !data?.length) return [];
   const rows = await regradeIntonation(db, data);
 
-  const lessonIds = [...new Set(data.map((s) => s.lesson_id).filter((x): x is string => !!x))];
-  const { data: assignments } = lessonIds.length
-    ? await db.from("assignments").select("id, title").in("lesson_id", lessonIds)
-    : { data: [] as { id: string; title: string }[] };
+  const lessonIds = [
+    ...new Set(
+      data
+        .flatMap((s) => [s.lesson_id, (s.analysis as PracticeAnalysis | null)?.checked_against?.lesson_id])
+        .filter((x): x is string => !!x),
+    ),
+  ];
+  const dates = [...new Set(data.map((s) => s.practice_date))];
+  const [{ data: assignments }, { data: logs }, { data: sameDays }] = await Promise.all([
+    lessonIds.length
+      ? db.from("assignments").select("id, title").in("lesson_id", lessonIds)
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+    db.from("practice_logs").select("practice_date, completed_assignment_ids").eq("student_id", studentId).in("practice_date", dates),
+    // Every session on those days, so a tick another recording heard isn't called "by hand".
+    db.from("practice_sessions").select("practice_date, analysis, counted").eq("student_id", studentId).in("practice_date", dates),
+  ]);
   const titles = Object.fromEntries((assignments ?? []).map((a) => [a.id, a.title]));
+  const hand: Record<string, string[]> = {};
+  for (const d of dates) {
+    const log = (logs ?? []).find((l) => l.practice_date === d);
+    hand[d] = handTicked(log?.completed_assignment_ids, (sameDays ?? []).filter((x) => x.practice_date === d));
+  }
   // The sound timeline is large (fine pitch readings) and pages don't show it.
-  return rows.map((s) => ({ ...s, activity: null, review: (s.analysis as PracticeAnalysis | null) ?? null, titles }));
+  return rows.map((s) => ({
+    ...s,
+    activity: null,
+    review: (s.analysis as PracticeAnalysis | null) ?? null,
+    titles,
+    handTicked: hand[s.practice_date] ?? [],
+  }));
 }
 
 /** One recorded session, trimmed for the practice chart's day popup. */
@@ -58,6 +84,8 @@ export type PracticeDay = {
   noRecording: boolean;
   /** Assignment titles by id, for the items in the reviews. */
   titles: Record<string, string>;
+  /** Ids ticked off that day by the family or teacher that no recording heard. */
+  handTicked: string[];
 };
 
 /**
@@ -95,7 +123,7 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
 
   const days: Record<string, PracticeDay> = {};
   const day = (date: string) =>
-    (days[date] ??= { date, minutes: 0, listened: false, ticked: [], parentNote: null, sessions: [], noRecording: false, titles });
+    (days[date] ??= { date, minutes: 0, listened: false, ticked: [], parentNote: null, sessions: [], noRecording: false, titles, handTicked: [] });
   for (const l of logs ?? []) {
     const d = day(l.practice_date);
     d.minutes = l.minutes ?? 0;
@@ -120,6 +148,10 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
       recording_missing: missing,
       with_helper: !!s.with_helper,
     });
+  }
+  for (const l of logs ?? []) {
+    const d = days[l.practice_date];
+    if (d) d.handTicked = handTicked(l.completed_assignment_ids, d.sessions);
   }
   return days;
 }

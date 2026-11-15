@@ -28,26 +28,36 @@ export type CheckRow = {
   title: string;
   practiced: boolean;
   maybe: boolean;
+  /** Not heard on the recording, but ticked off by the family or teacher. */
+  byHand: boolean;
   minutes: number;
   note: string;
   group: "assigned" | "current";
 };
 
-export function checklist(r: PracticeAnalysis, titles: Record<string, string>): CheckRow[] {
-  const assigned: CheckRow[] = r.items.map((it) => ({
-    key: it.assignment_id,
-    title: titles[it.assignment_id] ?? "Assignment",
-    practiced: it.practiced,
-    maybe: it.practiced && it.confidence === "low",
-    minutes: it.minutes,
-    note: it.note,
-    group: "assigned",
-  }));
+export function checklist(r: PracticeAnalysis, titles: Record<string, string>, handTicked: string[] = []): CheckRow[] {
+  const hand = new Set(handTicked);
+  const assigned: CheckRow[] = r.items.map((it) => {
+    const heard = it.practiced && it.confidence !== "low";
+    const byHand = !heard && hand.has(it.assignment_id);
+    return {
+      key: it.assignment_id,
+      title: titles[it.assignment_id] ?? "Assignment",
+      practiced: it.practiced || byHand,
+      maybe: it.practiced && it.confidence === "low" && !byHand,
+      byHand,
+      minutes: it.minutes,
+      // The review's note says what it heard ("not played"), which a hand tick overrides.
+      note: byHand ? "" : it.note,
+      group: "assigned",
+    };
+  });
   const current: CheckRow[] = (r.repertoire ?? []).map((p) => ({
     key: `rep-${p.title}`,
     title: p.title,
     practiced: p.practiced,
     maybe: false,
+    byHand: false,
     minutes: 0,
     note: p.note,
     group: "current",
@@ -108,13 +118,16 @@ export function PracticeReviewBody({
   titles,
   compact = false,
   teacherView = false,
+  handTicked = [],
 }: {
   review: PracticeAnalysis;
   titles: Record<string, string>;
   compact?: boolean;
   teacherView?: boolean;
+  /** That day's items ticked by hand, shown ticked with "by hand". */
+  handTicked?: string[];
 }) {
-  const rows = checklist(r, titles);
+  const rows = checklist(r, titles, handTicked);
   const assigned = rows.filter((c) => c.group === "assigned");
   const current = rows.filter((c) => c.group === "current");
   const goingWell = (r.going_well ?? []).map((p) => p.text);
@@ -136,6 +149,7 @@ export function PracticeReviewBody({
                 <CheckMark on={c.practiced} className="h-4 w-4 text-[10px]" />
                 {c.title}
                 {c.maybe && <span className="text-muted">?</span>}
+                {c.byHand && <span className="text-muted">(by hand)</span>}
               </li>
             ))}
           </ul>
@@ -274,6 +288,7 @@ function CheckGroup({ label, rows, showLabel }: { label: string; rows: CheckRow[
               <span className="font-medium">{c.title}</span>
               {c.practiced && c.minutes > 0 && <span className="text-muted"> · {Math.round(c.minutes)} min</span>}
               {c.maybe && <span className="text-muted"> · maybe</span>}
+              {c.byHand && <span className="text-muted"> · ticked by hand</span>}
               {c.note && <span className="text-sm text-muted"> · {c.note}</span>}
             </span>
           </li>

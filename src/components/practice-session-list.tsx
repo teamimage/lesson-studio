@@ -64,7 +64,7 @@ function SessionCard({
   const r = s.review;
   const working = s.status === "transcribing" || s.status === "analyzing";
   const stuckUpload = s.status === "uploading" && uploadStuck(s.created_at);
-  const checks = r ? checklist(r, s.titles) : [];
+  const checks = r ? checklist(r, s.titles, s.handTicked) : [];
   const done = checks.filter((c) => c.practiced).length;
 
   // Flat: no frame and no open/close of its own, so the text runs the full
@@ -104,7 +104,7 @@ function SessionCard({
         <div className="flex flex-col gap-3 text-[16px]">
           {s.status === "error" && <div className="text-sm text-danger">{s.error || "The review didn't finish."}</div>}
           {working && <div className="text-sm text-muted">Listening back to the practice. This takes a minute or two.</div>}
-          {r && <PracticeReviewBody review={r} titles={s.titles} compact={compact} teacherView={teacherView} />}
+          {r && <PracticeReviewBody review={r} titles={s.titles} compact={compact} teacherView={teacherView} handTicked={s.handTicked} />}
           <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canRedo={teacherView && s.status === "done" && !!r}
             canSwitch={canSwitch && (s.status === "done" || s.status === "error")}
           />
@@ -152,7 +152,7 @@ function SessionCard({
         <div className="flex flex-col gap-3 border-t border-rule px-4 py-3 text-[16px]">
           {s.status === "error" && <div className="text-sm text-danger">{s.error || "The review didn't finish."}</div>}
           {working && <div className="text-sm text-muted">Listening back to the practice. This takes a minute or two.</div>}
-          {r && <PracticeReviewBody review={r} titles={s.titles} compact={compact} teacherView={teacherView} />}
+          {r && <PracticeReviewBody review={r} titles={s.titles} compact={compact} teacherView={teacherView} handTicked={s.handTicked} />}
           <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canRedo={teacherView && s.status === "done" && !!r}
             canSwitch={canSwitch && (s.status === "done" || s.status === "error")}
           />

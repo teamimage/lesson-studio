@@ -188,7 +188,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <section className="flex flex-col gap-2">
             <h2 className="font-display text-[22px] font-semibold">Since the last lesson</h2>
             <Card>
-              <WeekStrip week={week} large days={practiceDays} lessons={lessonDays} />
+              <WeekStrip week={week} large days={practiceDays} lessons={lessonDays} studentId={studentId} />
               <p className="mt-3 text-[18px]">
                 {week.daysPracticed} of {week.days.length} days practised
                 {week.totalMinutes > 0 ? ` · ${week.totalMinutes} min` : ""}

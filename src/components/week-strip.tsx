@@ -15,7 +15,10 @@ export function WeekStrip({
   days,
   lessons,
   teacherView = false,
+  studentId,
 }: {
+  /** Lets a day's popup link to that day's own page, to change what was done. */
+  studentId?: string;
   week: PracticeWeek;
   large?: boolean;
   days?: Record<string, PracticeDay>;
@@ -42,6 +45,7 @@ export function WeekStrip({
               date={day}
               lessons={lessonMarks}
               teacherView={teacherView}
+              editHref={studentId && day <= today ? `/v3/students/${studentId}/practice/${day}` : undefined}
               title={`${day}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${log?.minutes ? ` · ${log.minutes} min` : ""}${recorded ? " · recorded" : ""}${noRecording ? " · no recording" : ""}`}
               className={cx(
                 "relative flex items-center justify-center rounded-full border text-xs font-semibold",
