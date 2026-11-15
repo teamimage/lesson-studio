@@ -5,6 +5,7 @@ import { cx, Pill } from "@/components/ui";
 import { LocalTime } from "@/components/local-time";
 import { PracticeReviewBody } from "@/components/practice-review";
 import { GRADE_TONE, GradeLegend } from "@/components/grade-legend";
+import { bestGrade, gradeMark, gradeName, gradingOfReviews } from "@/lib/grading";
 import { formatDate } from "@/lib/format";
 import type { DaySession, PracticeDay } from "@/lib/practice/data";
 import { useBackToClose } from "@/lib/use-back-to-close";
@@ -169,7 +170,9 @@ function DayBody({
           ) : dayGrade ? (
             <GradeBadgeRow grade={dayGrade} line={`Best of ${sessions.length} sessions today.`} />
           ) : null}
-          {sessions.length > 0 && <GradeLegend family={!teacherView} className="-mt-2" />}
+          {sessions.length > 0 && (
+            <GradeLegend family={!teacherView} className="-mt-2" grading={gradingOfReviews(sessions.map((s) => s.review))} />
+          )}
 
           <DayTotals day={day} />
 
@@ -315,11 +318,7 @@ export function LessonNote({ upcoming = false, small = false }: { upcoming?: boo
   );
 }
 
-const GRADE_ORDER = ["A", "B", "C", "D", "F"];
 
-function bestGrade(grades: string[]): string {
-  return [...grades].sort((a, b) => GRADE_ORDER.indexOf(a) - GRADE_ORDER.indexOf(b))[0];
-}
 
 function GradeBadge({ grade, small }: { grade: string | null; small?: boolean }) {
   return (
@@ -329,9 +328,9 @@ function GradeBadge({ grade, small }: { grade: string | null; small?: boolean })
         small ? "h-10 w-10 text-xl" : "h-16 w-16 text-4xl",
         grade ? GRADE_TONE[grade] : "border border-dashed border-rule text-muted",
       )}
-      aria-label={grade ? `Grade ${grade}` : "No grade"}
+      aria-label={grade ? gradeName(grade) : "No grade"}
     >
-      {grade ?? "–"}
+      {grade ? gradeMark(grade) : "–"}
     </span>
   );
 }
@@ -359,6 +358,7 @@ function gradeLine(s: DaySession): { grade: string | null; line: string } {
 }
 
 function GradeBlock({ session, small }: { session: DaySession; small?: boolean }) {
+  if (session.review?.grading?.system === "none") return null;
   const { grade, line } = gradeLine(session);
   return <GradeBadgeRow grade={grade} line={line} small={small} />;
 }

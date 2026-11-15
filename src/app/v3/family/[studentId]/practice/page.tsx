@@ -1,4 +1,5 @@
 import { GradeLegend } from "@/components/grade-legend";
+import { gradingOfStudent } from "@/lib/grading";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Shell } from "@/components/shell";
@@ -192,7 +193,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 {week.daysPracticed} of {week.days.length} days practised
                 {week.totalMinutes > 0 ? ` · ${week.totalMinutes} min` : ""}
               </p>
-              <GradeLegend family className="mt-2" />
+              <GradeLegend family className="mt-2" grading={gradingOfStudent(student)} instrument={student.instrument} />
             </Card>
           </section>
         </div>

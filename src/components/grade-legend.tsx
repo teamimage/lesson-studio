@@ -1,4 +1,13 @@
 import { cx } from "@/components/ui";
+import {
+  DEFAULT_GRADING,
+  GRADE_TONE,
+  STANDARD_LABELS,
+  definitionsFor,
+  gradeMark,
+  instrumentFamily,
+  type GradingConfig,
+} from "@/lib/grading";
 
 // "What do grades mean?": a small link next to the practice grade and the
 // practice chart that opens, in place, a short key to the A-F practice
@@ -8,29 +17,7 @@ import { cx } from "@/components/ui";
 // src/lib/ai/analyze-practice.ts and the cents bands in
 // src/lib/practice/intonation.ts.
 
-export const GRADE_TONE: Record<string, string> = {
-  A: "bg-sage text-white",
-  B: "bg-sage/70 text-white",
-  C: "bg-amber text-white",
-  D: "bg-accent text-white",
-  F: "bg-danger text-white",
-};
-
-const FAMILY_GRADES: [string, string][] = [
-  ["A", "Focused practice. Most of the list, with real work on the hard spots."],
-  ["B", "Good practice with one thing missing, like a skipped piece or no slow work."],
-  ["C", "Some useful practice, but a lot left out, or mostly playing straight through."],
-  ["D", "A little real practice, with a lot of wandering."],
-  ["F", "Counted, but barely practice."],
-];
-
-const TEACHER_GRADES: [string, string][] = [
-  ["A", "Focused practice that covered most of the list, with real work on hard spots."],
-  ["B", "Good practice with one thing missing (a skipped assignment, little slow work)."],
-  ["C", "Some useful practice, but much left out or mostly playing through."],
-  ["D", "A little real practice in a lot of wandering."],
-  ["F", "Counted, but barely practice."],
-];
+export { GRADE_TONE } from "@/lib/grading";
 
 const TUNING_BANDS: [string, string][] = [
   ["within 7 cents", "in tune"],
@@ -43,13 +30,22 @@ export function GradeLegend({
   family = false,
   className,
   label = "What do grades mean?",
+  grading = DEFAULT_GRADING,
+  instrument,
 }: {
   /** Parent and child wording, in big type. */
   family?: boolean;
   className?: string;
   label?: string;
+  /** The student's grading system, standard and definitions. */
+  grading?: GradingConfig;
+  /** Leaves out the intonation key for piano. */
+  instrument?: string | null;
 }) {
-  const grades = family ? FAMILY_GRADES : TEACHER_GRADES;
+  const grades = definitionsFor(grading);
+  const passFail = grading.system === "pass_fail";
+  const showTuning = instrumentFamily(instrument) !== "piano";
+  if (grading.system === "none" && !showTuning) return null;
   return (
     <details className={cx("group", className)}>
       <summary
@@ -74,14 +70,18 @@ export function GradeLegend({
           family ? "text-[18px] leading-relaxed" : "text-[15px]",
         )}
       >
-        <p>
-          {family
-            ? "Each recorded practice gets one letter for the session as a whole. It's about how the practice time was used, not talent, and not how hard the music is."
-            : "One letter per recorded session, for the session as a whole: how well the practice time was used, judged from the recording against the current lesson's list. Not talent, not how hard the music is."}
-        </p>
+        {grading.system === "none" ? (
+          <p>{family ? "Practice isn't graded. The reviews say what went well and what to work on." : "Grades are off for this student. Reviews still list what went well and what to work on."}</p>
+        ) : (
+          <p>
+            {family
+              ? `Each recorded practice gets ${passFail ? "a pass or a fail" : "one letter"} for the session as a whole. It's about how the practice time was used, not talent, not how hard the music is, and not how long it was.`
+              : `${passFail ? "Pass or fail" : "One letter"} per recorded session, on your ${STANDARD_LABELS[grading.standard].label} standard: how well the practice time was used, judged from the recording against the current lesson's list. Not talent, not difficulty, not length.`}
+          </p>
+        )}
 
         <ul className="flex flex-col gap-2">
-          {grades.map(([g, text]) => (
+          {grades.map(({ grade: g, text }) => (
             <li key={g} className="flex items-start gap-3">
               <span
                 className={cx(
@@ -90,34 +90,39 @@ export function GradeLegend({
                   GRADE_TONE[g],
                 )}
               >
-                {g}
+                {gradeMark(g)}
               </span>
-              <span className="pt-1">{text}</span>
+              <span className="pt-1">
+                {passFail && <span className="font-semibold">{g}: </span>}
+                {text}
+              </span>
             </li>
           ))}
         </ul>
 
-        {family ? (
-          <p>
-            <strong>What helps the grade:</strong> doing the teacher&apos;s list, slow careful work on the hard spots,
-            really playing (not long breaks or noodling), and playing in tune. If the notes are often out of tune, the
-            grade can&apos;t be an A, however well the time was used.
-          </p>
-        ) : (
-          <div>
-            <div className="font-semibold">What the reviewer weighs</div>
-            <ul className="mt-1 list-disc pl-5">
-              <li>Coverage: assignments and current pieces worked on, especially your focus.</li>
-              <li>Focused work: repeating hard spots, slow work, scales before pieces, rather than only playing through.</li>
-              <li>Time on task: playing time against session length, few long breaks, a sensible length for the age.</li>
-              <li>
-                Care: steady tempo and intonation. An &quot;uneven&quot; or &quot;often out of tune&quot; intonation verdict
-                keeps the grade below A.
-              </li>
-            </ul>
-          </div>
-        )}
+        {grading.system !== "none" &&
+          (family ? (
+            <p>
+              <strong>What helps:</strong> working on the teacher&apos;s focus first, slow careful work on the hard
+              spots, then playing them through. A short practice can get {passFail ? "a pass" : "an A"}.
+            </p>
+          ) : (
+            <div>
+              <div className="font-semibold">What the reviewer weighs</div>
+              <ul className="mt-1 list-disc pl-5">
+                <li>Your focus first, then how much of the list got real work.</li>
+                <li>Method: looping and slowing hard spots, then getting through, rather than restarting or only playing through.</li>
+                <li>
+                  {instrumentFamily(instrument) === "piano"
+                    ? "Care: steady pulse, right notes and evenness. Hands together, voicing and pedalling can't be heard from the phone, so they don't count."
+                    : "Care: steady pulse, right notes and measured intonation."}
+                </li>
+                <li>Length doesn&apos;t count either way. Change the system, standard or wording in Settings, Grading.</li>
+              </ul>
+            </div>
+          ))}
 
+        {showTuning && (
         <div>
           <div className="font-semibold">{family ? "In tune is checked separately" : "Intonation, a separate measure"}</div>
           <p className="mt-1">
@@ -141,11 +146,12 @@ export function GradeLegend({
             </p>
           )}
         </div>
+        )}
 
         <ul className={cx("flex flex-col gap-1", family ? "" : "text-muted")}>
           <li>
             {family
-              ? "More than one session in a day? The chart shows the best grade."
+              ? "More than one session in a day? The calendar shows the best grade."
               : "Several sessions in a day: the day shows the best grade."}
           </li>
           <li>

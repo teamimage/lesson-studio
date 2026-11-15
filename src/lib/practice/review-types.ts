@@ -4,6 +4,7 @@
 import type { ScaleSummary } from "./scales";
 import type { MusicMatch } from "@/lib/melody";
 import type { PieceMethod } from "./method";
+import type { GradeValue, GradingStandard, GradingSystem } from "@/lib/grading";
 
 /**
  * What a "going well" or "work on" bullet is about. Kept as data so later
@@ -46,14 +47,15 @@ export type PracticeItem = {
 /** A current piece (from the student's repertoire) that isn't on the assignment list. */
 export type RepertoireCheck = { title: string; practiced: boolean; note: string };
 
-/** Letter grade for how well a session was used. Empty when not counted. */
-export const PRACTICE_GRADES = ["A", "B", "C", "D", "F"] as const;
-export type PracticeGrade = (typeof PRACTICE_GRADES)[number];
+/** Grade for how well a session was used: a letter, or Pass/Fail. Empty when not counted or not graded. */
+export type PracticeGrade = GradeValue;
 
 export type PracticeAnalysis = {
   counted: boolean;
   /** Missing on reviews written before grading was added; empty when not counted. */
   grade?: PracticeGrade | "";
+  /** The system and standard it was graded on. Missing before Nov 15 2026 (letter, strict rules). */
+  grading?: { system: GradingSystem; standard: GradingStandard };
   /** One short line on why the session got that grade. */
   grade_reason?: string;
   not_counted_reason: string;

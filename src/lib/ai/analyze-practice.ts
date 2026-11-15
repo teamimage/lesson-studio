@@ -1,7 +1,8 @@
 import "server-only";
 import { anthropicClient, DraftError, lessonModel, usageRows } from "./draft-lesson";
 import type { ClaudeUsage } from "./pricing";
-import { POINT_TOPICS, PRACTICE_GRADES, type PracticeAnalysis } from "@/lib/practice/review-types";
+import { POINT_TOPICS, type PracticeAnalysis } from "@/lib/practice/review-types";
+import { ALL_GRADES, DEFAULT_GRADING, gradesFor, gradingPrompt, type GradingConfig } from "@/lib/grading";
 import type { ScaleSummary } from "@/lib/practice/scales";
 import { systemWithStyle, type TeachingStyle } from "./teaching-style";
 
@@ -40,6 +41,8 @@ export type PracticeContext = {
   intonationText: string;
   /** The teacher's review tone and teaching profile. */
   style?: TeachingStyle;
+  /** Grading system, standard and definitions for this student. */
+  grading?: GradingConfig;
   /**
    * What the family was told after the last few practices (newest first), so
    * this review can lead with what changed instead of saying it all again.
@@ -84,7 +87,7 @@ const SCHEMA = {
   properties: {
     counted: { type: "boolean" },
     not_counted_reason: { type: "string" },
-    grade: { type: "string", enum: [...PRACTICE_GRADES, ""] },
+    grade: { type: "string", enum: [...ALL_GRADES, ""] },
     grade_reason: { type: "string" },
     summary: { type: "string" },
     items: {
@@ -163,7 +166,7 @@ const SCHEMA = {
   },
 } as const;
 
-const SYSTEM = `You review a child's recorded home music practice for their family and their teacher. Most students follow the Suzuki method: a parent supervises daily practice, and the teacher assigns a short list of pieces, review pieces and technique (scales, arpeggios, etudes, bow or hand exercises) each week.
+const SYSTEM_TEMPLATE = `You review a child's recorded home music practice for their family and their teacher. Most students follow the Suzuki method: a parent supervises daily practice, and the teacher assigns a short list of pieces, review pieces and technique (scales, arpeggios, etudes, bow or hand exercises) each week.
 
 You cannot hear the recording. You get what the phone wrote down while it recorded: one line per second with sound, giving the loudest level (dB below full scale; quieter than -50 dB counts as quiet) and the notes it detected in that second, in order, as note names with octave (C4 is middle C), sometimes with the average distance from the nearest note in cents. Quiet stretches are folded into one line. The pitch detector follows one melody line: chords and piano accompaniment come out as their top or strongest note, and it can briefly jump an octave. You may also get a transcript of anything said aloud (often the parent or child naming what comes next). Long stretches of music can produce garbled words in the transcript; ignore those.
 
@@ -187,13 +190,7 @@ How the student practised matters as much as what. Judge the method the way an e
 
 counted: false only when the session clearly wasn't practice: almost nothing musical, or only a few random notes now and then, or long silence with sound only at the very start and end. A short but real practice counts. Put a one-sentence, non-judgemental reason in not_counted_reason (empty when counted).
 
-grade: a letter grade, A, B, C, D or F, for the quality of the practice in this session (not the child's talent or how hard the music is). Judge how well the time was used, from the evidence:
-- Coverage: how many of the assignments and current pieces were worked on, especially the teacher's focus.
-- Method: isolating and looping hard spots, slow work, then getting through; not restarting from the top and stalling, and not only playing straight through. A session that keeps restarting and stalling at the same spot with no slow or spot work can't be above C however long it was.
-- Time on task: playing time against session length, few long breaks, and a length that is reasonable for the student's age (a focused 10 to 15 minutes is good practice for a young child).
-- Care: steady tempo and intonation where the note data shows it. Intonation that is "uneven" or "often out of tune" keeps the grade below A however well the time was used.
-A means focused practice that covered most of the list with real work on hard spots. B is good practice with one thing missing (a skipped assignment, little slow work). C is some useful practice but much left out or mostly playing through. D is a little real practice in a lot of wandering. F is reserved for a session that was counted but barely practice. Grade fairly and without inflation, but remember a parent and child will read it. Empty only when the session wasn't counted.
-grade_reason: one short, plain sentence (under 15 words) on the main reason for the grade, in different words from the work_on bullets, naming what would raise it when it isn't an A ("Covered everything with careful slow work on the shift." or "Lovely Gavotte; add the D major scale for an A.").
+<<GRADING>>
 
 Write for the parent and child in a plain, kind, factual voice, as a good teacher talks to a child: never scold, shame or sound suspicious, and never flatter. Praise has to be earned by the evidence: no "great job", "amazing" or "well done" for simply playing, for playing a lot, or for repeating things. These are children and practising at all counts for something, so say what was done, but say honestly how it was done. How warm or firm to be is set by the teacher's review tone at the end of these instructions. Keep everything short: these are a checklist and bullet points, not explanations.
 Everything the family reads (summary, encouragement, going_well, work_on, method_note, grade_reason, notes) describes the playing only. Never describe the child's mood, attitude, effort of will, attention or behaviour ("frustrated", "distracted", "silly", "unfocused", "noodling", "not trying", "tired of it"), and never report or comment on what family members said to each other, or how a parent spoke. If something of that kind matters for the teacher, put the plain fact in teacher_note only. When the recording shows a child upset, the family's text says what was played, one thing that was earned, and one small next step, and nothing else.
@@ -208,6 +205,11 @@ Everything the family reads (summary, encouragement, going_well, work_on, method
 - teacher_note: one or two factual sentences for the teacher only (what was and wasn't covered, anything that may need attention). Empty if nothing to add.
 - changed: the card the family reads first: what is different about this practice, in at most three lines, each under 14 words and each with one tag. first_time: something done for the first time (a piece reached its last line, a scale played in tune, an assignment never practised before). better: clearly better than the last practice, with the comparison in plain numbers when you have them ("Stopped once in Gavotte's last line. Sunday it stopped five times"). went_back: clearly worse than the last practice. same: a known problem that has not moved, named in a few words with no explanation. left: assigned things not touched today, all named together in ONE line ("Scales, arpeggios, Silent Night"); they are left for tomorrow, never "skipped" or "missed". Most important first, and a line about one of the focus points comes before the rest. Compare only with the earlier reviews you were given; with none, use first_time and left only, or leave the list empty. A few cents of intonation either way inside one band is "same", not better or went_back. Describes the playing only. Do not repeat these lines in summary. focus_id is the id of the focus point the line is about, or empty.
 - focus: when you are given "What we're working on", one entry for every point, by its id: what THIS practice showed about it. not_heard when the recording can't show it (posture, arm weight, anything not audible in the notes or named in the speech) or it wasn't practised; never guess. Otherwise first_time, better, same or went_back against the earlier reviews (same when there is nothing to compare with). note: at most twelve words of evidence, empty for not_heard. Empty list when you were given no focus points.`;
+
+/** The fixed instructions with this student's grading rules in place. */
+function systemFor(grading: GradingConfig, instrument: string): string {
+  return SYSTEM_TEMPLATE.replace("<<GRADING>>", gradingPrompt(grading, instrument));
+}
 
 function contextText(c: PracticeContext): string {
   const lines = [
@@ -269,6 +271,7 @@ function contextText(c: PracticeContext): string {
 }
 
 export async function analyzePractice(ctx: PracticeContext): Promise<{ analysis: PracticeAnalysis; usage: ClaudeUsage[] }> {
+  const grading = ctx.grading ?? DEFAULT_GRADING;
   const anthropic = anthropicClient();
   const stream = anthropic.beta.messages.stream({
     model: lessonModel(),
@@ -276,7 +279,7 @@ export async function analyzePractice(ctx: PracticeContext): Promise<{ analysis:
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
-    system: systemWithStyle(SYSTEM, ctx.style, "practice"),
+    system: systemWithStyle(systemFor(grading, ctx.instrument), ctx.style, "practice"),
     messages: [
       {
         role: "user",
@@ -292,7 +295,14 @@ export async function analyzePractice(ctx: PracticeContext): Promise<{ analysis:
   if (message.stop_reason === "max_tokens") throw new DraftError("The review came out too long. Try again.", usage);
   const text = message.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
   try {
-    return { analysis: JSON.parse(text) as PracticeAnalysis, usage };
+    const analysis = JSON.parse(text) as PracticeAnalysis;
+    // Keep the grade inside the system this student is graded on.
+    if (analysis.grade && !(gradesFor(grading.system) as readonly string[]).includes(analysis.grade)) {
+      analysis.grade = "";
+      analysis.grade_reason = "";
+    }
+    analysis.grading = { system: grading.system, standard: grading.standard };
+    return { analysis, usage };
   } catch {
     throw new DraftError("Claude's review couldn't be read. Try again.", usage);
   }

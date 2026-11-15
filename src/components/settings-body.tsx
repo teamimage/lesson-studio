@@ -5,6 +5,7 @@ import { isAdmin } from "@/lib/admin";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import { setPassword, updateReviewTone, updateTeacher } from "@/app/settings/actions";
+import { STANDARD_LABELS, SYSTEM_LABELS, parseGrading } from "@/lib/grading";
 import {
   PROFILE_SECTIONS,
   QUESTIONS,
@@ -79,6 +80,7 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
       )}
 
       {viewer.teacher && <TeachingAssistant teacher={viewer.teacher} notice={assistant} />}
+      {viewer.teacher && <Grading teacher={viewer.teacher} />}
 
       {viewer.teacher && <AiCosts teacherId={viewer.teacher.id} />}
 
@@ -214,6 +216,29 @@ async function AiCosts({ teacherId }: { teacherId: string }) {
           </>
         )}
       </Card>
+    </section>
+  );
+}
+
+// Which grading system and standard practice reviews use.
+function Grading({ teacher }: { teacher: Tables<"teachers"> }) {
+  const g = parseGrading((teacher as { grading?: unknown }).grading);
+  return (
+    <section id="grading" className="scroll-mt-6">
+      <SectionTitle>Grading</SectionTitle>
+      <Link
+        href="/settings/grading"
+        className="flex min-h-12 items-center justify-between rounded-2xl border border-rule bg-sheet px-4 py-3 font-semibold"
+      >
+        <span>
+          {SYSTEM_LABELS[g.system].label}
+          {g.system !== "none" && `, ${STANDARD_LABELS[g.standard].label.toLowerCase()} standard`}
+          <span className="block text-sm font-normal text-muted">
+            Choose the system, how strict it is, what each grade means, and set any student apart.
+          </span>
+        </span>
+        <span aria-hidden>›</span>
+      </Link>
     </section>
   );
 }

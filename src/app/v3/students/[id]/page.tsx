@@ -1,4 +1,5 @@
 import { GradeLegend } from "@/components/grade-legend";
+import { gradingOfStudent } from "@/lib/grading";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -240,7 +241,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             eventLinks
           />
           <PracticeCalendarLegend />
-          <GradeLegend />
+          <GradeLegend grading={gradingOfStudent(student)} instrument={student.instrument} />
         </Card>
 
         <Timeline

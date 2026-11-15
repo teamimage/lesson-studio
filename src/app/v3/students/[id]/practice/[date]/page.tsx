@@ -11,6 +11,7 @@ import { getPracticeLog, getStudent } from "@/lib/data";
 import { capitalize, formatDate, relativeDay } from "@/lib/format";
 import { listPracticeSessions } from "@/lib/practice/data";
 import { createClient } from "@/lib/supabase/server";
+import { gradeMark, gradeName, gradingOfStudent } from "@/lib/grading";
 
 type Params = Promise<{ id: string; date: string }>;
 
@@ -59,10 +60,10 @@ async function Body({ params }: { params: Params }) {
                 "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-display text-[24px] font-semibold leading-none",
                 GRADE_TONE[g as string] ?? "bg-rule text-ink",
               )}
-              aria-label={`Grade ${g}`}
-              title={`Grade ${g}`}
+              aria-label={gradeName(g as string)}
+              title={gradeName(g as string)}
             >
-              {g}
+              {gradeMark(g as string)}
             </span>
           ))}
         </span>
@@ -117,7 +118,7 @@ async function Body({ params }: { params: Params }) {
             <Card className="p-3 sm:p-4">
               <PracticeSessionList sessions={sessions} teacherView flat />
             </Card>
-            <GradeLegend />
+            <GradeLegend grading={gradingOfStudent(student)} instrument={student.instrument} />
           </section>
         ) : (
           !nothing && <p className="text-sm text-muted">Logged by hand, no recording, so there&apos;s no grade or review.</p>
