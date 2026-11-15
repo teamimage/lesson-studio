@@ -1,3 +1,5 @@
+import { PracticePinSetting } from "@/components/practice-pin-setting";
+import { practicePinSet } from "@/lib/practice-pin";
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
@@ -47,12 +49,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const student = await getStudent(id);
   if (!student) notFound();
   const supabase = await createClient();
-  const [parents, consent, repertoire, lessonRows, logRows] = await Promise.all([
+  const [parents, consent, repertoire, lessonRows, logRows, pinSet] = await Promise.all([
     listParentsForStudent(id),
     getConsentStatus(id),
     listRepertoire(id),
     supabase.from("lessons").select("lesson_date").eq("student_id", id).order("lesson_date", { ascending: true }),
     supabase.from("practice_logs").select("practice_date, minutes").eq("student_id", id),
+    practicePinSet(id),
   ]);
   const first = student.name.split(" ")[0];
   const lessonDates = (lessonRows.data ?? []).map((l) => l.lesson_date);
@@ -224,6 +227,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             made={sp.made}
             returnTo={`/v3/students/${id}/about`}
           />
+          <PracticePinSetting studentId={id} isSet={pinSet} teacher />
           <Link href={`/v3/family/${id}`} className="self-start text-sm text-plum underline">
             See {first}&apos;s Family mode
           </Link>

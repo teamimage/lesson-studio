@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayISO } from "@/lib/format";
+import { checkPracticePinFor, pinMessage } from "@/lib/practice-pin";
 
 // Saves one day of practice for a student. Works for a parent or the teacher;
 // row-level security decides who may write.
@@ -73,12 +74,22 @@ export async function savePracticeDay(input: {
   minutes: number | null;
   listened: boolean;
   note: string;
+  /** The parent PIN, when one is set. */
+  pin?: string;
+  /** Opened from Family mode on the teacher's account: the PIN applies there too. */
+  familyMode?: boolean;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const { studentId, date } = input;
   if (!studentId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "That day couldn't be found." };
   if (date > todayISO()) return { ok: false, error: "That day hasn't happened yet." };
   const viewer = await getViewer();
   const supabase = await createClient();
+  const { data: owner } = await supabase.from("students").select("teacher_id").eq("id", studentId).maybeSingle();
+  const isTeacher = !!viewer.teacher && viewer.teacher.id === owner?.teacher_id;
+  if (!isTeacher || input.familyMode) {
+    const r = await checkPracticePinFor(studentId, input.pin ?? "", supabase);
+    if (r !== "ok") return { ok: false, error: pinMessage(r) };
+  }
   const minutes =
     input.minutes == null || !Number.isFinite(input.minutes) ? null : Math.max(0, Math.min(600, Math.round(input.minutes)));
   const { data: existing } = await supabase

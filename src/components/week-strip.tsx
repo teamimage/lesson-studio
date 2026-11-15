@@ -16,7 +16,10 @@ export function WeekStrip({
   lessons,
   teacherView = false,
   studentId,
+  familyMode = false,
 }: {
+  /** Version 3 Family mode: day pages open asking for the parent PIN. */
+  familyMode?: boolean;
   /** Lets a day's popup link to that day's own page, to change what was done. */
   studentId?: string;
   week: PracticeWeek;
@@ -45,7 +48,7 @@ export function WeekStrip({
               date={day}
               lessons={lessonMarks}
               teacherView={teacherView}
-              editHref={studentId && day <= today ? `/v3/students/${studentId}/practice/${day}` : undefined}
+              editHref={studentId && day <= today ? `/v3/students/${studentId}/practice/${day}${familyMode ? "?from=family" : ""}` : undefined}
               title={`${day}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${log?.minutes ? ` · ${log.minutes} min` : ""}${recorded ? " · recorded" : ""}${noRecording ? " · no recording" : ""}`}
               className={cx(
                 "relative flex items-center justify-center rounded-full border text-xs font-semibold",

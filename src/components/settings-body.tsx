@@ -1,3 +1,6 @@
+import { listStudents } from "@/lib/data";
+import { PracticePinSetting } from "@/components/practice-pin-setting";
+import { practicePinSet } from "@/lib/practice-pin";
 import { Button, Card, Field, Input, Notice, SectionTitle } from "@/components/ui";
 import { PasswordInput } from "@/components/password-input";
 import { getViewer } from "@/lib/auth";
@@ -84,6 +87,7 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
 
       {viewer.teacher && <AiCosts teacherId={viewer.teacher.id} />}
 
+      {!viewer.teacher && viewer.parentRows.length > 0 && <ParentPins />}
       <section>
         <SectionTitle>Account</SectionTitle>
         <Card className="flex flex-col gap-3">
@@ -294,6 +298,32 @@ function TeachingAssistant({ teacher, notice }: { teacher: Tables<"teachers">; n
           </span>
           <span aria-hidden>›</span>
         </Link>
+      </Card>
+    </section>
+  );
+}
+
+// Family accounts: a parent PIN per child that guards changing practice records.
+async function ParentPins() {
+  const students = (await listStudents()).filter((s) => s.active);
+  if (!students.length) return null;
+  const pins = await Promise.all(students.map((s) => practicePinSet(s.id)));
+  return (
+    <section>
+      <SectionTitle>Practice records</SectionTitle>
+      <Card className="flex flex-col gap-4">
+        <p className="text-sm text-muted">
+          Set a PIN so only a parent can change a day&apos;s practice record (tick off work, fix the minutes). Practising and
+          ticking off today&apos;s list still works without it.
+        </p>
+        {students.map((s, i) => (
+          <PracticePinSetting
+            key={s.id}
+            studentId={s.id}
+            name={students.length > 1 ? s.name.split(" ")[0] : undefined}
+            isSet={pins[i]}
+          />
+        ))}
       </Card>
     </section>
   );

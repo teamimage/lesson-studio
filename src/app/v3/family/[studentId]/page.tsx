@@ -104,6 +104,7 @@ async function Body({ params }: { params: Params }) {
             initialLessons={lessonDays}
             teacherView
             eventLinks
+            familyMode
           />
           <PracticeCalendarLegend />
           <GradeLegend family grading={gradingOfStudent(student)} instrument={student.instrument} />

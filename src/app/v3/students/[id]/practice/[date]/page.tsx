@@ -9,6 +9,7 @@ import { PracticeDayEditor, type EditorItem } from "@/components/practice-day-ed
 import { Card, Pill, cx } from "@/components/ui";
 import { getViewer } from "@/lib/auth";
 import { heardOnDay } from "@/lib/practice/hand-ticks";
+import { practicePinSet } from "@/lib/practice-pin";
 import { getPracticeLog, getStudent } from "@/lib/data";
 import { capitalize, formatDate, relativeDay } from "@/lib/format";
 import { listPracticeSessions } from "@/lib/practice/data";
@@ -16,21 +17,22 @@ import { createClient } from "@/lib/supabase/server";
 import { gradeMark, gradeName, gradingOfStudent } from "@/lib/grading";
 
 type Params = Promise<{ id: string; date: string }>;
+type SP = Promise<{ from?: string }>;
 
 // Version 3: one day of a student's practice, opened from a history card's
 // title or from the calendar's day popup. Everything about that day: what
 // was done (the family or the teacher can tick off work the recording
 // missed, and fix the minutes and note), and each recorded session with its
 // grade and review. Open to the teacher and to the student's family.
-export default function V3PracticeDayPage({ params }: { params: Params }) {
+export default function V3PracticeDayPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
     <Suspense fallback={<Shell title=" " v3Tab="students" me={<Me />} wide>{null}</Shell>}>
-      <Body params={params} />
+      <Body params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function Body({ params }: { params: Params }) {
+async function Body({ params, searchParams }: { params: Params; searchParams: SP }) {
   const viewer = await getViewer();
   const { id, date } = await params;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
@@ -38,8 +40,10 @@ async function Body({ params }: { params: Params }) {
   const student = await getStudent(id);
   if (!student) notFound();
   const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
+  // Opened from Family mode on the teacher's account: the parent PIN applies there too.
+  const familyMode = (await searchParams).from === "family";
   const db = await createClient();
-  const [log, sessions, { data: lessonsThatDay }, { data: plan }] = await Promise.all([
+  const [log, sessions, { data: lessonsThatDay }, { data: plan }, pinSet] = await Promise.all([
     getPracticeLog(id, date),
     listPracticeSessions(id, 50, date),
     db.from("lessons").select("id, status").eq("student_id", id).eq("lesson_date", date),
@@ -54,6 +58,7 @@ async function Body({ params }: { params: Params }) {
       .order("approved_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    practicePinSet(id, db),
   ]);
   const ticked = log?.completed_assignment_ids ?? [];
   const onPlan = (plan?.assignments ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
@@ -92,8 +97,8 @@ async function Body({ params }: { params: Params }) {
         </span>
       }
       eyebrow={`${first} · ${capitalize(relativeDay(date))}`}
-      back={{ href: isTeacher ? `/v3/students/${id}` : `/family/${id}`, label: first }}
-      {...(isTeacher ? { v3Tab: "students" as const } : { tab: "family" as const })}
+      back={{ href: !isTeacher ? `/family/${id}` : familyMode ? `/v3/family/${id}` : `/v3/students/${id}`, label: first }}
+      {...(!isTeacher ? { tab: "family" as const } : { v3Tab: familyMode ? ("family" as const) : ("students" as const) })}
       me={<Me />}
       wide
     >
@@ -112,12 +117,14 @@ async function Body({ params }: { params: Params }) {
         {nothing && <p className="text-[16px] text-muted">No practice on record for {first} this day yet.</p>}
         <Card>
           <PracticeDayEditor
-            key={`${date}-${log?.updated_at ?? ""}`}
+            key={date}
             studentId={id}
             date={date}
             items={items}
             recorded={sessions.some((s) => !!s.review)}
-            canRegrade={isTeacher}
+            canRegrade={isTeacher && !familyMode}
+            pinRequired={pinSet && (!isTeacher || familyMode)}
+            familyMode={familyMode}
             initial={{
               done: ticked,
               minutes: log?.minutes ?? null,
