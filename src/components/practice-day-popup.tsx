@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AddLessonOnDay } from "@/components/calendar-add";
 import { cx, Pill } from "@/components/ui";
 import { LocalTime } from "@/components/local-time";
 import { PracticeReviewBody } from "@/components/practice-review";
@@ -29,8 +30,14 @@ export function PracticeDayCell({
   title,
   practiceHref,
   editHref,
+  addPracticeHref,
+  addLessonFor,
   children,
 }: {
+  /** The day can take a hand-added practice: its page, opened ready to fill in. */
+  addPracticeHref?: string;
+  /** The teacher can add a lesson on this day (the student's id). */
+  addLessonFor?: string;
   /** List mode: the page for this day's practice; lessons link to their lesson page. */
   practiceHref?: string;
   /** The day's own page, where the family or teacher can change what was done. */
@@ -48,6 +55,41 @@ export function PracticeDayCell({
   const hasRecord = !!day && (day.minutes > 0 || day.ticked.length > 0 || day.listened || day.sessions.length > 0);
   const hasLesson = !!lessons?.length;
   const when = day?.date ?? date ?? lessons?.[0]?.date;
+  const lastTap = useRef(0);
+  const canAdd = !!when && (!!addPracticeHref || !!addLessonFor);
+  // An empty day: a double click or double tap offers to add a lesson or practice.
+  if (!hasRecord && !hasLesson && canAdd) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => {
+            const now = Date.now();
+            if (now - lastTap.current < 400) {
+              lastTap.current = 0;
+              setOpen(true);
+            } else lastTap.current = now;
+          }}
+          className={cx(className, "cursor-pointer select-none [touch-action:manipulation]")}
+          title={`${title ?? ""} · double-tap to add`}
+          aria-label={`Add a lesson or practice on ${formatDate(when!, "weekday")} (double-tap)`}
+        >
+          {children}
+        </button>
+        {open && (
+          <DayPopup
+            date={when!}
+            lessons={[]}
+            teacherView={teacherView}
+            practiceHref={practiceHref ?? addPracticeHref}
+            addPracticeHref={addPracticeHref}
+            addLessonFor={addLessonFor}
+            onClose={() => setOpen(false)}
+          />
+        )}
+      </>
+    );
+  }
   if ((!hasRecord && !hasLesson) || !when) {
     return (
       <div className={className} title={title}>
@@ -74,6 +116,8 @@ export function PracticeDayCell({
           teacherView={teacherView}
           practiceHref={practiceHref}
           editHref={editHref}
+          addPracticeHref={addPracticeHref}
+          addLessonFor={addLessonFor}
           onClose={() => setOpen(false)}
         />
       )}
@@ -88,6 +132,8 @@ function DayPopup({
   teacherView,
   practiceHref,
   editHref,
+  addPracticeHref,
+  addLessonFor,
   onClose,
 }: {
   date: string;
@@ -96,6 +142,8 @@ function DayPopup({
   teacherView: boolean;
   practiceHref?: string;
   editHref?: string;
+  addPracticeHref?: string;
+  addLessonFor?: string;
   onClose: () => void;
 }) {
   useBackToClose(true, onClose);
@@ -129,7 +177,7 @@ function DayPopup({
         <div className="sticky top-0 z-10 flex items-start gap-3 border-b border-rule bg-paper px-4 pt-3 pb-2.5">
           <div className="min-w-0 flex-1">
             <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-accent-ink">
-              {lessons.length ? (day ? "Lesson and practice" : "Lesson") : "Practice"}
+              {lessons.length ? (day ? "Lesson and practice" : "Lesson") : day ? "Practice" : "Nothing yet"}
             </div>
             <div className="font-semibold">{formatDate(date, "long")}</div>
           </div>
@@ -139,7 +187,15 @@ function DayPopup({
         </div>
 
         {practiceHref ? (
-          <DayList day={day} lessons={lessons} practiceHref={practiceHref} dayGrade={dayGrade} />
+          <DayList
+            date={date}
+            day={day}
+            lessons={lessons}
+            practiceHref={practiceHref}
+            dayGrade={dayGrade}
+            addPracticeHref={addPracticeHref}
+            addLessonFor={addLessonFor}
+          />
         ) : (
         <div className="flex flex-col gap-4 px-4 py-4 text-[16px]">
           {lessons.map((l, i) => (
@@ -216,11 +272,17 @@ function DayBody({
 
 /** List mode: one tappable row per thing that happened that day. */
 function DayList({
+  date,
   day,
   lessons,
   practiceHref,
   dayGrade,
+  addPracticeHref,
+  addLessonFor,
 }: {
+  date: string;
+  addPracticeHref?: string;
+  addLessonFor?: string;
   day?: PracticeDay;
   lessons: LessonMark[];
   practiceHref: string;
@@ -291,7 +353,37 @@ function DayList({
           </Link>
         </li>
       )}
-      {!day && lessons.some((l) => !l.upcoming) && <li className="text-sm text-muted">No practice logged this day.</li>}
+      {!day && lessons.some((l) => !l.upcoming) && !addPracticeHref && (
+        <li className="text-sm text-muted">No practice logged this day.</li>
+      )}
+      {addLessonFor && !lessons.some((l) => l.lessonId) && (
+        <li>
+          <AddLessonOnDay studentId={addLessonFor} date={date} className={cx(row, "w-full border-dashed border-accent/50 text-left hover:border-accent")}>
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-accent text-[13px] font-bold leading-none text-accent-ink" aria-hidden>
+              +
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold">Add lesson</span>
+              <span className="block text-sm text-muted">Upload its video or write it up</span>
+            </span>
+            {go}
+          </AddLessonOnDay>
+        </li>
+      )}
+      {addPracticeHref && !day && (
+        <li>
+          <Link href={addPracticeHref} className={cx(row, "border-dashed border-sage/60 hover:border-sage")}>
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-sage text-[13px] font-bold leading-none text-sage" aria-hidden>
+              +
+            </span>
+            <span className="min-w-0">
+              <span className="block font-semibold">Add practice</span>
+              <span className="block text-sm text-muted">Minutes, what was done, a note</span>
+            </span>
+            {go}
+          </Link>
+        </li>
+      )}
     </ul>
   );
 }

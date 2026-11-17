@@ -15,6 +15,7 @@ import { Fold } from "@/components/fold";
 import { PreLessonBrief } from "@/components/pre-lesson-brief";
 import { RepertoireMap } from "@/components/repertoire-map";
 import { PracticeCalendarLegend, PracticeMonthCalendar } from "@/components/practice-month-calendar";
+import { CalendarAddButtons } from "@/components/calendar-add";
 import { listLessonMarks } from "@/lib/lesson-marks";
 import { Button, Card, LinkButton, Notice, Pill } from "@/components/ui";
 import { startLesson } from "@/app/lessons/live-actions";
@@ -239,8 +240,10 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             initialLessons={lessonDays}
             teacherView
             eventLinks
+            canAddLesson
           />
           <PracticeCalendarLegend />
+          <CalendarAddButtons studentId={id} today={today} canAddLesson />
           <GradeLegend grading={gradingOfStudent(student)} instrument={student.instrument} />
         </Card>
 

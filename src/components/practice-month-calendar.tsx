@@ -7,6 +7,7 @@ import { monthLabel, monthOf, monthWeeks, shiftMonth } from "@/lib/practice/mont
 import { type PracticeMonth, loadPracticeMonth } from "@/app/students/practice-month-actions";
 import type { LessonMark } from "@/lib/lesson-mark-types";
 import { LessonNote, PracticeDayCell } from "./practice-day-popup";
+import { addPracticeHref } from "./calendar-add";
 import { cx } from "./ui";
 
 const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -25,10 +26,13 @@ export function PracticeMonthCalendar({
   initialLessons = {},
   teacherView = false,
   eventLinks = false,
+  canAddLesson = false,
   familyMode = false,
 }: {
   /** Version 3: a tapped day lists what happened, each item opening its own page. */
   eventLinks?: boolean;
+  /** Teacher: a day with no lesson can take one (double-tap an empty day, or from its popup). */
+  canAddLesson?: boolean;
   /** Version 3 Family mode: day pages open asking for the parent PIN. */
   familyMode?: boolean;
   studentId: string;
@@ -147,6 +151,8 @@ export function PracticeMonthCalendar({
                   teacherView={teacherView}
                   practiceHref={eventLinks ? `/v3/students/${studentId}/practice/${d}${familyMode ? "?from=family" : ""}` : undefined}
                   editHref={d <= today ? `/v3/students/${studentId}/practice/${d}${familyMode ? "?from=family" : ""}` : undefined}
+                  addPracticeHref={eventLinks && d <= today ? addPracticeHref(studentId, d, familyMode) : undefined}
+                  addLessonFor={eventLinks && canAddLesson && d <= today ? studentId : undefined}
                   title={`${parseISODate(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${minutes ? ` · ${minutes} min` : ""}${day?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}${noRecording ? " · no recording" : ""}`}
                   className={cx(
                     "relative flex h-11 flex-col items-center justify-center rounded-lg",

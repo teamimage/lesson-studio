@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 import { gradeMark, gradeName, gradingOfStudent } from "@/lib/grading";
 
 type Params = Promise<{ id: string; date: string }>;
-type SP = Promise<{ from?: string }>;
+type SP = Promise<{ from?: string; edit?: string }>;
 
 // Version 3: one day of a student's practice, opened from a history card's
 // title or from the calendar's day popup. Everything about that day: what
@@ -41,7 +41,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   if (!student) notFound();
   const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
   // Opened from Family mode on the teacher's account: the parent PIN applies there too.
-  const familyMode = (await searchParams).from === "family";
+  const sp = await searchParams;
+  const familyMode = sp.from === "family";
   const db = await createClient();
   const [log, sessions, { data: lessonsThatDay }, { data: plan }, pinSet] = await Promise.all([
     getPracticeLog(id, date),
@@ -125,6 +126,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             canRegrade={isTeacher && !familyMode}
             pinRequired={pinSet && (!isTeacher || familyMode)}
             familyMode={familyMode}
+            startEditing={sp.edit === "1"}
             initial={{
               done: ticked,
               minutes: log?.minutes ?? null,
