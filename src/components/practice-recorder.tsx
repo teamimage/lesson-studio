@@ -13,10 +13,13 @@ import { TUNED_CENTS, TUNING_VALID_SECONDS, tuneNotesFor, type TuningCheck } fro
 import { Button, Card, cx } from "@/components/ui";
 import { Tuner, type TunerReadings } from "@/components/tuner";
 
-// Start practice / Stop practice. Records audio (or video with audio) in the
+// Start practice / Pause practice / Stop practice. Records audio (or video with audio) in the
 // browser, writes down a once-a-second sound timeline while it records, and
 // at Stop uploads the file for the AI to review. The recording is deleted
 // after the review; only the review is kept.
+//
+// Pause stops the recording, the timeline and the clock; Resume carries on
+// in the same recording. Paused time doesn't count toward practice minutes.
 //
 // The tuner sits on the same card: before Start (with its own microphone)
 // and during practice (listening through the recording's microphone). Each
@@ -133,6 +136,15 @@ export function PracticeRecorder({
   const [elapsed, setElapsed] = useState(0);
   const [level, setLevel] = useState(-100);
   const [stoppedEarly, setStoppedEarly] = useState(false);
+  const [paused, setPausedState] = useState(false);
+  const pausedRef = useRef(false);
+  // Wall-clock pauses so far, and when the current one began (performance.now()).
+  const pausesRef = useRef<{ from: number; to: number }[]>([]);
+  const pausedAtRef = useRef<number | null>(null);
+  const setPaused = (v: boolean) => {
+    pausedRef.current = v;
+    setPausedState(v);
+  };
 
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -367,7 +379,8 @@ export function PracticeRecorder({
     // save what was recorded.
     for (const track of stream.getTracks()) {
       track.onended = () => {
-        if (recorderRef.current?.state === "recording") {
+        const state = recorderRef.current?.state;
+        if (state === "recording" || state === "paused") {
           setStoppedEarly(true);
           stop();
         }
@@ -399,6 +412,9 @@ export function PracticeRecorder({
     };
 
     startRef.current = { wall: new Date(), perf: performance.now() };
+    pausesRef.current = [];
+    pausedAtRef.current = null;
+    setPaused(false);
     recorder.start(1000);
     stoppingRef.current = false;
     setElapsed(0);
@@ -406,8 +422,8 @@ export function PracticeRecorder({
 
     tickRef.current = window.setInterval(() => {
       const t0 = startRef.current;
-      if (!t0) return;
-      const secs = (performance.now() - t0.perf) / 1000;
+      if (!t0 || pausedRef.current) return;
+      const secs = activeSeconds(performance.now());
       const sec = Math.floor(secs);
       if (!current || current.t !== sec) {
         push();
@@ -434,9 +450,49 @@ export function PracticeRecorder({
     stopFlushRef.current = push;
   }
 
+  /** Practice time since Start, leaving out pauses (performance.now() clock). */
+  function activeSeconds(perfNow: number): number {
+    const t0 = startRef.current;
+    if (!t0) return 0;
+    let pausedMs = pausesRef.current.reduce((sum, p) => sum + Math.max(0, Math.min(p.to, perfNow) - Math.min(p.from, perfNow)), 0);
+    if (pausedAtRef.current !== null && perfNow > pausedAtRef.current) pausedMs += perfNow - pausedAtRef.current;
+    return Math.max(0, (perfNow - t0.perf - pausedMs) / 1000);
+  }
+
+  function pause() {
+    const rec = recorderRef.current;
+    if (!rec || rec.state !== "recording" || stoppingRef.current) return;
+    try {
+      rec.pause();
+    } catch {
+      return;
+    }
+    pausedAtRef.current = performance.now();
+    setPaused(true);
+    setLevel(-100);
+  }
+
+  function resume() {
+    const rec = recorderRef.current;
+    if (!rec || rec.state !== "paused") return;
+    try {
+      rec.resume();
+    } catch {
+      return;
+    }
+    if (pausedAtRef.current !== null) pausesRef.current.push({ from: pausedAtRef.current, to: performance.now() });
+    pausedAtRef.current = null;
+    setPaused(false);
+  }
+
   function stop() {
     if (stoppingRef.current) return;
     stoppingRef.current = true;
+    if (pausedAtRef.current !== null) {
+      pausesRef.current.push({ from: pausedAtRef.current, to: performance.now() });
+      pausedAtRef.current = null;
+    }
+    setPaused(false);
     if (tickRef.current) window.clearInterval(tickRef.current);
     tickRef.current = null;
     stopFlushRef.current?.();
@@ -449,7 +505,9 @@ export function PracticeRecorder({
   async function finish(mimeType: string) {
     const t0 = startRef.current;
     const ended = new Date();
-    const duration = t0 ? (ended.getTime() - t0.wall.getTime()) / 1000 : 0;
+    // Only the time actually practising; pauses are left out.
+    const duration = t0 ? activeSeconds(performance.now()) : 0;
+    const toActive = (wall: number) => (t0 ? activeSeconds(t0.perf + (wall - t0.wall.getTime())) : 0);
     teardown();
     if (previewRef.current) previewRef.current.srcObject = null;
     const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
@@ -470,7 +528,13 @@ export function PracticeRecorder({
       practiceDate: toISODate(t0.wall),
       activity: activityRef.current,
       tuning: checksRef.current
-        .map((c): TuningCheck => ({ t: Math.round((c.wall - t0.wall.getTime()) / 1000), s: c.s, ok: c.ok }))
+        .map(
+          (c): TuningCheck => ({
+            t: Math.round(c.wall < t0.wall.getTime() ? (c.wall - t0.wall.getTime()) / 1000 : toActive(c.wall)),
+            s: c.s,
+            ok: c.ok,
+          }),
+        )
         .filter((c) => c.t >= -TUNING_VALID_SECONDS),
       withHelper: withHelperRef.current,
     };
@@ -587,7 +651,14 @@ export function PracticeRecorder({
 
   return (
     <Card tone="plum" className="flex flex-col gap-3">
-      {recording && <div className="text-right font-mono text-2xl tabular-nums">{clock(elapsed)}</div>}
+      {recording && (
+        <div className="flex items-baseline justify-between gap-3">
+          <span className={cx("text-sm font-semibold", paused ? "text-plum" : "text-muted")}>
+            {paused ? "Paused" : "Recording"}
+          </span>
+          <span className={cx("font-mono text-2xl tabular-nums", paused && "text-muted")}>{clock(elapsed)}</span>
+        </div>
+      )}
 
       {withVideo && (
         <video
@@ -708,15 +779,27 @@ export function PracticeRecorder({
             </Button>
           )}
           <div className="h-2 overflow-hidden rounded-full bg-plum/15" aria-hidden>
-            <div className="h-full rounded-full bg-plum transition-[width] duration-100" style={{ width: `${meter * 100}%` }} />
+            <div className="h-full rounded-full bg-plum transition-[width] duration-100" style={{ width: `${paused ? 0 : meter * 100}%` }} />
           </div>
           <p className="text-xs text-muted">
-            Keep this page open and the screen on. On iPhone and iPad, locking the screen or switching apps stops the
-            recording (what was recorded so far is kept).
+            {paused
+              ? "Paused: nothing is being recorded and the clock is stopped. Paused time doesn't count toward practice minutes."
+              : "Keep this page open and the screen on. On iPhone and iPad, locking the screen or switching apps stops the recording (what was recorded so far is kept)."}
           </p>
-          <Button type="button" variant="danger" className="min-h-14 bg-danger text-lg text-white hover:bg-danger" onClick={stop}>
-            Stop practice
-          </Button>
+          <div className="grid grid-cols-2 gap-3">
+            {paused ? (
+              <Button type="button" variant="plum" className="min-h-14 text-lg" onClick={resume}>
+                Resume practice
+              </Button>
+            ) : (
+              <Button type="button" variant="secondary" className="min-h-14 text-lg" onClick={pause}>
+                Pause practice
+              </Button>
+            )}
+            <Button type="button" variant="danger" className="min-h-14 bg-danger text-lg text-white hover:bg-danger" onClick={stop}>
+              Stop practice
+            </Button>
+          </div>
         </>
       )}
 
