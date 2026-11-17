@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Card } from "@/components/ui";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { formatDate } from "@/lib/format";
@@ -5,10 +6,26 @@ import { channelReady } from "@/lib/overview/send";
 import { ACTIVITY_WORD, formatMoney, type OverviewData } from "@/lib/overview/types";
 import { BalanceEdit, ContactDetailsLink, ContactRow, HistoryLink, YearsEdit } from "./student-overview-parts";
 
-// The overview box at the top of the teacher's student page. Left: name and
-// instrument, years playing, parents, Contact buttons, communication
-// history, balance. Right (below on a phone): current repertoire from the
-// last two lessons. Teacher only: the family's pages never show it.
+/** A box whose title bar folds it open and shut (same look as "What we're working on"). */
+function Fold({ title, meta, open, children }: { title: string; meta?: string; open?: boolean; children: ReactNode }) {
+  return (
+    <details open={open} className="group/fold rounded-2xl border border-rule bg-sheet shadow-[0_1px_0_rgba(43,37,33,0.04)]">
+      <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center gap-x-3 px-4 py-2 [&::-webkit-details-marker]:hidden">
+        <h2 className="font-display text-[20px] font-semibold">{title}</h2>
+        {meta && <span className="text-sm text-muted">{meta}</span>}
+        <span aria-hidden className="ml-auto text-xl text-muted transition-transform group-open/fold:rotate-90">
+          ›
+        </span>
+      </summary>
+      <div className="flex flex-col gap-2.5 px-4 pb-4">{children}</div>
+    </details>
+  );
+}
+
+// The overview at the top of the teacher's student page, as three boxes:
+// name and instrument; "Student info" (folded: years playing, parents,
+// Contact buttons, communication history, balance); "Current repertoire"
+// (open, can be folded) from the last two lessons. Teacher only: the family's pages never show it.
 
 export function StudentOverview({
   studentId,
@@ -28,6 +45,14 @@ export function StudentOverview({
   const parents = data.contacts.filter((c) => c.role === "parent");
   const off = !data.ready;
   const cents = data.balanceCents;
+  // One short line on the folded "Student info" bar.
+  const summary = [
+    years === null ? null : `${years} yr${years === 1 ? "" : "s"}`,
+    cents && cents > 0 ? `${formatMoney(cents)} due` : null,
+    data.messages.length ? `${data.messages.length} message${data.messages.length === 1 ? "" : "s"}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const balanceView = (
     <span className="text-[16px]">
@@ -52,12 +77,13 @@ export function StudentOverview({
   );
 
   return (
-    <Card className="grid gap-4 sm:grid-cols-2 sm:gap-6">
-      <div className="flex min-w-0 flex-col gap-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="font-display text-[22px] font-semibold leading-tight">{name}</h2>
-          <InstrumentTag instrument={instrument} />
-        </div>
+    <div className="flex flex-col gap-3">
+      <Card className="flex flex-wrap items-center gap-2 py-3">
+        <h2 className="font-display text-[22px] font-semibold leading-tight">{name}</h2>
+        <InstrumentTag instrument={instrument} />
+      </Card>
+
+      <Fold title="Student info" meta={off ? undefined : summary}>
         <YearsEdit studentId={studentId} years={years} since={data.playingSince} disabled={off} />
         <p className="text-[16px]">
           {parents.length === 0 ? (
@@ -84,10 +110,9 @@ export function StudentOverview({
         {off && (
           <p className="text-sm text-amber">Run student-overview.sql in Supabase to turn on editing, messages and the balance.</p>
         )}
-      </div>
+      </Fold>
 
-      <div className="flex min-w-0 flex-col gap-1.5 border-t border-rule pt-3 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
-        <h3 className="font-display text-[18px] font-semibold">Current repertoire</h3>
+      <Fold title="Current repertoire" meta={`${data.repertoire.length} piece${data.repertoire.length === 1 ? "" : "s"}`} open>
         {data.repertoire.length === 0 ? (
           <p className="text-[16px] text-muted">No pieces listed in the last two lessons.</p>
         ) : (
@@ -104,7 +129,7 @@ export function StudentOverview({
           </ul>
         )}
         <p className="text-[13px] text-muted">From the last two lessons.</p>
-      </div>
-    </Card>
+      </Fold>
+    </div>
   );
 }
