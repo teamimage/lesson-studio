@@ -118,9 +118,10 @@ export function WorkingOnCard({
           </summary>
           <ul className="mt-2 flex flex-col gap-3">
             {data.watching.map((w) => (
-              <li key={w.id} className="flex flex-wrap items-start gap-2">
-                <AcceptFocusForm id={w.id} studentId={studentId} title={w.title} cue={w.parent_cue} />
-                <Mark id={w.id} studentId={studentId} what="done">Done</Mark>
+              <li key={w.id}>
+                <AcceptFocusForm id={w.id} studentId={studentId} title={w.title} cue={w.parent_cue}>
+                  <Mark id={w.id} studentId={studentId} what="done">Done</Mark>
+                </AcceptFocusForm>
               </li>
             ))}
           </ul>
@@ -128,16 +129,17 @@ export function WorkingOnCard({
       )}
 
       {teacherView && data.proposed.length > 0 && (
-        <div className="mt-2 flex flex-col gap-3 border-t border-rule pt-3">
+        <div className="mt-2 flex flex-col gap-2 border-t border-rule pt-3">
+          <h3 className="font-display text-[18px] font-semibold">Suggestions from the teacher</h3>
           <p className="text-sm text-muted">
-            Suggested from the lesson. Nothing here is on the list, or shown to the family, until you accept it. Change the words first if they
-            aren&apos;t yours.
+            Taken from the last lesson. Nothing here is on the list, or shown to the family, until you accept it.
           </p>
-          <ul className="flex flex-col gap-4">
+          <ul className="flex flex-col divide-y divide-rule">
             {data.proposed.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-start gap-2">
-                <AcceptFocusForm id={p.id} studentId={studentId} title={p.title} cue={p.parent_cue} />
-                <Mark id={p.id} studentId={studentId} what="dismiss">Not this</Mark>
+              <li key={p.id} className="py-3 last:pb-0">
+                <AcceptFocusForm id={p.id} studentId={studentId} title={p.title} cue={p.parent_cue}>
+                  <Mark id={p.id} studentId={studentId} what="dismiss">Not this</Mark>
+                </AcceptFocusForm>
               </li>
             ))}
           </ul>
