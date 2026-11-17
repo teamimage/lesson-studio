@@ -7,6 +7,7 @@ import { InstrumentTag } from "@/components/instrument-tag";
 import { GradeLegend } from "@/components/grade-legend";
 import { gradingOfStudent } from "@/lib/grading";
 import { PracticeCalendarLegend, PracticeMonthCalendar } from "@/components/practice-month-calendar";
+import { CalendarAddButtons } from "@/components/calendar-add";
 import { Timeline } from "@/components/v3/timeline";
 import { Card, LinkButton, Pill } from "@/components/ui";
 import { getViewer } from "@/lib/auth";
@@ -107,6 +108,7 @@ async function Body({ params }: { params: Params }) {
             familyMode
           />
           <PracticeCalendarLegend />
+          <CalendarAddButtons studentId={id} today={today} canAddLesson={false} familyMode />
           <GradeLegend family grading={gradingOfStudent(student)} instrument={student.instrument} />
         </Card>
 

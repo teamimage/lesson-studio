@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Field, Input, Textarea, cx } from "@/components/ui";
 import { savePracticeDay } from "@/app/family/actions";
@@ -28,7 +28,10 @@ export function PracticeDayEditor({
   canRegrade = false,
   pinRequired = false,
   familyMode = false,
+  startEditing = false,
 }: {
+  /** Open straight into editing (Add practice from the calendar). */
+  startEditing?: boolean;
   /** A parent PIN is set and this viewer needs it to change the record. */
   pinRequired?: boolean;
   /** Opened from Family mode: sent with the save so the server asks for the PIN too. */
@@ -64,6 +67,15 @@ export function PracticeDayEditor({
     }
     setEditing(true);
   }
+
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!startEditing || opened.current) return;
+    opened.current = true;
+    startEdit();
+    // Only on first load, when asked to open ready to edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startEditing]);
 
   function unlock() {
     setPinError(null);
