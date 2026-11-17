@@ -6,7 +6,9 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 /**
  * Version 3 student page: the big Start lesson button with a round ▾ on its
  * right that drops down the other ways to make a lesson (Write up by hand).
- * `children` is the main button (a form or a link), full width.
+ * `children` is the main button (a form or a link), full width. Its label is
+ * padded equally on both sides so it sits on the same centre line as the
+ * full-width buttons below it, ignoring the ▾.
  */
 export function StartLessonMenu({
   children,
@@ -33,7 +35,7 @@ export function StartLessonMenu({
 
   return (
     <div ref={box} className="relative">
-      <div className="[&_a]:pr-16 [&_button]:pr-16">{children}</div>
+      <div className="[&_a]:px-16 [&_button]:px-16">{children}</div>
       <button
         type="button"
         aria-label="More ways to add a lesson"
