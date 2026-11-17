@@ -25,7 +25,8 @@ function Fold({ title, meta, open, children }: { title: string; meta?: string; o
 // The overview at the top of the teacher's student page, as three boxes:
 // name and instrument; "Student info" (folded: years playing, parents,
 // Contact buttons, communication history, balance); "Current repertoire"
-// (open, can be folded) from the last two lessons. Teacher only: the family's pages never show it.
+// (open, can be folded): pieces, scales and arpeggios, etudes, exercises and
+// listening from the last two lessons. Teacher only: the family's pages never show it.
 
 export function StudentOverview({
   studentId,
@@ -45,6 +46,7 @@ export function StudentOverview({
   const parents = data.contacts.filter((c) => c.role === "parent");
   const off = !data.ready;
   const cents = data.balanceCents;
+  const repertoireCount = data.repertoire.reduce((n, g) => n + g.items.length, 0);
   // One short line on the folded "Student info" bar.
   const summary = [
     years === null ? null : `${years} yr${years === 1 ? "" : "s"}`,
@@ -112,23 +114,29 @@ export function StudentOverview({
         )}
       </Fold>
 
-      <Fold title="Current repertoire" meta={`${data.repertoire.length} piece${data.repertoire.length === 1 ? "" : "s"}`} open>
+      <Fold title="Current repertoire" meta={repertoireCount ? `${repertoireCount} item${repertoireCount === 1 ? "" : "s"}` : undefined} open>
         {data.repertoire.length === 0 ? (
-          <p className="text-[16px] text-muted">No pieces listed in the last two lessons.</p>
+          <p className="text-[16px] text-muted">Nothing listed or assigned in the last two lessons.</p>
         ) : (
-          <ul className="flex flex-col">
-            {data.repertoire.map((r) => (
-              <li key={r.title} className="flex items-baseline gap-2 py-1 text-[16px]">
-                <span className="min-w-0 flex-1">{r.title}</span>
-                <span className="shrink-0 text-[13px] text-muted">
-                  {ACTIVITY_WORD[r.activity] ?? r.activity}
-                  {r.lessons === 2 ? " · both lessons" : r.latest ? "" : " · lesson before"}
-                </span>
-              </li>
-            ))}
-          </ul>
+          data.repertoire.map((g) => (
+            <div key={g.key} className="flex flex-col">
+              <h3 className="text-[15px] font-semibold">{g.label}</h3>
+              <ul className="flex flex-col pl-3">
+                {g.items.map((r) => (
+                  <li key={r.title} className="flex items-baseline gap-2 py-0.5 text-[16px]">
+                    <span className="min-w-0 flex-1">{r.title}</span>
+                    <span className="shrink-0 text-[13px] text-muted">
+                      {[r.activity ? (ACTIVITY_WORD[r.activity] ?? r.activity) : null, r.lessons === 2 ? "both lessons" : r.latest ? null : "lesson before"]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))
         )}
-        <p className="text-[13px] text-muted">From the last two lessons.</p>
+        <p className="text-[13px] text-muted">Everything played or assigned in the last two lessons.</p>
       </Fold>
     </div>
   );

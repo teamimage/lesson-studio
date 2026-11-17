@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { LessonFull, Student } from "@/lib/data";
-import type { Channel, Contact, MessageRow, OverviewData, RepertoireLine } from "./types";
+import type { Channel, Contact, MessageRow, OverviewData, RepertoireGroup, RepertoireGroupKey, RepertoireLine } from "./types";
 
 // The student overview box at the top of the teacher's student page: who the
 // student is, how to reach them and their parents, the balance, and what
@@ -78,29 +78,75 @@ export async function getStudentOverview(student: Student, lessons: LessonFull[]
   };
 }
 
+const GROUP_LABEL: Record<RepertoireGroupKey, string> = {
+  pieces: "Pieces",
+  scales: "Scales and arpeggios",
+  etudes: "Etudes",
+  exercises: "Exercises",
+  listening: "Listening",
+};
+
+const SCALE = /\b(scales?|arpeggios?|broken thirds|chromatic)\b/i;
+const ETUDE = /\b(etudes?|études?|studies|study no|wohlfahrt|kayser|dotzauer|czerny|burgm(ü|u)ller|hanon|schradieck|sevcik)\b/i;
+
+const norm = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ");
+/** "Perpetual Motion: shifts" belongs to the piece "Perpetual Motion". */
+const baseTitle = (t: string) => norm(t.split(/[:(–—-]/)[0]);
+
 /**
- * "Current repertoire": the pieces in the last two lessons that list any.
- * A piece in both lessons comes first. Drafts count, since the pieces are
- * what was played even before the write-up is approved.
+ * "Current repertoire": everything in the last two lessons that list any
+ * pieces or assignments, grouped: pieces (from the lesson's piece list, plus
+ * any piece assignment not already named), scales and arpeggios, etudes,
+ * other exercises (technique, theory, games), listening. Names are exactly as
+ * the lesson recorded them. Something in both lessons comes first. Drafts
+ * count, since that is what was played even before the write-up is approved.
  */
-export function currentRepertoire(lessons: LessonFull[]): RepertoireLine[] {
+export function currentRepertoire(lessons: LessonFull[]): RepertoireGroup[] {
   const recent = [...lessons]
-    .filter((l) => (l.lesson_pieces ?? []).length > 0)
+    .filter((l) => (l.lesson_pieces ?? []).length > 0 || (l.assignments ?? []).length > 0)
     .sort((a, b) => (a.lesson_date < b.lesson_date ? 1 : a.lesson_date > b.lesson_date ? -1 : 0))
     .slice(0, 2);
-  const byKey = new Map<string, RepertoireLine>();
+  const groups = new Map<RepertoireGroupKey, Map<string, RepertoireLine & { seen: Set<number> }>>();
+  const add = (group: RepertoireGroupKey, key: string, title: string, activity: string | null, i: number) => {
+    if (!groups.has(group)) groups.set(group, new Map());
+    const g = groups.get(group)!;
+    const line = g.get(key) ?? { title: title.trim(), activity, lessons: 0, latest: false, seen: new Set<number>() };
+    line.seen.add(i);
+    line.lessons = line.seen.size;
+    line.latest = line.seen.has(0);
+    g.set(key, line);
+  };
+
+  // Pieces first, so piece assignments can tell what is already listed.
   recent.forEach((lesson, i) => {
-    for (const piece of lesson.lesson_pieces) {
-      const key = piece.repertoire_id ?? piece.title.trim().toLowerCase();
-      const seen = byKey.get(key);
-      if (seen) {
-        seen.lessons += 1;
-        continue;
-      }
-      byKey.set(key, { title: piece.title.trim(), activity: piece.activity, lessons: 1, latest: i === 0 });
+    for (const piece of lesson.lesson_pieces ?? []) add("pieces", piece.repertoire_id ?? norm(piece.title), piece.title, piece.activity, i);
+  });
+  const pieceNames = new Set([...(groups.get("pieces")?.values() ?? [])].map((p) => baseTitle(p.title)));
+
+  recent.forEach((lesson, i) => {
+    for (const a of lesson.assignments ?? []) {
+      const title = a.title.trim();
+      if (!title) continue;
+      let group: RepertoireGroupKey;
+      if (SCALE.test(title)) group = "scales";
+      else if (ETUDE.test(title)) group = "etudes";
+      else if (a.kind === "piece" || a.kind === "review") {
+        if (pieceNames.has(baseTitle(title))) continue;
+        group = "pieces";
+      } else if (a.kind === "listening") group = "listening";
+      else group = "exercises";
+      add(group, group === "pieces" ? baseTitle(title) : norm(title), title, null, i);
     }
   });
-  return [...byKey.values()].sort((a, b) => b.lessons - a.lessons || Number(b.latest) - Number(a.latest));
+
+  const order: RepertoireGroupKey[] = ["pieces", "scales", "etudes", "exercises", "listening"];
+  return order
+    .filter((k) => groups.get(k)?.size)
+    .map((k) => ({
+      key: k,
+      label: GROUP_LABEL[k],
+      items: [...groups.get(k)!.values()].map((l): RepertoireLine => ({ title: l.title, activity: l.activity, lessons: l.lessons, latest: l.latest })).sort((a, b) => b.lessons - a.lessons || Number(b.latest) - Number(a.latest)),
+    }));
 }
 
 export const CHANNELS: Channel[] = ["email", "text", "push"];

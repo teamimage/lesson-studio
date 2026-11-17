@@ -14,12 +14,17 @@ export type Contact = {
 
 export type RepertoireLine = {
   title: string;
-  activity: string;
+  /** Pieces: started, worked_on, ... Assignments: none. */
+  activity: string | null;
   /** In how many of the last two lessons (1 or 2). */
   lessons: number;
   /** In the most recent lesson. */
   latest: boolean;
 };
+
+export type RepertoireGroupKey = "pieces" | "scales" | "etudes" | "exercises" | "listening";
+
+export type RepertoireGroup = { key: RepertoireGroupKey; label: string; items: RepertoireLine[] };
 
 export type MessageRow = {
   id: string;
@@ -44,7 +49,7 @@ export type OverviewData = {
   balanceCents: number | null;
   balanceNote: string | null;
   balanceUpdatedAt: string | null;
-  repertoire: RepertoireLine[];
+  repertoire: RepertoireGroup[];
   messages: MessageRow[];
 };
 
