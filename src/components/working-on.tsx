@@ -34,9 +34,16 @@ function Point({ item, teacherView }: { item: FocusItem; teacherView: boolean })
   return (
     <li className="flex flex-col gap-1 py-2.5">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <Pill tone={TONE[item.status]} className="text-[13px]">
-          {STATUS_WORDS[item.status]}
-        </Pill>
+        {/* Accepted and shared with the family, with nothing heard about it yet. */}
+        {teacherView && item.status === "working" && !item.lastHeardOn ? (
+          <Pill tone="plum" className="text-[13px]">
+            Sent
+          </Pill>
+        ) : (
+          <Pill tone={TONE[item.status]} className="text-[13px]">
+            {STATUS_WORDS[item.status]}
+          </Pill>
+        )}
         <span className="text-[17px] font-medium">{item.title}</span>
         {item.piece && <span className="text-sm text-muted">{item.piece}</span>}
       </div>
@@ -82,12 +89,9 @@ export function WorkingOnCard({
   const cue = data.open.find((o) => o.parent_cue)?.parent_cue;
   const room = MAX_FOCUS - data.open.length;
 
-  return (
-    <Card className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-        <h2 className="font-display text-[20px] font-semibold">What we&apos;re working on</h2>
-        {data.lessonDate && <span className="text-sm text-muted">from the {formatDate(data.lessonDate)} lesson</span>}
-      </div>
+  const heading = <h2 className="font-display text-[20px] font-semibold">What we&apos;re working on</h2>;
+  const body = (
+    <>
 
       {data.open.length > 0 ? (
         <ul className="flex flex-col divide-y divide-rule">
@@ -163,6 +167,44 @@ export function WorkingOnCard({
           )}
         </div>
       )}
-    </Card>
+    </>
+  );
+
+  // The family always sees the list open. For the teacher the whole card
+  // folds: open while suggestions wait for an answer, closed once each has
+  // one (and whenever there are none), to be opened by hand.
+  if (!teacherView)
+    return (
+      <Card className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          {heading}
+          {data.lessonDate && <span className="text-sm text-muted">from the {formatDate(data.lessonDate)} lesson</span>}
+        </div>
+        {body}
+      </Card>
+    );
+  const waiting = data.proposed.length;
+  return (
+    <div className="rounded-2xl border border-rule bg-sheet shadow-[0_1px_0_rgba(43,37,33,0.04)]">
+      <details key={waiting > 0 ? "waiting" : "decided"} open={waiting > 0} className="group">
+        <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center gap-x-3 px-4 py-2 [&::-webkit-details-marker]:hidden">
+          {heading}
+          <span className={cx("text-sm", waiting ? "font-medium text-accent-ink" : "text-muted")}>
+            {waiting
+              ? `${waiting} suggestion${waiting === 1 ? "" : "s"} to decide`
+              : data.open.length
+                ? `${data.open.length} on the list`
+                : "nothing on the list yet"}
+          </span>
+          <span aria-hidden className="ml-auto text-xl text-muted transition-transform group-open:rotate-90">
+            ›
+          </span>
+        </summary>
+        <div className="flex flex-col gap-1 px-4 pb-4">
+          {data.lessonDate && <span className="text-sm text-muted">from the {formatDate(data.lessonDate)} lesson</span>}
+          {body}
+        </div>
+      </details>
+    </div>
   );
 }
