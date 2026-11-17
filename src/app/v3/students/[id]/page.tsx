@@ -38,12 +38,16 @@ import { consentPath } from "@/lib/recording-consent";
 import { listScoreIndex } from "@/lib/scores";
 import { getWorkingOn } from "@/lib/focus/data";
 import { WorkingOnCard } from "@/components/working-on";
+import { StudentOverview } from "@/components/student-overview";
+import { getStudentOverview } from "@/lib/overview/data";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ show?: string; consent?: string }>;
 
 // Version 3 student page, top to bottom: Start lesson (its ▾ drops down
-// "Write up by hand") and Music stand; the full practice calendar; the last
+// "Write up by hand") and Music stand; the student overview box (who, years
+// playing, parents, Contact buttons, history, balance, current repertoire);
+// the full practice calendar; "What we're working on"; the last
 // 10 days of history in one box of sections (Everything, Lessons, Practice,
 // Videos, Reviews) picked from buttons on the left (across the top on a
 // phone), with "See all history"; then the pre-lesson brief, music and bar
@@ -74,15 +78,28 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   ]);
   const today = todayISO();
   const monthSpan = monthRange(monthOf(today));
-  const [practiceDays, lessonDays] = await Promise.all([
+  const [practiceDays, lessonDays, overview] = await Promise.all([
     listPracticeDays(id, ...monthSpan),
     listLessonMarks(id, ...monthSpan, today),
+    getStudentOverview(student, lessons),
   ]);
   const first = student.name.split(" ")[0];
   const drafts = lessons.filter((l) => l.status === "draft");
   const since = addDays(today, -RECENT_DAYS);
   const entries = all.filter((e) => e.date >= since);
   const older = all.length - entries.length;
+
+  // "What we're working on" sits below the practice calendar, folded. While
+  // suggestions wait for an answer it comes up under the overview, open.
+  const waitingOnTeacher = workingOn.proposed.length > 0;
+  const workingOnCard = (
+    <WorkingOnCard
+      data={workingOn}
+      studentId={id}
+      teacherView
+      hasApprovedLesson={lessons.some((l) => l.status === "approved")}
+    />
+  );
 
   const musicSection = (
     <div className="flex flex-col gap-4">
@@ -219,12 +236,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           </form>
         </div>
 
-        <WorkingOnCard
-          data={workingOn}
-          studentId={id}
-          teacherView
-          hasApprovedLesson={lessons.some((l) => l.status === "approved")}
-        />
+        <StudentOverview studentId={id} name={student.name} instrument={student.instrument} data={overview} year={Number(today.slice(0, 4))} />
+        {waitingOnTeacher && workingOnCard}
 
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -246,6 +259,8 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           <CalendarAddButtons studentId={id} today={today} canAddLesson />
           <GradeLegend grading={gradingOfStudent(student)} instrument={student.instrument} />
         </Card>
+
+        {!waitingOnTeacher && workingOnCard}
 
         <Timeline
           entries={entries}

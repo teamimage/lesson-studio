@@ -6,6 +6,8 @@ import { Button, Card, Field, Input, Notice, SectionTitle } from "@/components/u
 import { requireTeacher } from "@/lib/auth";
 import { getStudent, listParentsForStudent } from "@/lib/data";
 import { addParent, removeParent, updateStudent } from "../../actions";
+import { getStudentOverview } from "@/lib/overview/data";
+import { ContactDetailsForm } from "@/components/student-overview-parts";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ error?: string }>;
@@ -24,6 +26,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const { error } = await searchParams;
   const [student, parents] = await Promise.all([getStudent(id), listParentsForStudent(id)]);
   if (!student) notFound();
+  const overview = await getStudentOverview(student, []);
 
   return (
     <Shell title={student.name} eyebrow="Edit student" back={{ href: `/students/${id}`, label: student.name }} tab="studio">
@@ -67,6 +70,27 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               <Button variant="secondary">Add parent</Button>
             </form>
           </div>
+        </section>
+
+        <section>
+          <SectionTitle>Contact details</SectionTitle>
+          <p className="mb-3 text-sm text-muted">
+            Used by the Contact buttons on the student page. Messages are sent from the app and kept in the communication history.
+          </p>
+          {overview.ready ? (
+            <div className="flex flex-col divide-y divide-rule">
+              {overview.contacts.map((c) => (
+                <div key={c.key} className="flex flex-col gap-2 py-3">
+                  <p className="font-semibold">
+                    {c.name} <span className="text-sm font-normal text-muted">{c.role === "student" ? "student" : "parent"}</span>
+                  </p>
+                  <ContactDetailsForm studentId={id} contact={c} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Notice tone="amber">Run student-overview.sql in Supabase to add emails and mobile numbers here.</Notice>
+          )}
         </section>
       </div>
     </Shell>
