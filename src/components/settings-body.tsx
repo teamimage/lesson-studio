@@ -8,6 +8,8 @@ import { isAdmin } from "@/lib/admin";
 import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import { setPassword, updateReviewTone, updateTeacher } from "@/app/settings/actions";
+import { updateMessageSettings } from "@/app/students/overview-actions";
+import { channelReady } from "@/lib/overview/send";
 import { STANDARD_LABELS, SYSTEM_LABELS, parseGrading } from "@/lib/grading";
 import {
   PROFILE_SECTIONS,
@@ -68,6 +70,8 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
           </form>
         </section>
       )}
+
+      {viewer.teacher && <MessageSettings teacher={viewer.teacher} />}
 
       {viewer.teacher && (
         <Link
@@ -325,6 +329,39 @@ async function ParentPins() {
           />
         ))}
       </Card>
+    </section>
+  );
+}
+
+/** Settings, Messages: how emails and texts from the Contact buttons go out. */
+function MessageSettings({ teacher }: { teacher: Tables<"teachers"> }) {
+  const t = teacher as Tables<"teachers"> & { message_signature?: string | null; message_reply_to?: string | null };
+  const ready = channelReady();
+  const ready_ = (on: boolean) => (on ? <span className="text-sage">set up</span> : <span className="text-amber">not set up yet</span>);
+  return (
+    <section>
+      <SectionTitle>Messages</SectionTitle>
+      <p className="mb-3 text-sm text-muted">
+        Emails and texts sent from a student&apos;s Contact buttons go out from the app and are kept in that student&apos;s communication history.
+      </p>
+      <ul className="mb-3 flex flex-col gap-0.5 text-[16px]">
+        <li>Email: {ready_(ready.email)}</li>
+        <li>Text: {ready_(ready.text)}</li>
+        <li>Push notifications: <span className="text-muted">come with the installed app</span></li>
+      </ul>
+      {t.message_signature === undefined ? (
+        <Notice tone="amber">Run student-overview.sql in Supabase to set a signature and reply address.</Notice>
+      ) : (
+        <form action={updateMessageSettings} className="flex flex-col gap-4">
+          <Field label="Sign messages as" hint="Added to the end of every email and text, e.g. “Maaike Kahn, Kahn Music Studio”.">
+            <Input name="message_signature" defaultValue={t.message_signature ?? ""} />
+          </Field>
+          <Field label="Replies go to" hint="The email address families reply to. Empty uses your sign-in email.">
+            <Input name="message_reply_to" type="email" defaultValue={t.message_reply_to ?? ""} />
+          </Field>
+          <Button>Save</Button>
+        </form>
+      )}
     </section>
   );
 }
