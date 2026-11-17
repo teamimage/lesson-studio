@@ -107,7 +107,8 @@ function isPdf(f: File): boolean {
 async function pdfPages(file: File, onPage: (done: number, total: number) => void): Promise<Prepared[]> {
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const loading = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+  const doc = await loading.promise;
   const out: Prepared[] = [];
   for (let n = 1; n <= doc.numPages; n++) {
     const page = await doc.getPage(n);
@@ -124,7 +125,7 @@ async function pdfPages(file: File, onPage: (done: number, total: number) => voi
     out.push({ blob: await canvasToJpeg(canvas), w: canvas.width, h: canvas.height });
     onPage(out.length, doc.numPages);
   }
-  await doc.destroy();
+  await loading.destroy();
   return out;
 }
 
