@@ -335,6 +335,10 @@ export type Database = {
       };
       parents: {
         Row: {
+          family_id: string | null;
+          whole_family: boolean;
+          relationship: string;
+          phone: string | null;
           created_at: string;
           email: string;
           id: string;
@@ -344,6 +348,10 @@ export type Database = {
           user_id: string | null;
         };
         Insert: {
+          family_id?: string | null;
+          whole_family?: boolean;
+          relationship?: string;
+          phone?: string | null;
           created_at?: string;
           email: string;
           id?: string;
@@ -353,6 +361,10 @@ export type Database = {
           user_id?: string | null;
         };
         Update: {
+          family_id?: string | null;
+          whole_family?: boolean;
+          relationship?: string;
+          phone?: string | null;
           created_at?: string;
           email?: string;
           id?: string;
@@ -1189,6 +1201,7 @@ export type Database = {
       };
       students: {
         Row: {
+          family_id: string | null;
           active: boolean;
           age: number | null;
           created_at: string;
@@ -1206,6 +1219,7 @@ export type Database = {
           teacher_id: string;
         };
         Insert: {
+          family_id?: string | null;
           active?: boolean;
           age?: number | null;
           created_at?: string;
@@ -1223,6 +1237,7 @@ export type Database = {
           teacher_id: string;
         };
         Update: {
+          family_id?: string | null;
           active?: boolean;
           age?: number | null;
           created_at?: string;
@@ -1475,8 +1490,15 @@ export type Database = {
         };
         Relationships: [];
       };
+      families: {
+        Row: { id: string; teacher_id: string; name: string; created_at: string };
+        Insert: { id?: string; teacher_id: string; name?: string; created_at?: string };
+        Update: { id?: string; teacher_id?: string; name?: string; created_at?: string };
+        Relationships: [];
+      };
       family_invites: {
         Row: {
+          parent_id: string | null;
           id: string;
           teacher_id: string;
           student_id: string;
@@ -1494,6 +1516,7 @@ export type Database = {
           join_email: string | null;
         };
         Insert: {
+          parent_id?: string | null;
           id?: string;
           teacher_id: string;
           student_id: string;
@@ -1510,6 +1533,7 @@ export type Database = {
           revoked_at?: string | null;
         };
         Update: {
+          parent_id?: string | null;
           status?: string;
           name?: string;
           email?: string;

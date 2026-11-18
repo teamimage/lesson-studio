@@ -78,6 +78,9 @@ export async function removeFamilyAccess(fd: FormData) {
   const parentId = String(fd.get("parent_id") ?? "");
   const supabase = await createClient();
   await supabase.from("student_parents").delete().eq("student_id", studentId).eq("parent_id", parentId);
+  // They keep their other children, but no longer see the whole family
+  // (or this child would come back when another joins it).
+  await supabase.from("parents").update({ whole_family: false }).eq("id", parentId);
   await supabase
     .from("family_invites")
     .update({ status: "revoked", revoked_at: new Date().toISOString() })
