@@ -73,6 +73,10 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
       )}
 
       {viewer.teacher && (
+        <RowLink href="/settings/lesson-times" title="Lesson times" hint="Each student's regular weekly lesson, and one-off lessons" />
+      )}
+
+      {viewer.teacher && (
         <RowLink href="/families" title="Families" hint="Parents and guardians, what they see, and their invites" />
       )}
 
