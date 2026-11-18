@@ -2,7 +2,7 @@ import "server-only";
 import { type LessonFull, type PracticeWeek, type Student, getPracticeWeek, listLessons, listRepertoire } from "@/lib/data";
 import type { Repertoire } from "@/lib/data";
 import { todayISO } from "@/lib/format";
-import { findTodayLesson } from "@/lib/lesson-today";
+import { findRunningLesson } from "@/lib/lesson-today";
 import { listPracticeSessions, type PracticeSessionView } from "@/lib/practice/data";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { nextLesson } from "@/lib/teacher-data";
@@ -17,7 +17,7 @@ export type TodayRow = {
   repertoire: Repertoire[];
   lastSession: PracticeSessionView | null;
   consent: "signed" | "needed" | "setup";
-  /** A lesson started in the last 12 hours, if any. */
+  /** A lesson started and not yet ended (at most 3 hours old), if any. */
   runningLessonId: string | null;
   next: { date: string; source: "set" | "weekly" } | null;
   /** Lesson day is today (by schedule, or a lesson was started today). */
@@ -34,7 +34,7 @@ export async function loadTodayRow(student: Student, today = todayISO()): Promis
     listRepertoire(id),
     listPracticeSessions(id, 1),
     getConsentStatus(id),
-    findTodayLesson(id),
+    findRunningLesson(id),
   ]);
   const next = nextLesson(student, lessons[0] ?? null, today);
   const hadLessonToday = lessons.some((l) => l.lesson_date === today);

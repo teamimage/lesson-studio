@@ -17,7 +17,12 @@ export async function startLesson(fd: FormData) {
   if (!(await hasConsent(studentId))) redirect(consentPath(studentId, `/students/${studentId}`));
   const lessonId = await findOrCreateTodayLesson(studentId, teacher.id);
   if (!lessonId) redirect(`/students/${studentId}?error=lesson`);
+  // Starting again after End lesson reopens the same lesson: drop the timer
+  // length End wrote, so Downbeat shows it in progress again until it ends.
+  const supabase = await createClient();
+  if ((await lessonLengthSource(supabase, lessonId)) === "timer") await writeLength(supabase, lessonId, null, null);
   revalidatePath(`/students/${studentId}`);
+  revalidatePath("/downbeat");
   redirect(`/lessons/${lessonId}/live`);
 }
 
@@ -84,6 +89,8 @@ async function writeLessonLength(id: string, onlyIfEmpty: boolean) {
   await writeLength(supabase, id, minutes, "timer");
   revalidatePath(`/lessons/${id}`);
   revalidatePath(`/lessons/${id}/live`);
+  revalidatePath("/downbeat");
+  revalidatePath("/v3");
   return true;
 }
 
