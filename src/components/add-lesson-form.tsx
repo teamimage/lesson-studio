@@ -18,6 +18,7 @@ export function AddLessonForm({
   pupils,
   booked,
   date: initialDate,
+  time: initialTime,
   next,
   student: initialStudent,
   everyOtherWeek,
@@ -25,13 +26,14 @@ export function AddLessonForm({
   pupils: Pupil[];
   booked: Booked[];
   date: string;
+  time?: string;
   next: string;
   student: string | null;
   everyOtherWeek: boolean;
 }) {
   const [studentId, setStudentId] = useState(pupils.some((p) => p.id === initialStudent) ? initialStudent! : "");
   const [date, setDate] = useState(initialDate);
-  const [time, setTime] = useState("");
+  const [time, setTime] = useState(initialTime ?? "");
   const pupil = pupils.find((p) => p.id === studentId);
   const [minutes, setMinutes] = useState(pupil?.minutes ?? 30);
   const [repeat, setRepeat] = useState("once");

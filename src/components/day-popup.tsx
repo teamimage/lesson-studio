@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { type ReactNode, useRef, useState } from "react";
+import { addHrefFor } from "@/components/press-to-add";
 
 // A day on a calendar: tapping it pops up that day's lessons (a sheet from
 // the bottom on a phone, a box in the middle on wider screens).
@@ -11,6 +13,7 @@ export function DayPopup({
   children,
   title,
   body,
+  addDate,
 }: {
   label: string;
   className?: string;
@@ -18,7 +21,23 @@ export function DayPopup({
   children: ReactNode;
   title: ReactNode;
   body: ReactNode;
+  /** Press and hold (or right-click) the day to add a lesson on it. */
+  addDate?: string;
 }) {
+  const router = useRouter();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const fired = useRef(false);
+  function add() {
+    if (!addDate) return;
+    fired.current = true;
+    if (navigator.vibrate) navigator.vibrate(15);
+    router.push(addHrefFor(addDate));
+  }
+  function clear() {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  }
   const [open, setOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   function close() {
@@ -32,7 +51,27 @@ export function DayPopup({
         aria-label={label}
         aria-current={current ? "date" : undefined}
         className={className}
+        style={{ WebkitTouchCallout: "none" }}
+        onPointerDown={(e) => {
+          fired.current = false;
+          if (!addDate || e.pointerType === "mouse") return;
+          start.current = { x: e.clientX, y: e.clientY };
+          clear();
+          timer.current = setTimeout(add, 500);
+        }}
+        onPointerMove={(e) => {
+          if (start.current && Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > 10) clear();
+        }}
+        onPointerUp={clear}
+        onPointerCancel={clear}
+        onContextMenu={(e) => {
+          if (!addDate) return;
+          e.preventDefault();
+          clear();
+          if (!fired.current) add();
+        }}
         onClick={() => {
+          if (fired.current) return;
           setOpen(true);
           requestAnimationFrame(() => dialog.current?.showModal());
         }}

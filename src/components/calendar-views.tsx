@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cx } from "@/components/ui";
 import { DayPopup } from "@/components/day-popup";
 import { LessonPress, type PressLesson } from "@/components/lesson-press";
+import { PressToAdd } from "@/components/press-to-add";
 import { addDays, formatDate, parseISODate } from "@/lib/format";
 import { monthOf } from "@/lib/practice/month";
 import { type Closure, type Occurrence, cancelLabel, formatTime, isOn, occurrenceRef, toMinutes } from "@/lib/schedule";
@@ -77,7 +78,7 @@ export function WeekList({ from, occs, ctx }: { from: string; occs: Occurrence[]
 export function DayAgenda({ date, occs, ctx, heading = true }: { date: string; occs: Occurrence[]; ctx: Ctx; heading?: boolean }) {
   const closed = closedOn(date, ctx.closures);
   return (
-    <div className={cx("py-2.5", date === ctx.today && "bg-accent-soft/40")}>
+    <PressToAdd date={date} className={cx("py-2.5", date === ctx.today && "bg-accent-soft/40")}>
       {heading && (
         <div className={cx("text-[15px]", date === ctx.today ? "font-semibold text-accent-ink" : "text-muted")}>
           {dayLabel(date)}
@@ -94,7 +95,7 @@ export function DayAgenda({ date, occs, ctx, heading = true }: { date: string; o
           ))}
         </ul>
       )}
-    </div>
+    </PressToAdd>
   );
 }
 
@@ -179,8 +180,10 @@ export function WeekGrid({ from, occs, ctx }: { from: string; occs: Occurrence[]
 
         {/* One column per day */}
         {days.map((d) => (
-          <div
+          <PressToAdd
             key={d}
+            date={d}
+            hours={{ first, px: HOUR_PX }}
             className={cx("relative border-l border-rule", d === ctx.today && "bg-accent-soft/30", closedOn(d, ctx.closures) && "bg-rule/30")}
             style={{ height: hours.length * HOUR_PX }}
           >
@@ -220,7 +223,7 @@ export function WeekGrid({ from, occs, ctx }: { from: string; occs: Occurrence[]
                   </LessonPress>
                 );
               })}
-          </div>
+          </PressToAdd>
         ))}
       </div>
       {untimed.length > 0 && (
@@ -272,6 +275,7 @@ export function MonthGrid({
         return (
           <DayPopup
             key={d}
+            addDate={d}
             label={`${dayLabel(d)}: ${on.length} lesson${on.length === 1 ? "" : "s"}`}
             current={d === ctx.today}
             className={cx(
@@ -320,7 +324,7 @@ export function MonthGrid({
 export function DayBody({ date, occs, ctx, back }: { date: string; occs: Occurrence[]; ctx: Ctx; back: string }) {
   const closed = closedOn(date, ctx.closures);
   return (
-    <div className="flex flex-col">
+    <PressToAdd date={date} className="flex flex-col">
       {closed && <p className="text-[15px] text-muted">Studio closed{closed.note ? `: ${closed.note}` : ""}.</p>}
       {occs.length === 0 ? (
         <p className="py-2 text-[16px] text-muted">No lessons this day.</p>
@@ -331,14 +335,14 @@ export function DayBody({ date, occs, ctx, back }: { date: string; occs: Occurre
           ))}
         </ul>
       )}
-      {occs.length > 0 && <p className="pt-1 text-sm text-muted">Press and hold a lesson to edit or delete it.</p>}
+      {occs.length > 0 && <p className="pt-1 text-sm text-muted">Press and hold a lesson to edit or delete it, or an empty spot to add one.</p>}
       <Link
         href={addLessonHref(date, back)}
         className="mt-3 self-center rounded-full px-4 py-2 text-[15px] font-medium text-accent-ink no-underline hover:bg-accent-soft"
       >
         + Add lesson
       </Link>
-    </div>
+    </PressToAdd>
   );
 }
 

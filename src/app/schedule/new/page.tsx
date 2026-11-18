@@ -7,7 +7,7 @@ import { addDays, todayISO } from "@/lib/format";
 import { isOn } from "@/lib/schedule";
 import { loadSchedule, scheduleBetween } from "@/lib/schedule-data";
 
-type SP = Promise<{ date?: string; next?: string; student?: string }>;
+type SP = Promise<{ date?: string; time?: string; next?: string; student?: string }>;
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -50,6 +50,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
         pupils={pupils}
         booked={booked}
         date={date}
+        time={sp.time && /^\d{2}:\d{2}$/.test(sp.time) ? sp.time : ""}
         next={next}
         student={sp.student ?? null}
         everyOtherWeek={schedule.foundation}
