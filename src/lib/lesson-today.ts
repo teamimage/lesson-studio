@@ -25,6 +25,31 @@ export async function findTodayLesson(studentId: string): Promise<string | null>
   return recent?.id ?? null;
 }
 
+// A lesson still counts as "in lesson now" only until it is ended, and never
+// for longer than this, so one left open by mistake drops off by itself.
+const RUNNING_MAX_HOURS = 3;
+
+/**
+ * The lesson in progress for a student: started in the last 3 hours, still a
+ * draft, and not ended yet. End lesson (lesson card or music stand) writes the
+ * lesson's length, and so does a video or a typed length, so a lesson with a
+ * length is over. Used by Downbeat and the Today screen for "In lesson now".
+ */
+export async function findRunningLesson(studentId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const since = new Date(Date.now() - RUNNING_MAX_HOURS * 3600_000).toISOString();
+  const { data: recent } = await supabase
+    .from("lessons")
+    .select("id, status, duration_minutes")
+    .eq("student_id", studentId)
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!recent || recent.status !== "draft" || recent.duration_minutes != null) return null;
+  return recent.id;
+}
+
 /** Start lesson: today's lesson for a student (reused if one was started recently), or a new draft. */
 export async function findOrCreateTodayLesson(studentId: string, teacherId: string): Promise<string | null> {
   const recent = await findTodayLesson(studentId);
