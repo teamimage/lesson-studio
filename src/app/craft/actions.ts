@@ -7,7 +7,6 @@ import { todayISO } from "@/lib/format";
 import { programBySlug } from "@/lib/craft/content";
 
 function refresh() {
-  revalidatePath("/craft");
   revalidatePath("/downbeat");
 }
 
