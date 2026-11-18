@@ -50,9 +50,12 @@ export type UsageSummary = {
   lessons: LessonTotal[];
 };
 
-/** Totals for Settings: by month, and by lesson (most recent first). */
-export async function getUsageSummary(teacherId: string): Promise<UsageSummary> {
-  const db = await createClient();
+/** Totals for Admin (pass the admin client to read any teacher): by month, and by lesson (most recent first). */
+export async function getUsageSummary(
+  teacherId: string,
+  client?: Awaited<ReturnType<typeof createClient>>,
+): Promise<UsageSummary> {
+  const db = client ?? (await createClient());
   const { data } = await db
     .from("ai_usage")
     .select(

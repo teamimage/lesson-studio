@@ -22,7 +22,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
   const studio = parseGrading((teacher as { grading?: unknown }).grading);
   const { data: students } = await db.from("students").select("*").eq("teacher_id", teacher.id).order("name");
   return (
-    <Shell title="Grading" back={{ href: "/settings#grading", label: "Settings" }} tab="settings">
+    <Shell title="Grading" back={{ href: "/settings/teaching#grading", label: "Teacher settings" }} tab="settings">
       <GradingSettings studio={studio} students={students ?? []} saved={saved} />
     </Shell>
   );

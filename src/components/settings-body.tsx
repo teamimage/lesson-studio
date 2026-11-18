@@ -6,10 +6,10 @@ import { PasswordInput } from "@/components/password-input";
 import { getViewer } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import Link from "next/link";
+import { Fold } from "@/components/fold";
 import { signOut } from "@/app/login/actions";
 import { setPassword, updateReviewTone, updateTeacher } from "@/app/settings/actions";
 import { updateMessageSettings } from "@/app/students/overview-actions";
-import { channelReady } from "@/lib/overview/send";
 import { STANDARD_LABELS, SYSTEM_LABELS, parseGrading } from "@/lib/grading";
 import {
   PROFILE_SECTIONS,
@@ -22,9 +22,6 @@ import {
   toneOf,
 } from "@/lib/assistant/profile";
 import type { Json, Tables } from "@/lib/supabase/types";
-import { getUsageSummary } from "@/lib/ai/usage";
-import { formatUsd } from "@/lib/ai/pricing";
-import { formatDate } from "@/lib/format";
 
 const PASSWORD_NOTICES: Record<string, { tone: "sage" | "danger" | "plum"; text: string }> = {
   saved: { tone: "sage", text: "Password saved. Next time, sign in with your email and this password." },
@@ -38,16 +35,20 @@ const PASSWORD_NOTICES: Record<string, { tone: "sage" | "danger" | "plum"; text:
 
 export type SettingsSP = Promise<{ saved?: string; password?: string; assistant?: string }>;
 
-/** The Settings page body; also folded into the version 3 Setup page. */
+/**
+ * The Settings page body (also the version 3 Settings page): the teacher's
+ * own studio, each part a box that opens in place. Teaching assistant and
+ * grading have their own page (Teacher settings and grading); running the
+ * app as a whole lives on the Admin tab.
+ */
 export async function SettingsBody({ searchParams, adminLink = true }: { searchParams: SettingsSP; adminLink?: boolean }) {
   const viewer = await getViewer();
-  const { saved, password, assistant } = await searchParams;
-  const admin = await isAdmin();
+  const { saved, password } = await searchParams;
+  const admin = adminLink ? await isAdmin() : false;
   const passwordNotice = password ? PASSWORD_NOTICES[password] : undefined;
   return (
-    <div className="flex flex-col gap-8">
-      {saved && <Notice tone="sage">Saved.</Notice>}
-      {admin && adminLink && (
+    <div className="flex flex-col gap-3">
+      {admin && (
         <Link
           href="/admin"
           className="flex min-h-12 items-center justify-between rounded-2xl border border-accent/30 bg-accent-soft px-4 font-semibold text-accent-ink"
@@ -57,8 +58,8 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
         </Link>
       )}
       {viewer.teacher && (
-        <section>
-          <SectionTitle>Teacher</SectionTitle>
+        <Fold id="studio" title="You and your studio" meta="names" open={!!saved}>
+          {saved && <Notice tone="sage">Saved.</Notice>}
           <form action={updateTeacher} className="flex flex-col gap-4">
             <Field label="Your name" hint="Appears on lesson sheets, e.g. “Ms. Ana”.">
               <Input name="name" defaultValue={viewer.teacher.name} />
@@ -68,163 +69,93 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
             </Field>
             <Button>Save</Button>
           </form>
-        </section>
+        </Fold>
       )}
-
-      {viewer.teacher && <MessageSettings teacher={viewer.teacher} />}
 
       {viewer.teacher && (
-        <Link
-          href="/store"
-          className="flex min-h-12 items-center justify-between rounded-2xl border border-rule bg-sheet px-4 font-semibold hover:border-accent/50"
-        >
-          <span>
-            Studio store
-            <span className="block text-sm font-normal text-muted">Books, supplies and gear for your families to buy</span>
-          </span>
-          <span aria-hidden className="text-accent-ink">›</span>
-        </Link>
+        <Fold id="messages" title="Messages" meta="signature, reply address">
+          <MessageSettings teacher={viewer.teacher} />
+        </Fold>
       )}
 
-      {viewer.teacher && <TeachingAssistant teacher={viewer.teacher} notice={assistant} />}
-      {viewer.teacher && <Grading teacher={viewer.teacher} />}
+      {viewer.teacher && (
+        <RowLink href="/settings/teaching" title="Teacher settings and grading" hint="Your teaching assistant, review tone and grading" />
+      )}
 
-      {viewer.teacher && <AiCosts teacherId={viewer.teacher.id} />}
+      {viewer.teacher && (
+        <RowLink href="/store" title="Studio store" hint="Books, supplies and gear for your families to buy" />
+      )}
 
       {!viewer.teacher && viewer.parentRows.length > 0 && <ParentPins />}
-      <section>
-        <SectionTitle>Account</SectionTitle>
-        <Card className="flex flex-col gap-3">
-          <div className="text-[16px]">
-            Signed in as <span className="font-medium">{viewer.email}</span>
-            <div className="text-sm text-muted">
-              {viewer.teacher ? "Teacher" : ""}
-              {viewer.teacher && viewer.parentRows.length > 0 ? " and " : ""}
-              {viewer.parentRows.length > 0 ? "parent" : ""}
-            </div>
-          </div>
-          <form action={signOut}>
-            <Button variant="secondary">Sign out</Button>
-          </form>
-        </Card>
-      </section>
 
-      <section id="password" className="scroll-mt-6">
-        <SectionTitle>Password</SectionTitle>
-        <Card className="flex flex-col gap-3">
-          <p className="text-sm text-muted">
-            Set a password to sign in without waiting for an email code. You can still use a code any time.
-          </p>
-          {passwordNotice && <Notice tone={passwordNotice.tone}>{passwordNotice.text}</Notice>}
-          <form action={setPassword} className="flex flex-col gap-4">
-            {/* Lets password managers save the login under the right email. */}
-            <input type="email" name="username" autoComplete="username" value={viewer.email} readOnly hidden />
-            <Field label="New password" hint="At least 8 characters.">
-              <PasswordInput
-                name="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
-                autoFocus={password === "reset"}
-              />
-            </Field>
-            <Field label="Type it again">
-              <PasswordInput name="confirm" autoComplete="new-password" minLength={8} required />
-            </Field>
-            <Button>Save password</Button>
-          </form>
-        </Card>
-      </section>
+      <Fold id="account" title="Account" meta={viewer.email}>
+        <div className="text-[16px]">
+          Signed in as <span className="font-medium">{viewer.email}</span>
+          <div className="text-sm text-muted">
+            {viewer.teacher ? "Teacher" : ""}
+            {viewer.teacher && viewer.parentRows.length > 0 ? " and " : ""}
+            {viewer.parentRows.length > 0 ? "parent" : ""}
+          </div>
+        </div>
+        <form action={signOut}>
+          <Button variant="secondary">Sign out</Button>
+        </form>
+      </Fold>
+
+      <Fold id="password" title="Password" meta="sign in without a code" open={!!passwordNotice}>
+        <p className="text-sm text-muted">
+          Set a password to sign in without waiting for an email code. You can still use a code any time.
+        </p>
+        {passwordNotice && <Notice tone={passwordNotice.tone}>{passwordNotice.text}</Notice>}
+        <form action={setPassword} className="flex flex-col gap-4">
+          {/* Lets password managers save the login under the right email. */}
+          <input type="email" name="username" autoComplete="username" value={viewer.email} readOnly hidden />
+          <Field label="New password" hint="At least 8 characters.">
+            <PasswordInput
+              name="password"
+              autoComplete="new-password"
+              minLength={8}
+              required
+              autoFocus={password === "reset"}
+            />
+          </Field>
+          <Field label="Type it again">
+            <PasswordInput name="confirm" autoComplete="new-password" minLength={8} required />
+          </Field>
+          <Button>Save password</Button>
+        </form>
+      </Fold>
     </div>
   );
 }
 
-function monthLabel(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+/** Teacher settings and grading page: teaching assistant and grading. */
+export async function TeachingSettingsBody({ searchParams }: { searchParams: Promise<{ assistant?: string }> }) {
+  const viewer = await getViewer();
+  const { assistant } = await searchParams;
+  if (!viewer.teacher) return null;
+  return (
+    <div className="flex flex-col gap-8">
+      <TeachingAssistant teacher={viewer.teacher} notice={assistant} />
+      <Grading teacher={viewer.teacher} />
+    </div>
+  );
 }
 
-// Running totals of what the AI has cost: lesson videos (transcription +
-// Claude) and reading uploaded sheet music.
-async function AiCosts({ teacherId }: { teacherId: string }) {
-  const usage = await getUsageSummary(teacherId);
+function RowLink({ href, title, hint }: { href: string; title: string; hint: string }) {
   return (
-    <section id="ai-costs" className="scroll-mt-6">
-      <SectionTitle>AI costs</SectionTitle>
-      <Card className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">This month</div>
-            <div className="font-display text-2xl">{formatUsd(usage.thisMonthUsd)}</div>
-          </div>
-          <div>
-            <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">All time</div>
-            <div className="font-display text-2xl">{formatUsd(usage.allTimeUsd)}</div>
-          </div>
-        </div>
-        {usage.lessons.length === 0 ? (
-          <p className="text-sm text-muted">
-            Nothing yet. Costs show up here after a lesson video is processed, sheet music is read or a practice session is reviewed.
-          </p>
-        ) : (
-          <>
-            <div>
-              <div className="mb-1 text-sm font-semibold">By month</div>
-              <ul className="divide-y divide-rule text-sm">
-                {usage.months.map((m) => (
-                  <li key={m.month} className="flex justify-between py-1.5">
-                    <span>{monthLabel(m.month)}</span>
-                    <span className="tabular-nums">{formatUsd(m.costUsd)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <div className="mb-1 text-sm font-semibold">By lesson, music and practice</div>
-              <ul className="divide-y divide-rule text-sm">
-                {usage.lessons.slice(0, 30).map((l) => (
-                  <li
-                    key={l.key}
-                    className="flex items-baseline justify-between gap-3 py-1.5"
-                  >
-                    <span className="min-w-0">
-                      {l.assistant ? (
-                        <span className="font-medium">Teaching assistant</span>
-                      ) : l.practice ? (
-                        <span className="font-medium">
-                          Practice reviews{l.studentName ? `: ${l.studentName}` : " (deleted sessions)"}
-                        </span>
-                      ) : l.music ? (
-                        l.scoreTitle ? (
-                          <span className="font-medium">
-                            Sheet music: {l.scoreTitle}
-                            {l.studentName ? ` (${l.studentName})` : ""}
-                          </span>
-                        ) : (
-                          <span className="text-muted">Deleted sheet music</span>
-                        )
-                      ) : l.lessonId ? (
-                        <Link href={`/lessons/${l.lessonId}`} className="font-medium text-accent-ink">
-                          {l.studentName ?? "Lesson"}
-                          {l.lessonDate ? `, ${formatDate(l.lessonDate)}` : ""}
-                        </Link>
-                      ) : (
-                        <span className="text-muted">Deleted lessons</span>
-                      )}
-                      <span className="block text-xs text-muted">
-                        {l.audioMinutes > 0 ? `${Math.round(l.audioMinutes)} min transcribed ${formatUsd(l.transcriptionUsd)} · ` : ""}
-                        Claude {formatUsd(l.claudeUsd)}
-                      </span>
-                    </span>
-                    <span className="tabular-nums">{formatUsd(l.costUsd)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </>
-        )}
-      </Card>
-    </section>
+    <Link
+      href={href}
+      className="flex min-h-12 items-center gap-3 rounded-2xl border border-rule bg-sheet/60 px-4 py-2 text-ink no-underline"
+    >
+      <span className="min-w-0">
+        <span className="block font-display text-[19px] font-semibold">{title}</span>
+        <span className="block text-sm text-muted">{hint}</span>
+      </span>
+      <span aria-hidden className="ml-auto text-xl text-muted">
+        ›
+      </span>
+    </Link>
   );
 }
 
@@ -313,9 +244,7 @@ async function ParentPins() {
   if (!students.length) return null;
   const pins = await Promise.all(students.map((s) => practicePinSet(s.id)));
   return (
-    <section>
-      <SectionTitle>Practice records</SectionTitle>
-      <Card className="flex flex-col gap-4">
+    <Fold id="practice-records" title="Practice records" meta="parent PIN" open>
         <p className="text-sm text-muted">
           Set a PIN so only a parent can change a day&apos;s practice record (tick off work, fix the minutes). Practising and
           ticking off today&apos;s list still works without it.
@@ -328,27 +257,18 @@ async function ParentPins() {
             isSet={pins[i]}
           />
         ))}
-      </Card>
-    </section>
+    </Fold>
   );
 }
 
-/** Settings, Messages: how emails and texts from the Contact buttons go out. */
+/** Settings, Messages box: how emails and texts from the Contact buttons go out. */
 function MessageSettings({ teacher }: { teacher: Tables<"teachers"> }) {
   const t = teacher as Tables<"teachers"> & { message_signature?: string | null; message_reply_to?: string | null };
-  const ready = channelReady();
-  const ready_ = (on: boolean) => (on ? <span className="text-sage">set up</span> : <span className="text-amber">not set up yet</span>);
   return (
-    <section>
-      <SectionTitle>Messages</SectionTitle>
-      <p className="mb-3 text-sm text-muted">
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-muted">
         Emails and texts sent from a student&apos;s Contact buttons go out from the app and are kept in that student&apos;s communication history.
       </p>
-      <ul className="mb-3 flex flex-col gap-0.5 text-[16px]">
-        <li>Email: {ready_(ready.email)}</li>
-        <li>Text: {ready_(ready.text)}</li>
-        <li>Push notifications: <span className="text-muted">come with the installed app</span></li>
-      </ul>
       {t.message_signature === undefined ? (
         <Notice tone="amber">Run student-overview.sql in Supabase to set a signature and reply address.</Notice>
       ) : (
@@ -362,6 +282,6 @@ function MessageSettings({ teacher }: { teacher: Tables<"teachers"> }) {
           <Button>Save</Button>
         </form>
       )}
-    </section>
+    </div>
   );
 }

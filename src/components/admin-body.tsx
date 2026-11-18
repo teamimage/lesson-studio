@@ -5,10 +5,16 @@ import { Button, Card, Pill, SectionTitle } from "@/components/ui";
 import { requireAdmin } from "@/lib/admin";
 import { formatDate } from "@/lib/format";
 import { adminDeleteAccount, adminMakeTeacher } from "@/app/admin/actions";
+import { AiCosts } from "@/components/ai-costs";
+import { channelReady } from "@/lib/overview/send";
 
 export type AdminSP = Promise<{ saved?: string; deleted?: string; error?: string }>;
 
-/** The Admin page body; also folded into the version 3 Setup page. */
+/**
+ * The Admin page body: everything about running the app as a whole (all
+ * accounts, storage, the store catalogue, AI costs, message services).
+ * A teacher's own studio settings stay under Settings / Setup.
+ */
 export async function AdminBody({ searchParams }: { searchParams: AdminSP }) {
   const { db, viewer } = await requireAdmin();
   const sp = await searchParams;
@@ -21,6 +27,8 @@ export async function AdminBody({ searchParams }: { searchParams: AdminSP }) {
   const emailOf = new Map((users ?? []).map((u) => [u.id, u]));
   const teacherUserIds = new Set((teachers ?? []).map((t) => t.user_id));
   const otherUsers = (users ?? []).filter((u) => !teacherUserIds.has(u.id));
+  const ready = channelReady();
+  const status = (on: boolean) => (on ? <span className="text-sage">set up</span> : <span className="text-amber">not set up yet</span>);
 
   return (
     <div className="flex flex-col gap-8">
@@ -137,6 +145,29 @@ export async function AdminBody({ searchParams }: { searchParams: AdminSP }) {
           })}
           {otherUsers.length === 0 && <p className="text-sm text-muted">None.</p>}
         </div>
+      </section>
+
+      {(teachers ?? []).map((t) => (
+        <AiCosts
+          key={t.id}
+          teacherId={t.id}
+          admin
+          title={(teachers ?? []).length > 1 ? `AI costs: ${t.name || "No name yet"}` : "AI costs"}
+        />
+      ))}
+
+      <section>
+        <SectionTitle>Message services</SectionTitle>
+        <p className="mb-2 text-sm text-muted">
+          How emails and texts from the Contact buttons go out, for every studio. Set up with keys in Vercel.
+        </p>
+        <ul className="flex flex-col gap-0.5 text-[16px]">
+          <li>Email (Resend): {status(ready.email)}</li>
+          <li>Text (Twilio): {status(ready.text)}</li>
+          <li>
+            Push notifications: <span className="text-muted">come with the installed app</span>
+          </li>
+        </ul>
       </section>
     </div>
   );

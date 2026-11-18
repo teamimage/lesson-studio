@@ -10,6 +10,7 @@
 /* Family accounts (invited parents): family: styles apply only for them,
    staff: for everyone else (teachers). Set from the ls_role cookie. */
 @custom-variant family (&:where([data-role="family"], [data-role="family"] *));
+@custom-variant admin (&:where([data-admin="1"], [data-admin="1"] *));
 @custom-variant staff (&:where(html:not([data-role="family"]), html:not([data-role="family"]) *));
 
 /* Warm, mild palette: cream paper, terracotta accent, sage for "done",

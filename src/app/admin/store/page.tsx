@@ -12,7 +12,7 @@ type SP = Promise<{ saved?: string; deleted?: string; error?: string }>;
 
 export default function AdminStorePage({ searchParams }: { searchParams: SP }) {
   return (
-    <Shell title="Store products" eyebrow="Admin" back={{ href: "/admin", label: "Admin" }} wide>
+    <Shell v3Tab="admin" title="Store products" eyebrow="Admin" back={{ href: "/admin", label: "Admin" }} wide>
       <Suspense>
         <Body searchParams={searchParams} />
       </Suspense>
