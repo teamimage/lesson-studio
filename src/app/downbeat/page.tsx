@@ -30,13 +30,21 @@ import { CraftLine } from "@/components/craft-line";
 import { CraftSection } from "@/components/craft-section";
 import { type TodayRow, loadTodayRow } from "@/lib/v3-data";
 import { WeekSwitcher } from "@/components/week-switcher";
+import { IntroCalendar } from "@/components/intro-calendar";
+import { MonthGrid } from "@/components/calendar-views";
+import { monthOf } from "@/lib/practice/month";
+import { createClient } from "@/lib/supabase/server";
 
 // How far Earlier / Later reach. Every week in range is sent with the page,
 // so switching weeks happens on the phone with no wait.
 const WEEKS_BACK = 8;
 const WEEKS_AHEAD = 8;
 
-type SP = Promise<{ w?: string }>;
+type SP = Promise<{ w?: string; cal?: string; m?: string }>;
+
+// Months the Month view can show without a trip to the server.
+const MONTHS_BACK = 1;
+const MONTHS_AHEAD = 3;
 
 // Intro (route /downbeat, once called Downbeat): the teacher's landing page. The schedule first (next lesson with
 // Start lesson, today's agenda, the week), then what needs a look (drafts,
@@ -88,7 +96,7 @@ async function Craft() {
 async function Body({ searchParams }: { searchParams: SP }) {
   await requireTeacher();
   const today = todayISO();
-  const [{ w }, students, drafts] = await Promise.all([searchParams, listStudents(), listDraftLessons()]);
+  const [{ w, cal, m }, students, drafts] = await Promise.all([searchParams, listStudents(), listDraftLessons()]);
   const active = students.filter((s) => s.active);
   if (active.length === 0) {
     return (
@@ -110,6 +118,35 @@ async function Body({ searchParams }: { searchParams: SP }) {
 
   const allWeeks = scheduleBetween(schedule, firstMonday, addDays(thisMonday, WEEKS_AHEAD * 7 + 6));
   const nameOf = new Map(active.map((s) => [s.id, s.name]));
+
+  // Month view: whole weeks covering each month in range.
+  const monthStartAt = (o: number) => {
+    let d = `${monthOf(today)}-01`;
+    for (let i = 0; i < Math.abs(o); i++) d = o > 0 ? `${monthOf(addDays(d, 32))}-01` : `${monthOf(addDays(d, -1))}-01`;
+    return d;
+  };
+  const monthSpans = Array.from({ length: MONTHS_BACK + MONTHS_AHEAD + 1 }, (_, i) => {
+    const o = i - MONTHS_BACK;
+    const start = monthStartAt(o);
+    const end = addDays(`${monthOf(addDays(start, 32))}-01`, -1);
+    return { o, start, from: weekStart(start), to: addDays(weekStart(end), 6) };
+  });
+  const spanFrom = monthSpans[0].from;
+  const spanTo = monthSpans[monthSpans.length - 1].to;
+  const monthOccs = scheduleBetween(schedule, spanFrom, spanTo);
+  const { data: heldRows } = await (await createClient())
+    .from("lessons")
+    .select("id, student_id, lesson_date, status")
+    .in("student_id", active.map((s) => s.id))
+    .gte("lesson_date", spanFrom)
+    .lte("lesson_date", spanTo);
+  const calCtx = {
+    today,
+    nameOf,
+    held: new Map((heldRows ?? []).map((r) => [`${r.student_id}:${r.lesson_date}`, { id: r.id, status: r.status }])),
+    closures: schedule.closures,
+  };
+  const monthOffset = Math.max(-MONTHS_BACK, Math.min(MONTHS_AHEAD, Math.round(Number(m) || 0)));
   const todays = ahead.filter((o) => o.date === today);
   const now = nowMinutes();
 
@@ -210,33 +247,50 @@ async function Body({ searchParams }: { searchParams: SP }) {
         </section>
       </div>
 
-      {/* The week: every week in range is rendered here; the switcher shows one. */}
-      <section className="flex flex-col gap-2">
-      <WeekSwitcher
-        initial={offset}
-        weeks={Array.from({ length: WEEKS_BACK + WEEKS_AHEAD + 1 }, (_, i) => {
-          const o = i - WEEKS_BACK;
-          const monday = addDays(thisMonday, o * 7);
-          const sunday = addDays(monday, 6);
-          return {
-            offset: o,
-            title: o === 0 ? "This week" : `Week of ${formatDate(monday)}`,
-            body: (
-              <WeekDays
-                monday={monday}
-                week={allWeeks.filter((x) => x.date >= monday && x.date <= sunday)}
-                rowOf={rowOf}
-                today={today}
-                nameOf={nameOf}
-              />
-            ),
-          };
-        })}
+      {/* The calendar: Week / Month and the full calendar link on top. Every
+          week and month in range is rendered here; the switchers show one. */}
+      <IntroCalendar
+        initialView={cal === "month" ? "month" : "week"}
+        initialMonth={monthOffset}
+        week={
+            <WeekSwitcher
+              initial={offset}
+              weeks={Array.from({ length: WEEKS_BACK + WEEKS_AHEAD + 1 }, (_, i) => {
+                const o = i - WEEKS_BACK;
+                const monday = addDays(thisMonday, o * 7);
+                const sunday = addDays(monday, 6);
+                return {
+                  offset: o,
+                  title: o === 0 ? "This week" : `Week of ${formatDate(monday)}`,
+                  body: (
+                    <WeekDays
+                      monday={monday}
+                      week={allWeeks.filter((x) => x.date >= monday && x.date <= sunday)}
+                      rowOf={rowOf}
+                      today={today}
+                      nameOf={nameOf}
+                    />
+                  ),
+                };
+              })}
+            />
+        }
+        months={monthSpans.map((x) => ({
+          offset: x.o,
+          title: parseISODate(x.start).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+          body: (
+            <MonthGrid
+              from={x.from}
+              to={x.to}
+              month={monthOf(x.start)}
+              occs={monthOccs.filter((o) => o.date >= x.from && o.date <= x.to)}
+              ctx={calCtx}
+              picked={null}
+              dayHref={(d) => `/calendar?view=month&d=${d}&day=${d}`}
+            />
+          ),
+        }))}
       />
-        <Link href="/calendar" className="self-start text-[16px] font-semibold text-accent-ink">
-          Full calendar: week and month ›
-        </Link>
-      </section>
 
       {/* Practice since the last lesson */}
       <section>
