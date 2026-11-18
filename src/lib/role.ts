@@ -53,8 +53,7 @@ export function familyMayOpen(pathname: string): boolean {
   return false;
 }
 
-// Runs in <head> with the version script: marks <html data-role="family">
-// for family accounts so the header shows only the family tabs, and
-// data-admin="1" for app admins so the header shows the Admin tab. Families
-// always get the standard (Proposed) look; the version dropdown is teacher-only.
-export const ROLE_BOOT_SCRIPT = `try{var r=document.cookie.match(/(?:^|; )${ROLE_COOKIE}=([^;.]+)/);var f=r&&r[1]==="family";document.documentElement.dataset.role=f?"family":"teacher";if(f)document.documentElement.dataset.ui="proposed";var a=document.cookie.match(/(?:^|; )${ADMIN_COOKIE}=([^;.]+)/);document.documentElement.dataset.admin=!f&&a&&a[1]==="1"?"1":"0"}catch(e){}`;
+// Runs in <head>: marks <html data-role="family"> for family accounts so the
+// header shows only the family tabs, and data-admin="1" for app admins so the
+// header shows the Admin tab.
+export const ROLE_BOOT_SCRIPT = `try{var r=document.cookie.match(/(?:^|; )${ROLE_COOKIE}=([^;.]+)/);var f=r&&r[1]==="family";document.documentElement.dataset.role=f?"family":"teacher";var a=document.cookie.match(/(?:^|; )${ADMIN_COOKIE}=([^;.]+)/);document.documentElement.dataset.admin=!f&&a&&a[1]==="1"?"1":"0"}catch(e){}`;
