@@ -1,21 +1,30 @@
 import Link from "next/link";
-import { Button, Field, Input, Textarea } from "@/components/ui";
+import { Button, Field, Input, Select, Textarea } from "@/components/ui";
 import { InstrumentBookFields } from "@/components/instrument-book-fields";
 import { PhotoField } from "@/components/photo-field";
 import { studentPhotoSrc } from "@/lib/constants";
 import type { Student } from "@/lib/data";
+
+export const LENGTHS = [15, 20, 30, 45, 60, 75, 90];
 
 export function StudentForm({
   student,
   action,
   submitLabel,
   withParent,
+  lengthReady,
+  defaultMinutes,
 }: {
   student?: Student;
   action: (fd: FormData) => Promise<void>;
   submitLabel: string;
   withParent?: boolean;
+  /** True once student-lesson-length.sql has run (the usual length is saved on the student). */
+  lengthReady?: boolean;
+  /** The usual length to show: the student's own, else their regular lesson's, else 30. */
+  defaultMinutes?: number;
 }) {
+  const usual = student?.lesson_minutes ?? defaultMinutes ?? 30;
   return (
     <form action={action} className="flex flex-col gap-4">
       {student && <input type="hidden" name="id" value={student.id} />}
@@ -55,6 +64,18 @@ export function StudentForm({
             <Input name="lesson_time" placeholder="4:30 PM" />
           </Field>
         </div>
+      )}
+      {lengthReady && (
+        <Field label="Usual lesson length" hint="Add lesson uses this length and blocks that much time.">
+          <Select name="lesson_minutes" defaultValue={String(usual)}>
+            {LENGTHS.includes(usual) ? null : <option value={usual}>{usual} minutes</option>}
+            {LENGTHS.map((m) => (
+              <option key={m} value={m}>
+                {m} minutes
+              </option>
+            ))}
+          </Select>
+        </Field>
       )}
       <Field label="Goals" hint="Shown to the parent.">
         <Textarea name="goals" defaultValue={student?.goals ?? ""} rows={2} />

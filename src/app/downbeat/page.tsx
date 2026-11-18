@@ -31,7 +31,8 @@ import { CraftSection } from "@/components/craft-section";
 import { type TodayRow, loadTodayRow } from "@/lib/v3-data";
 import { WeekSwitcher } from "@/components/week-switcher";
 import { IntroCalendar } from "@/components/intro-calendar";
-import { MonthGrid } from "@/components/calendar-views";
+import { MonthGrid, addLessonHref, pressOf } from "@/components/calendar-views";
+import { LessonPress } from "@/components/lesson-press";
 import { monthOf } from "@/lib/practice/month";
 import { createClient } from "@/lib/supabase/server";
 
@@ -252,6 +253,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
       <IntroCalendar
         initialView={cal === "month" ? "month" : "week"}
         initialMonth={monthOffset}
+        addHref={addLessonHref(today, "/downbeat")}
         week={
             <WeekSwitcher
               initial={offset}
@@ -285,8 +287,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
               month={monthOf(x.start)}
               occs={monthOccs.filter((o) => o.date >= x.from && o.date <= x.to)}
               ctx={calCtx}
-              picked={null}
-              dayHref={(d) => `/calendar?view=month&d=${d}&day=${d}`}
+              back="/downbeat?cal=month"
             />
           ),
         }))}
@@ -404,7 +405,7 @@ function OccurrenceRow({
   const ref = occurrenceRef(occ);
   return (
     <li className={cx(big && "py-2.5")}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <LessonPress lesson={pressOf(occ, s.name)} className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className={cx("w-[4.6rem] shrink-0 tabular-nums font-semibold", off && "text-muted line-through")}>
           {occ.time ? formatTime(occ.time) : "—"}
         </span>
@@ -447,7 +448,7 @@ function OccurrenceRow({
             </Link>
           )}
         </span>
-      </div>
+      </LessonPress>
     </li>
   );
 }

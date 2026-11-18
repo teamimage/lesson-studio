@@ -14,11 +14,13 @@ export function IntroCalendar({
   months,
   initialView,
   initialMonth,
+  addHref,
 }: {
   week: ReactNode;
   months: MonthView[];
   initialView: "week" | "month";
   initialMonth: number;
+  addHref: string;
 }) {
   const [view, setView] = useState(initialView);
   const [offset, setOffset] = useState(initialMonth);
@@ -123,6 +125,12 @@ export function IntroCalendar({
               {month.body}
             </div>
           )}
+      <Link
+        href={addHref}
+        className="self-start rounded-full border border-rule bg-sheet px-4 py-2 text-[16px] font-semibold text-accent-ink no-underline hover:bg-accent-soft"
+      >
+        + Add lesson
+      </Link>
     </section>
   );
 }

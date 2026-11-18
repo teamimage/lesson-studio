@@ -7,7 +7,7 @@ import { listStudents } from "@/lib/data";
 import { addDays, formatDate, parseISODate, todayISO } from "@/lib/format";
 import { monthOf } from "@/lib/practice/month";
 import { weekStart } from "@/lib/schedule";
-import { type CalendarCtx, Legend, MonthGrid, WeekGrid, WeekList } from "@/components/calendar-views";
+import { type CalendarCtx, Legend, addLessonHref, MonthGrid, WeekGrid, WeekList } from "@/components/calendar-views";
 import { loadSchedule, scheduleBetween } from "@/lib/schedule-data";
 import { createClient } from "@/lib/supabase/server";
 
@@ -119,11 +119,16 @@ async function Body({ searchParams }: { searchParams: SP }) {
           month={monthOf(monthStart)}
           occs={occs}
           ctx={ctx}
-          picked={sp.day && ISO.test(sp.day) ? sp.day : showsToday ? today : null}
-          dayHref={(d) => href("month", anchor, d)}
+          back={href("month", anchor)}
         />
       )}
 
+      <Link
+        href={addLessonHref(showsToday ? today : view === "week" ? from : monthStart, href(view, anchor))}
+        className="self-start rounded-full border border-rule bg-sheet px-4 py-2 text-[16px] font-semibold text-accent-ink no-underline hover:bg-accent-soft"
+      >
+        + Add lesson
+      </Link>
       <Legend foundation={schedule.foundation} />
       <p className="text-sm text-muted">
         Set regular lessons, one-offs and closed dates in{" "}

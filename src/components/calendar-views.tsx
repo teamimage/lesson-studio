@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { cx } from "@/components/ui";
+import { DayPopup } from "@/components/day-popup";
+import { LessonPress, type PressLesson } from "@/components/lesson-press";
 import { addDays, formatDate, parseISODate } from "@/lib/format";
 import { monthOf } from "@/lib/practice/month";
 import { type Closure, type Occurrence, cancelLabel, formatTime, isOn, occurrenceRef, toMinutes } from "@/lib/schedule";
@@ -27,6 +29,29 @@ function tone(o: Occurrence, ctx: Ctx): string {
   if (ctx.held.has(`${o.studentId}:${o.date}`)) return "bg-sage-soft text-sage";
   if (o.kind === "moved" || o.kind === "extra") return "bg-plum-soft text-plum";
   return "bg-accent-soft text-accent-ink";
+}
+
+/** What the long-press menu needs to know about a lesson. */
+export function pressOf(o: Occurrence, name: string): PressLesson {
+  const ref = occurrenceRef(o);
+  return {
+    editHref: ref && !o.fallback ? `/schedule/${ref}` : null,
+    title: name,
+    when: `${formatDate(o.date, "weekday")}${o.time ? `, ${formatTime(o.time)}` : ""} · ${o.minutes} min`,
+    studentId: o.studentId,
+    slotId: o.fallback ? null : o.slotId,
+    slotDate: o.slotDate,
+    changeId: o.changeId,
+    kind: o.kind,
+  };
+}
+
+/** The Add lesson page for a date, coming back to `back` afterwards. */
+export function addLessonHref(date: string | null, back: string): string {
+  const q = new URLSearchParams();
+  if (date) q.set("date", date);
+  q.set("next", back);
+  return `/schedule/new?${q.toString()}`;
 }
 
 function firstName(ctx: Ctx, id: string) {
@@ -78,6 +103,7 @@ function AgendaLine({ o, ctx }: { o: Occurrence; ctx: Ctx }) {
   const held = ctx.held.get(`${o.studentId}:${o.date}`);
   return (
     <li>
+      <LessonPress lesson={pressOf(o, ctx.nameOf.get(o.studentId) ?? "Student")}>
       <Link href={lessonHref(o)} className="flex min-h-11 flex-wrap items-center gap-x-3 no-underline">
         <span className={cx("w-[4.6rem] shrink-0 tabular-nums font-semibold text-ink", off && "text-muted line-through")}>
           {o.time ? formatTime(o.time) : "—"}
@@ -88,6 +114,7 @@ function AgendaLine({ o, ctx }: { o: Occurrence; ctx: Ctx }) {
         <span className="text-sm text-muted">{o.minutes} min</span>
         <StateWord o={o} held={held} ctx={ctx} />
       </Link>
+      </LessonPress>
     </li>
   );
 }
@@ -170,8 +197,8 @@ export function WeekGrid({ from, occs, ctx }: { from: string; occs: Occurrence[]
                 const idx = group.indexOf(o);
                 const width = 100 / group.length;
                 return (
+                  <LessonPress key={o.key} lesson={pressOf(o, ctx.nameOf.get(o.studentId) ?? "Student")}>
                   <Link
-                    key={o.key}
                     href={lessonHref(o)}
                     title={`${ctx.nameOf.get(o.studentId) ?? ""} ${formatTime(o.time)} · ${o.minutes} min`}
                     className={cx("absolute overflow-hidden rounded-md px-1.5 py-0.5 text-[13px] leading-tight no-underline", tone(o, ctx))}
@@ -190,6 +217,7 @@ export function WeekGrid({ from, occs, ctx }: { from: string; occs: Occurrence[]
                       </>
                     )}
                   </Link>
+                  </LessonPress>
                 );
               })}
           </div>
@@ -217,83 +245,99 @@ export function MonthGrid({
   month,
   occs,
   ctx,
-  picked,
-  dayHref,
+  back,
 }: {
   from: string;
   to: string;
   month: string;
   occs: Occurrence[];
   ctx: Ctx;
-  picked: string | null;
-  dayHref: (d: string) => string;
+  /** The page to come back to after adding a lesson. */
+  back: string;
 }) {
   const days: string[] = [];
   for (let d = from; d <= to; d = addDays(d, 1)) days.push(d);
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-7 border-l border-t border-rule">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((w) => (
-          <div key={w} className="border-b border-r border-rule py-1 text-center text-xs font-medium uppercase tracking-wide text-muted">
-            {w}
-          </div>
-        ))}
-        {days.map((d) => {
-          const list = occs.filter((o) => o.date === d);
-          const on = list.filter(isOn);
-          const inMonth = monthOf(d) === month;
-          const closed = closedOn(d, ctx.closures);
-          return (
-            <Link
-              key={d}
-              href={dayHref(d)}
-              aria-label={`${dayLabel(d)}: ${on.length} lesson${on.length === 1 ? "" : "s"}`}
-              aria-current={picked === d ? "date" : undefined}
+    <div className="grid grid-cols-7 border-l border-t border-rule">
+      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((w) => (
+        <div key={w} className="border-b border-r border-rule py-1 text-center text-xs font-medium uppercase tracking-wide text-muted">
+          {w}
+        </div>
+      ))}
+      {days.map((d) => {
+        const list = occs.filter((o) => o.date === d);
+        const on = list.filter(isOn);
+        const inMonth = monthOf(d) === month;
+        const closed = closedOn(d, ctx.closures);
+        return (
+          <DayPopup
+            key={d}
+            label={`${dayLabel(d)}: ${on.length} lesson${on.length === 1 ? "" : "s"}`}
+            current={d === ctx.today}
+            className={cx(
+              "flex min-h-[4.25rem] flex-col gap-0.5 border-b border-r border-rule p-1 text-left md:min-h-[6.5rem]",
+              !inMonth && "opacity-45",
+              closed && "bg-rule/30",
+            )}
+            title={
+              <span className={cx(d === ctx.today && "text-accent-ink")}>
+                {formatDate(d, "long")}
+                {d === ctx.today && " · today"}
+              </span>
+            }
+            body={<DayBody date={d} occs={list} ctx={ctx} back={back} />}
+          >
+            <span
               className={cx(
-                "flex min-h-[4.25rem] flex-col gap-0.5 border-b border-r border-rule p-1 text-left no-underline md:min-h-[6.5rem]",
-                !inMonth && "opacity-45",
-                closed && "bg-rule/30",
-                picked === d && "outline outline-2 -outline-offset-2 outline-accent",
+                "flex size-6 items-center justify-center rounded-full text-[13px] tabular-nums",
+                d === ctx.today ? "bg-accent font-semibold text-white" : "text-ink",
               )}
             >
-              <span
-                className={cx(
-                  "flex size-6 items-center justify-center rounded-full text-[13px] tabular-nums",
-                  d === ctx.today ? "bg-accent font-semibold text-white" : "text-ink",
-                )}
-              >
-                {parseISODate(d).getDate()}
-              </span>
-              {/* Phone: a dot per lesson. Wider screens: time and name. */}
-              <span className="flex flex-wrap gap-0.5 md:hidden">
-                {list.slice(0, 6).map((o) => (
-                  <span key={o.key} className={cx("size-2 rounded-full", isOn(o) ? (o.kind === "moved" || o.kind === "extra" ? "bg-plum" : "bg-accent") : "bg-rule")} />
-                ))}
-              </span>
-              <span className="hidden flex-col gap-0.5 md:flex">
-                {list.slice(0, 4).map((o) => (
-                  <span key={o.key} className={cx("truncate rounded px-1 text-[12px] leading-snug", tone(o, ctx))}>
-                    {o.time ? formatTime(o.time).replace(" pm", "p").replace(" am", "a") : ""} {firstName(ctx, o.studentId)}
-                  </span>
-                ))}
-                {list.length > 4 && <span className="text-[12px] text-muted">+{list.length - 4} more</span>}
-              </span>
-            </Link>
-          );
-        })}
-      </div>
+              {parseISODate(d).getDate()}
+            </span>
+            {/* Phone: a dot per lesson. Wider screens: time and name. */}
+            <span className="flex flex-wrap gap-0.5 md:hidden">
+              {list.slice(0, 6).map((o) => (
+                <span key={o.key} className={cx("size-2 rounded-full", isOn(o) ? (o.kind === "moved" || o.kind === "extra" ? "bg-plum" : "bg-accent") : "bg-rule")} />
+              ))}
+            </span>
+            <span className="hidden w-full flex-col gap-0.5 md:flex">
+              {list.slice(0, 4).map((o) => (
+                <span key={o.key} className={cx("truncate rounded px-1 text-[12px] leading-snug", tone(o, ctx))}>
+                  {o.time ? formatTime(o.time).replace(" pm", "p").replace(" am", "a") : ""} {firstName(ctx, o.studentId)}
+                </span>
+              ))}
+              {list.length > 4 && <span className="text-[12px] text-muted">+{list.length - 4} more</span>}
+            </span>
+          </DayPopup>
+        );
+      })}
+    </div>
+  );
+}
 
-      {picked && picked >= from && picked <= to && (
-        <section>
-          <h3 className={cx("text-[17px] font-semibold", picked === ctx.today && "text-accent-ink")}>
-            {formatDate(picked, "long")}
-          </h3>
-          <DayAgenda date={picked} occs={occs.filter((o) => o.date === picked)} ctx={ctx} heading={false} />
-          {closedOn(picked, ctx.closures) && (
-            <p className="text-[15px] text-muted">Studio closed{closedOn(picked, ctx.closures)!.note ? `: ${closedOn(picked, ctx.closures)!.note}` : ""}.</p>
-          )}
-        </section>
+/** One day's lessons, with a quiet Add lesson at the bottom (the day pop-up). */
+export function DayBody({ date, occs, ctx, back }: { date: string; occs: Occurrence[]; ctx: Ctx; back: string }) {
+  const closed = closedOn(date, ctx.closures);
+  return (
+    <div className="flex flex-col">
+      {closed && <p className="text-[15px] text-muted">Studio closed{closed.note ? `: ${closed.note}` : ""}.</p>}
+      {occs.length === 0 ? (
+        <p className="py-2 text-[16px] text-muted">No lessons this day.</p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-rule">
+          {occs.map((o) => (
+            <AgendaLine key={o.key} o={o} ctx={ctx} />
+          ))}
+        </ul>
       )}
+      {occs.length > 0 && <p className="pt-1 text-sm text-muted">Press and hold a lesson to edit or delete it.</p>}
+      <Link
+        href={addLessonHref(date, back)}
+        className="mt-3 self-center rounded-full px-4 py-2 text-[15px] font-medium text-accent-ink no-underline hover:bg-accent-soft"
+      >
+        + Add lesson
+      </Link>
     </div>
   );
 }
