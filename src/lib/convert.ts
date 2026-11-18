@@ -128,7 +128,7 @@ export async function lessonToPractice(lessonId: string, rawActivity: unknown): 
   await db.from("lessons").delete().eq("id", lessonId);
 
   await reviewConverted(session.id);
-  return { ok: true, href: `/family/${lesson.student_id}#practice-reviews` };
+  return { ok: true, href: `/v3/students/${lesson.student_id}` };
 }
 
 export async function practiceToLesson(sessionId: string): Promise<ConvertResult> {
@@ -186,5 +186,5 @@ export async function practiceToLesson(sessionId: string): Promise<ConvertResult
   await db.from("practice_sessions").delete().eq("id", s.id);
 
   if (transcript) await draftFromTranscript(s.teacher_id, lessonId, transcript, s.duration_seconds);
-  return { ok: true, href: `/lessons/${lessonId}?switched=1` };
+  return { ok: true, href: `/v3/lessons/${lessonId}?switched=1` };
 }

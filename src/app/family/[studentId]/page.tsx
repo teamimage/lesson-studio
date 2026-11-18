@@ -45,9 +45,6 @@ import { listScores } from "@/lib/scores";
 import { practiceJumps } from "@/lib/practice-jumps";
 import { formatClock } from "@/lib/lesson-moments";
 import { listenTracksFor } from "@/lib/reference-data";
-import { getUiVersion } from "@/lib/ui-version-server";
-import { getPracticeView } from "@/lib/practice-view-server";
-import { PracticeViewToggle } from "@/components/practice-view-toggle";
 import { DayPractice, type DayItem, type DayLog } from "@/components/day-practice";
 import { Fold } from "@/components/fold";
 import { StoreView } from "@/components/store-view";
@@ -86,7 +83,7 @@ async function Body({
   params: Params;
   searchParams: SP;
 }) {
-  const [viewer, ui, view] = await Promise.all([getViewer(), getUiVersion(), getPracticeView()]);
+  const viewer = await getViewer();
   const { studentId } = await params;
   const sp = await searchParams;
   const student = await getStudent(studentId);
@@ -139,10 +136,7 @@ async function Body({
     : {};
   const ownTeacher =
     !!viewer.teacher && viewer.teacher.id === student.teacher_id;
-  // Proposed version: the teacher can switch to Family and see the page
-  // exactly as the parent does (no teacher notes, family grade wording).
-  const toggle = ui === "proposed" && ownTeacher;
-  const isTeacher = ownTeacher && !(toggle && view === "family");
+  const isTeacher = ownTeacher;
   const firstName = student.name.split(" ")[0];
   // The last 30 logs cover every day back to the oldest of them, so the day
   // arrows switch instantly inside that stretch.
@@ -218,7 +212,6 @@ async function Body({
         }))}
       >
         <div className="flex flex-col gap-6">
-          {toggle && <PracticeViewToggle view={view} />}
           {sp.welcome && (
             <Notice tone="plum">
               Welcome! This is {firstName}&apos;s practice page. Start practice records a session for{" "}

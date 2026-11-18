@@ -31,6 +31,7 @@ import { formatUsd } from "@/lib/ai/pricing";
 import { LinkMusic } from "@/components/link-music";
 import { VoiceEditSection } from "@/components/voice-edit";
 import { Fold } from "@/components/fold";
+import { LessonToPractice } from "@/components/switch-recording";
 import {
   assignmentJumps,
   buildMoments,
@@ -43,7 +44,7 @@ import { applyBarMap } from "@/lib/bar-map";
 import { pageRange } from "@/lib/score-analysis";
 
 type Params = Promise<{ id: string }>;
-type SP = Promise<{ approved?: string; upload?: string; video?: string }>;
+type SP = Promise<{ approved?: string; upload?: string; video?: string; switched?: string }>;
 
 // Version 3 lesson page: one scrolling story. The video stays in view; the
 // summary, every moment of the lesson (with what was said), the home
@@ -62,7 +63,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const { id } = await params;
   // The length follows the video (Cloudflare's reading is trusted); flagged when it can't be read.
   const lengthCheck = (await reconcileLengths(await createClient(), [id], { checkCloudflare: true }))[id];
-  const { approved, upload, video } = await searchParams;
+  const { approved, upload, video, switched } = await searchParams;
   const [lesson, recordings, archived, standEvents, ai] = await Promise.all([
     getLesson(id),
     listRecordingsForLesson(id),
@@ -157,6 +158,15 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           isMain: r.isMain,
         }))}
       >
+        {switched && isDraft && (
+          <Card tone="plum" className="mb-3 text-sm">
+            Switched from a practice session.{" "}
+            {ai.transcript
+              ? "Claude drafted it from what was said; read it over before approving."
+              : "There was no talking to draft from, so fill it in by hand."}{" "}
+            The practice recording was deleted after its review, so there&apos;s no video.
+          </Card>
+        )}
         {/* Where it stands and the one next step */}
         {isDraft ? (
           <Card tone="amber" className="flex flex-col gap-3">
@@ -181,6 +191,9 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                 </Button>
               </form>
             )}
+            {/* Maaike also practises with the children: a recording saved as a
+                lesson can be switched to a practice until it is approved. */}
+            <LessonToPractice lessonId={id} studentName={student.name} />
           </Card>
         ) : (
           <Card tone="sage" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[16px]">

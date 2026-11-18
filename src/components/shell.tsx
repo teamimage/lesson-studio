@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cx } from "./ui";
-import { VersionSwitch } from "./version-switch";
 import { TabScroll } from "./tab-scroll";
 
 type Tab = "downbeat" | "studio" | "desk" | "family" | "settings";
@@ -18,7 +17,6 @@ export function Shell({
   back,
   actions,
   tab,
-  proposedTab,
   children,
   wide,
   v3Tab,
@@ -29,8 +27,6 @@ export function Shell({
   back?: { href: string; label: string };
   actions?: ReactNode;
   tab?: Tab;
-  /** Tab to light up in the proposed version, when it differs (lesson day lights Desk). */
-  proposedTab?: Tab;
   children: ReactNode;
   wide?: boolean;
   /** Version 3 section to light up (defaults from `tab`). */
@@ -70,14 +66,11 @@ export function Shell({
             )}
             <div className="ml-auto flex items-center gap-2">
               {actions}
-              <span className="contents family:hidden">
-                <VersionSwitch />
-              </span>
               <Link
                 href="/v3/setup"
                 aria-current={v3 === "setup" ? "page" : undefined}
                 className={cx(
-                  "hidden min-h-9 max-w-36 items-center gap-1 truncate rounded-full border px-3 text-sm font-medium v3:flex",
+                  "flex min-h-9 max-w-36 items-center gap-1 truncate rounded-full border px-3 text-sm font-medium family:hidden",
                   v3 === "setup" ? "border-accent bg-accent-soft text-accent-ink" : "border-rule bg-sheet text-ink",
                 )}
               >
@@ -86,11 +79,11 @@ export function Shell({
               </Link>
             </div>
           </div>
-          {/* Version 3: Today and Students on the left, Teacher / Family
-              mode switch on the right, then Admin for app admins only
+          {/* Teachers: Downbeat, Today and Students on the left, Teacher /
+              Family mode switch on the right, then Admin for app admins only
               (data-admin from the ls_admin cookie). Family mode drops the
               teacher tabs and Admin. */}
-          <nav aria-label="Sections" className="-mx-1 hidden items-center gap-1 overflow-x-auto pb-1.5 pt-0.5 v3:flex">
+          <nav aria-label="Sections" className="-mx-1 flex items-center gap-1 overflow-x-auto pb-1.5 pt-0.5 family:hidden">
             {!familyMode && (
               <>
                 <V3TabLink href="/downbeat" on={v3 === "downbeat"} label="Downbeat" icon="♩" />
@@ -140,15 +133,8 @@ export function Shell({
           </nav>
           {/* Family accounts: only their side of the app. */}
           <nav aria-label="Sections" className="-mx-1 hidden gap-1 overflow-x-auto pb-1.5 pt-0.5 family:flex sm:justify-center">
-            <TabLink href="/family" tab="family" current={tab} proposed={proposedTab ?? tab} label="Home practice" icon="⌂" />
-            <TabLink href="/settings" tab="settings" current={tab} proposed={proposedTab ?? tab} label="Account" icon="⚙" />
-          </nav>
-          <nav aria-label="Sections" className="-mx-1 flex gap-1 overflow-x-auto pb-1.5 pt-0.5 v3:hidden family:hidden sm:justify-center">
-            <TabLink href="/downbeat" tab="downbeat" current={tab} proposed={proposedTab ?? tab} label="Downbeat" icon="♩" />
-            <TabLink href="/teacher" tab="desk" current={tab} proposed={proposedTab ?? tab} label="Desk" icon="▦" />
-            <TabLink href="/" tab="studio" current={tab} proposed={proposedTab ?? tab} label="Studio" proposedLabel="Students" icon="♪" />
-            <TabLink href="/family" tab="family" current={tab} proposed={proposedTab ?? tab} label="Home practice" icon="⌂" />
-            <TabLink href="/settings" tab="settings" current={tab} proposed={proposedTab ?? tab} label="Settings" icon="⚙" />
+            <TabLink href="/family" on={tab === "family"} label="Home practice" icon="⌂" />
+            <TabLink href="/settings" on={tab === "settings"} label="Account" icon="⚙" />
           </nav>
         </div>
       </header>
@@ -174,50 +160,21 @@ export function Shell({
   );
 }
 
-// Both versions are drawn from the same markup; the classic:/proposed:
-// variants (globals.css) pick the look from <html data-ui>, so the header
-// stays prerendered. Proposed: 44px tall, 16px text, bold + underline cue.
-function TabLink({
-  href,
-  label,
-  proposedLabel,
-  icon,
-  tab,
-  current,
-  proposed,
-}: {
-  href: string;
-  label: string;
-  proposedLabel?: string;
-  icon: string;
-  tab: Tab;
-  current?: Tab;
-  proposed?: Tab;
-}) {
-  const onCurrent = current === tab;
-  const onProposed = proposed === tab;
+// Family accounts' tabs: 44px tall, 16px text, bold + underline cue.
+function TabLink({ href, label, icon, on }: { href: string; label: string; icon: string; on: boolean }) {
   return (
     <Link
       href={href}
-      aria-current={onCurrent ? "page" : undefined}
+      aria-current={on ? "page" : undefined}
       className={cx(
-        "flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[14px] font-medium text-muted hover:text-ink",
-        "proposed:min-h-11 proposed:px-4 proposed:text-[16px]",
-        onCurrent && "classic:bg-accent-soft classic:text-accent-ink",
-        onProposed && "proposed:bg-accent-soft proposed:font-semibold proposed:text-accent-ink proposed:underline proposed:decoration-2 proposed:underline-offset-[6px]",
+        "flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[16px] font-medium text-muted hover:text-ink",
+        on && "bg-accent-soft font-semibold text-accent-ink underline decoration-2 underline-offset-[6px]",
       )}
     >
-      <span className="text-sm leading-none proposed:text-base" aria-hidden>
+      <span className="text-base leading-none" aria-hidden>
         {icon}
       </span>
-      {proposedLabel ? (
-        <>
-          <span className="proposed:hidden">{label}</span>
-          <span className="hidden proposed:inline">{proposedLabel}</span>
-        </>
-      ) : (
-        label
-      )}
+      {label}
     </Link>
   );
 }
