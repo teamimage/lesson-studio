@@ -211,6 +211,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
       </div>
 
       {/* The week: every week in range is rendered here; the switcher shows one. */}
+      <section className="flex flex-col gap-2">
       <WeekSwitcher
         initial={offset}
         weeks={Array.from({ length: WEEKS_BACK + WEEKS_AHEAD + 1 }, (_, i) => {
@@ -232,6 +233,10 @@ async function Body({ searchParams }: { searchParams: SP }) {
           };
         })}
       />
+        <Link href="/calendar" className="self-start text-[16px] font-semibold text-accent-ink">
+          Full calendar: week and month ›
+        </Link>
+      </section>
 
       {/* Practice since the last lesson */}
       <section>
