@@ -30,6 +30,7 @@ import {
 } from "@/lib/schedule";
 import { loadSchedule } from "@/lib/schedule-data";
 import { CraftLine } from "@/components/craft-line";
+import { CraftSection } from "@/components/craft-section";
 import { type TodayRow, loadTodayRow } from "@/lib/v3-data";
 
 type SP = Promise<{ w?: string }>;
@@ -58,6 +59,9 @@ export default function DownbeatPage({ searchParams }: { searchParams: SP }) {
         <Suspense fallback={<Skeleton />}>
           <Body searchParams={searchParams} />
         </Suspense>
+        <Suspense fallback={null}>
+          <Craft />
+        </Suspense>
       </div>
     </Shell>
   );
@@ -71,6 +75,11 @@ async function DateLine() {
 async function Focus() {
   const { teacher } = await requireTeacher();
   return <CraftLine teacherId={teacher.id} />;
+}
+
+async function Craft() {
+  const { teacher } = await requireTeacher();
+  return <CraftSection teacherId={teacher.id} />;
 }
 
 async function Body({ searchParams }: { searchParams: SP }) {
