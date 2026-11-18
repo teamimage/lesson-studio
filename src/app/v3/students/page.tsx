@@ -17,11 +17,6 @@ export default function V3Students() {
       title="Students"
       v3Tab="students"
       me={<Me />}
-      actions={
-        <LinkButton href="/students/new" variant="secondary" className="min-h-9 px-3 text-sm">
-          + Student
-        </LinkButton>
-      }
     >
       <Suspense fallback={<div className="h-40 animate-pulse rounded-2xl bg-sheet" />}>
         <Body />
@@ -77,6 +72,13 @@ async function Body() {
           </Card>
         </Link>
       ))}
+      {/* Adding a student lives under the list, not in the page header. */}
+      <Link
+        href="/students/new"
+        className="flex min-h-12 items-center justify-center rounded-2xl border border-dashed border-rule text-[16px] font-medium text-accent-ink hover:bg-accent-soft"
+      >
+        + Add a student
+      </Link>
     </div>
   );
 }
