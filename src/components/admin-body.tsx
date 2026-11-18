@@ -38,34 +38,6 @@ export async function AdminBody({ searchParams }: { searchParams: AdminSP }) {
         lessons, practice logs and videos. Changes here take effect right away for that account.
       </p>
 
-      <Link href="/admin/storage" className="block">
-        <Card className="flex items-center gap-3 transition hover:border-accent/50">
-          <div className="min-w-0 flex-1">
-            <div className="font-semibold">Storage</div>
-            <div className="text-sm text-muted">
-              Space used, videos deleted from lessons, and old videos to delete for good.
-            </div>
-          </div>
-          <span className="text-accent-ink" aria-hidden>
-            ›
-          </span>
-        </Card>
-      </Link>
-
-      <Link href="/admin/store" className="block">
-        <Card className="flex items-center gap-3 transition hover:border-accent/50">
-          <div className="min-w-0 flex-1">
-            <div className="font-semibold">Store products</div>
-            <div className="text-sm text-muted">
-              The affiliate catalogue teachers pick from for their studio stores.
-            </div>
-          </div>
-          <span className="text-accent-ink" aria-hidden>
-            ›
-          </span>
-        </Card>
-      </Link>
-
       <section>
         <SectionTitle>Teachers</SectionTitle>
         <div className="flex flex-col gap-3">
@@ -102,6 +74,34 @@ export async function AdminBody({ searchParams }: { searchParams: AdminSP }) {
           {(teachers ?? []).length === 0 && <p className="text-sm text-muted">No teachers yet.</p>}
         </div>
       </section>
+
+      <Link href="/admin/storage" className="block">
+        <Card className="flex items-center gap-3 transition hover:border-accent/50">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold">Storage</div>
+            <div className="text-sm text-muted">
+              Space used, videos deleted from lessons, and old videos to delete for good.
+            </div>
+          </div>
+          <span className="text-accent-ink" aria-hidden>
+            ›
+          </span>
+        </Card>
+      </Link>
+
+      <Link href="/admin/store" className="block">
+        <Card className="flex items-center gap-3 transition hover:border-accent/50">
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold">Store products</div>
+            <div className="text-sm text-muted">
+              The affiliate catalogue teachers pick from for their studio stores.
+            </div>
+          </div>
+          <span className="text-accent-ink" aria-hidden>
+            ›
+          </span>
+        </Card>
+      </Link>
 
       <section>
         <SectionTitle>Other sign-ins</SectionTitle>
