@@ -57,6 +57,8 @@ export type PracticeContext = {
    * recording heard: done off the recording (often before it was started).
    */
   doneOffRecording?: string[];
+  /** A merged session: where each later recording starts on the joined timeline ("12:40"). */
+  joinedAt?: string[];
 };
 
 const POINT = {
@@ -221,6 +223,10 @@ function contextText(c: PracticeContext): string {
     `Student: ${c.studentName}${c.age ? `, age ${c.age}` : ""}. Instrument: ${c.instrument}. Current book: ${c.currentBook || "not set"}.`,
     `Session length: ${Math.round(c.durationSeconds / 60)} min. Seconds with pitched sound: ${c.playingSeconds}.`,
   ];
+  if (c.joinedAt?.length)
+    lines.push(
+      `This practice was recorded in ${c.joinedAt.length + 1} parts on the same day, joined end to end into one timeline and one transcript; the next part starts at ${c.joinedAt.join(", ")}. The break between parts is not on the timeline. Review it as one practice session: a piece played in one part and again in the next is the same piece practised twice, not a restart.`,
+    );
   if (c.withHelper)
     lines.push(
       "This was home practice with someone else giving instruction, usually a parent (who may also be a music teacher). It is a practice session, not a lesson: treat any adult voice in the transcript as that helper, never as the student's teacher, and review it as the student's practice. Their instructions show what was worked on and how; credit the work to the practice. What the helper asked for counts as assigned work: playing it is on the list, not off the list. Grade the student's practice as usual otherwise. In teacher_note, say it was practised with a helper and name anything the helper asked for that differs from the assignments.",

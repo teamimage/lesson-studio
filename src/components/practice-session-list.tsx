@@ -81,6 +81,7 @@ function SessionCard({
               </span>
               {s.media === "video" && <Pill>video</Pill>}
               {s.with_helper && <Pill>with a helper</Pill>}
+              {s.mergedParts > 1 && <Pill tone="plum">joined from {s.mergedParts} recordings</Pill>}
               {(s as { recording_missing?: boolean }).recording_missing && (
                 <Pill tone="danger">! no recording</Pill>
               )}
@@ -125,6 +126,7 @@ function SessionCard({
               </span>
               {s.media === "video" && <Pill>video</Pill>}
               {s.with_helper && <Pill>with a helper</Pill>}
+              {s.mergedParts > 1 && <Pill tone="plum">joined from {s.mergedParts} recordings</Pill>}
               {(s as { recording_missing?: boolean }).recording_missing && (
                 <Pill tone="danger">! no recording</Pill>
               )}

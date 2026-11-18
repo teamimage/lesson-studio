@@ -11,7 +11,14 @@ export type PracticeSessionView = PracticeSession & {
   titles: Record<string, string>;
   /** Items ticked off that day by the family or teacher that no recording heard. */
   handTicked: string[];
+  /** Joined from this many recordings (0 for an ordinary one). */
+  mergedParts: number;
 };
+
+export function mergedPartsOf(raw: unknown): number {
+  const rows = (raw as { rows?: unknown[] } | null)?.rows;
+  return Array.isArray(rows) && rows.length > 1 ? rows.length : 0;
+}
 
 /** Recent practice sessions for a student (or one day of them), newest first, with assignment titles. */
 export async function listPracticeSessions(studentId: string, limit = 10, day?: string): Promise<PracticeSessionView[]> {
@@ -49,6 +56,9 @@ export async function listPracticeSessions(studentId: string, limit = 10, day?: 
   return rows.map((s) => ({
     ...s,
     activity: null,
+    // The original recordings of a joined session are only needed to split it back.
+    merged_from: null,
+    mergedParts: mergedPartsOf(s.merged_from),
     review: (s.analysis as PracticeAnalysis | null) ?? null,
     titles,
     handTicked: hand[s.practice_date] ?? [],

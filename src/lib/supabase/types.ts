@@ -719,6 +719,7 @@ export type Database = {
           provider_job_id: string | null;
           recording_missing: boolean;
           with_helper: boolean;
+          merged_from: Json | null;
           size_bytes: number | null;
           started_at: string;
           status: string;
@@ -747,6 +748,7 @@ export type Database = {
           provider_job_id?: string | null;
           recording_missing?: boolean;
           with_helper?: boolean;
+          merged_from?: Json | null;
           size_bytes?: number | null;
           started_at: string;
           status?: string;
@@ -775,6 +777,7 @@ export type Database = {
           provider_job_id?: string | null;
           recording_missing?: boolean;
           with_helper?: boolean;
+          merged_from?: Json | null;
           size_bytes?: number | null;
           started_at?: string;
           status?: string;

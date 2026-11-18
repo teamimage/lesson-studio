@@ -5,6 +5,7 @@ import { Shell } from "@/components/shell";
 import { Me } from "@/components/v3/me";
 import { GRADE_TONE, GradeLegend } from "@/components/grade-legend";
 import { PracticeSessionList } from "@/components/practice-session-list";
+import { PracticeJoinPanel } from "@/components/practice-join-panel";
 import { PracticeDayEditor, type EditorItem } from "@/components/practice-day-editor";
 import { Card, Pill, cx } from "@/components/ui";
 import { getViewer } from "@/lib/auth";
@@ -142,6 +143,22 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             <Card className="p-3 sm:p-4">
               <PracticeSessionList sessions={sessions} teacherView={isTeacher} canSwitch={isTeacher} flat />
             </Card>
+            <PracticeJoinPanel
+              studentId={id}
+              date={date}
+              pinRequired={pinSet && (!isTeacher || familyMode)}
+              familyMode={familyMode}
+              sessions={sessions
+                .slice()
+                .sort((a, b) => a.started_at.localeCompare(b.started_at))
+                .map((s) => ({
+                  id: s.id,
+                  startedAt: s.started_at,
+                  minutes: Math.round(s.duration_seconds / 60),
+                  busy: s.status !== "done" && s.status !== "error",
+                  parts: s.mergedParts,
+                }))}
+            />
             <GradeLegend family={!isTeacher} grading={gradingOfStudent(student)} instrument={student.instrument} />
           </section>
         ) : (
