@@ -131,7 +131,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
       {mode === "day" ? (
         <YourDay rows={rows} entries={entries} states={states} drafts={drafts} today={today} />
       ) : (
-        <NextLesson rows={rows} entries={entries} states={states} picked={picked} today={today} />
+        <NextLesson entries={entries} states={states} picked={picked} />
       )}
     </div>
   );
@@ -155,48 +155,79 @@ function ModeLink({ href, on, children }: { href: string; on: boolean; children:
 /** "16:30" → minutes after midnight; no time sorts last. */
 const clock = (t: string | null) => (t ? toMinutes(t) : 24 * 60);
 
-/** The student the Next lesson view opens on: the one asked for, else the lesson running, else who is up, else the soonest lesson. */
-function pickNext(rows: TodayRow[], entries: DayEntry[], states: EntryState[], picked?: string): TodayRow {
-  const asked = picked && rows.find((r) => r.student.id === picked);
-  if (asked) return asked;
-  const at = (st: EntryState) => entries[states.indexOf(st)]?.row;
-  const soonest = [...rows]
-    .filter((r) => r.next)
-    .sort((a, b) => a.next!.date.localeCompare(b.next!.date) || clock(a.next!.time) - clock(b.next!.time))[0];
-  return at("running") ?? at("next") ?? soonest ?? entries[entries.length - 1]?.row ?? rows[0];
+/**
+ * The lesson the Next lesson view opens on, from today's schedule only: the one
+ * asked for, else the lesson running, else who is up. Null when nothing is left today.
+ */
+function pickNext(entries: DayEntry[], states: EntryState[], picked?: string): number | null {
+  const asked = picked ? entries.findIndex((e) => e.row.student.id === picked) : -1;
+  if (asked >= 0) return asked;
+  const running = states.indexOf("running");
+  if (running >= 0) return running;
+  const up = states.indexOf("next");
+  return up >= 0 ? up : null;
 }
 
 // ---------- Next lesson ----------
 
 async function NextLesson({
-  rows,
   entries,
   states,
   picked,
-  today,
 }: {
-  rows: TodayRow[];
   entries: DayEntry[];
   states: EntryState[];
   picked?: string;
-  today: string;
 }) {
-  const next = pickNext(rows, entries, states, picked);
-  const i = entries.findIndex((e) => e.row === next);
-  const entry = i >= 0 ? entries[i] : null;
-  const state = i >= 0 ? states[i] : null;
+  // Only lessons on today's schedule (a lesson already running counts); never a cancelled one or another day's.
+  const keep = entries.map((e, k) => states[k] !== "off" && (!!e.occ || states[k] === "running"));
+  const todays = entries.filter((_, k) => keep[k]);
+  const todayStates = states.filter((_, k) => keep[k]);
+  const at = pickNext(todays, todayStates, picked);
+  const chips = (current: TodayRow | null) =>
+    todays.length > (current ? 1 : 0) && (
+      <nav aria-label="Today's lessons" className="flex flex-wrap items-center gap-2 text-[15px]">
+        <span className="text-muted">Today:</span>
+        {todays.map((e, k) => (
+          <Link
+            key={e.occ?.key ?? e.row.student.id}
+            href={`/v3?mode=next&s=${e.row.student.id}`}
+            aria-current={e.row === current ? "true" : undefined}
+            className={cx(
+              "rounded-full border px-3 py-1 no-underline",
+              e.row === current ? "border-accent/40 bg-accent-soft text-accent-ink" : "border-rule text-ink",
+              todayStates[k] === "done" && "text-muted",
+            )}
+          >
+            {todayStates[k] === "done" ? "✓ " : ""}
+            {e.row.student.name.split(" ")[0]}
+            {e.time ? ` ${formatTime(e.time)}` : ""}
+          </Link>
+        ))}
+      </nav>
+    );
+  if (at === null) {
+    return (
+      <div className="flex flex-col gap-4">
+        {chips(null)}
+        <p className="text-[17px] text-ink">
+          {todays.length > 0 ? "No more lessons today." : "No lessons on today's schedule."}{" "}
+          <Link href="/v3" className="text-accent-ink underline">
+            See your day ›
+          </Link>
+        </p>
+      </div>
+    );
+  }
+  const entry = todays[at];
+  const state = todayStates[at];
+  const next = entry.row;
   const label =
     state === "running"
       ? "In lesson now"
       : state === "done"
         ? "Today's lesson · done"
-        : state === "off"
-          ? `Today · ${cancelLabel(entry!.occ!)}`
-          : entry
-            ? `${state === "next" ? "Up next" : "Today"}${entry.time ? ` · ${formatTime(entry.time)}` : ""}`
-            : next.next
-              ? `Next lesson · ${relativeDay(next.next.date, today)}${next.next.time ? ` · ${formatTime(next.next.time)}` : ""}`
-              : "No lesson scheduled";
+        : `${state === "next" ? "Up next" : "Today"}${entry.time ? ` · ${formatTime(entry.time)}` : ""}`;
   const s = next.student;
   const [days, lessonDays] = next.week.days.length
     ? await Promise.all([
@@ -207,26 +238,7 @@ async function NextLesson({
 
   return (
     <div className="flex flex-col gap-6">
-      {entries.length > 1 && (
-        <nav aria-label="Today's lessons" className="flex flex-wrap items-center gap-2 text-[15px]">
-          <span className="text-muted">Today:</span>
-          {entries.map((e, k) => (
-            <Link
-              key={e.occ?.key ?? e.row.student.id}
-              href={`/v3?mode=next&s=${e.row.student.id}`}
-              aria-current={e.row === next ? "true" : undefined}
-              className={cx(
-                "rounded-full border px-3 py-1 no-underline",
-                e.row === next ? "border-accent/40 bg-accent-soft text-accent-ink" : "border-rule text-ink",
-                states[k] === "off" && "line-through opacity-60",
-              )}
-            >
-              {e.row.student.name.split(" ")[0]}
-              {e.time ? ` ${formatTime(e.time)}` : ""}
-            </Link>
-          ))}
-        </nav>
-      )}
+      {chips(next)}
       <section aria-label="Next student" className="flex flex-col gap-4">
         <Card className="flex flex-col gap-4 border-accent/40">
           <div className="flex items-start gap-3">
@@ -397,8 +409,8 @@ function YourDay({
               <>
                 Nothing on today. Next is {soonest.student.name.split(" ")[0]}, {relativeDay(soonest.next!.date, today)}
                 {soonest.next!.time ? ` at ${formatTime(soonest.next!.time)}` : ""}.{" "}
-                <Link href={`/v3?mode=next&s=${soonest.student.id}`} className="text-accent-ink underline">
-                  Get ready ›
+                <Link href={`/v3/students/${soonest.student.id}`} className="text-accent-ink underline">
+                  Open {soonest.student.name.split(" ")[0]} ›
                 </Link>
               </>
             ) : (
