@@ -20,6 +20,7 @@ function minutes(fd: FormData): number {
 
 function done() {
   revalidatePath("/downbeat");
+  revalidatePath("/settings/lesson-times");
 }
 
 /** A new regular weekly lesson for a student. */

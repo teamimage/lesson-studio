@@ -6,24 +6,21 @@ import { InstrumentTag } from "@/components/instrument-tag";
 import { PreLessonBrief } from "@/components/pre-lesson-brief";
 import { ConsentNeeded } from "@/components/consent-needed";
 import { Fold } from "@/components/fold";
-import { Button, Card, EmptyState, Input, LinkButton, Pill, SectionTitle, Select, cx } from "@/components/ui";
+import { Button, Card, EmptyState, Input, LinkButton, Pill, SectionTitle, cx } from "@/components/ui";
 import { startLesson } from "@/app/lessons/live-actions";
-import { addExtraLesson, addSlot, changeLesson, removeSlot, undoChange } from "./actions";
+import { changeLesson, undoChange } from "./actions";
+import { MinutesSelect } from "@/components/lesson-times";
 import { requireTeacher } from "@/lib/auth";
 import { studentPhotoSrc } from "@/lib/constants";
-import { type Student, listDraftLessons, listStudents, practiceTone } from "@/lib/data";
+import { listDraftLessons, listStudents, practiceTone } from "@/lib/data";
 import { addDays, formatDate, parseISODate, relativeDay, todayISO } from "@/lib/format";
 import { consentPath } from "@/lib/recording-consent";
 import {
   type Occurrence,
-  type Slot,
-  fallbackSlot,
-  WEEKDAY_NAMES,
   endTime,
   formatTime,
   nowMinutes,
   occurrencesBetween,
-  slotLabel,
   toMinutes,
   untilLabel,
   weekStart,
@@ -41,7 +38,7 @@ const WEEKS_AHEAD = 8;
 
 type SP = Promise<{ w?: string }>;
 
-// Downbeat: the teacher's landing page. The schedule first (next lesson with
+// Intro (route /downbeat, once called Downbeat): the teacher's landing page. The schedule first (next lesson with
 // Start lesson, today's agenda, the week), then what needs a look (drafts,
 // consent, who has and hasn't practised), then every student one tap away.
 // Everything opens in place; the only pages it leads to are ones that
@@ -49,7 +46,7 @@ type SP = Promise<{ w?: string }>;
 export default function DownbeatPage({ searchParams }: { searchParams: SP }) {
   return (
     <Shell
-      title="Downbeat"
+      title="Intro"
       eyebrow={
         <Suspense fallback="Your teaching day">
           <DateLine />
@@ -96,7 +93,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
   if (active.length === 0) {
     return (
       <EmptyState title="No students yet" action={<LinkButton href="/students/new">Add your first student</LinkButton>}>
-        Add a student and give them a lesson time. Downbeat then shows your week, the next lesson and who practised.
+        Add a student and give them a lesson time. Intro then shows your week, the next lesson and who practised.
       </EmptyState>
     );
   }
@@ -140,15 +137,13 @@ async function Body({ searchParams }: { searchParams: SP }) {
   const needConsent = rows.filter((r) => r.consent !== "signed");
   const practised = rows.filter((r) => r.week.daysPracticed > 0).sort((a, b) => b.week.daysPracticed - a.week.daysPracticed);
   const notYet = rows.filter((r) => r.week.daysPracticed === 0);
-  const slotsByStudent = new Map<string, typeof schedule.slots>();
-  for (const s of schedule.slots) slotsByStudent.set(s.student_id, [...(slotsByStudent.get(s.student_id) ?? []), s]);
 
   return (
     <div className="flex flex-col gap-7">
       {!schedule.ready && (
         <Card tone="amber" className="text-[16px]">
           Lesson times can&apos;t be saved yet: run <b>lesson-schedule.sql</b> in the Supabase SQL Editor once. Until
-          then Downbeat uses each student&apos;s Lesson day and Lesson time, and cancelling or moving a lesson is off.
+          then Intro uses each student&apos;s Lesson day and Lesson time, and cancelling or moving a lesson is off.
         </Card>
       )}
 
@@ -265,75 +260,6 @@ async function Body({ searchParams }: { searchParams: SP }) {
         </div>
       </section>
 
-      {/* Students */}
-      <section>
-        <SectionTitle action={<Link href="/students/new" className="text-sm font-medium text-accent-ink underline">+ Student</Link>}>
-          Students
-        </SectionTitle>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((r) => {
-            const s = r.student;
-            const slots = slotsByStudent.get(s.id) ?? [];
-            return (
-              <Link
-                key={s.id}
-                href={`/students/${s.id}`}
-                className="flex min-h-16 items-center gap-3 rounded-2xl border border-rule bg-sheet px-3 py-2 no-underline transition hover:border-accent/50"
-              >
-                <Avatar name={s.name} instrument={s.instrument} photoSrc={studentPhotoSrc(s)} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[17px] font-semibold text-ink">{s.name}</span>
-                  <span className="block truncate text-sm text-muted">
-                    {slots.length ? slots.map(slotLabel).join(", ") : "No lesson time"}
-                  </span>
-                </span>
-                {r.consent !== "signed" && <Pill tone="danger">consent</Pill>}
-                <span className="text-xl text-accent-ink" aria-hidden>
-                  ›
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Lesson times */}
-      <Fold title="Lesson times" meta="Set each student's regular lesson, or add a one-off">
-        {!schedule.ready ? (
-          <p className="text-[16px] text-muted">
-            Run lesson-schedule.sql first. It also copies each student&apos;s current Lesson day and time in as their
-            regular lesson.
-          </p>
-        ) : (
-          <>
-            <ul className="flex flex-col gap-3">
-              {active.map((s) => (
-                <li key={s.id} className="rounded-2xl border border-rule bg-paper px-3 py-3">
-                  <div className="mb-2 font-semibold">{s.name}</div>
-                  <SlotList studentId={s.id} slots={slotsByStudent.get(s.id) ?? []} />
-                  <AddSlotForm student={s} />
-                </li>
-              ))}
-            </ul>
-            <div className="rounded-2xl border border-rule bg-paper px-3 py-3">
-              <div className="mb-2 font-semibold">One-off lesson</div>
-              <form action={addExtraLesson} className="grid gap-2 sm:grid-cols-[2fr_1.3fr_1fr_1fr_auto]">
-                <Select name="student_id" aria-label="Student" required>
-                  {active.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </Select>
-                <Input type="date" name="on_date" aria-label="Date" defaultValue={today} required />
-                <Input type="time" name="start_time" aria-label="Start time" required />
-                <MinutesSelect />
-                <Button variant="secondary">Add</Button>
-              </form>
-            </div>
-          </>
-        )}
-      </Fold>
     </div>
   );
 }
@@ -520,60 +446,6 @@ function PracticeLine({ row }: { row: TodayRow }) {
         {w.daysPracticed}/{w.days.length} days{w.totalMinutes ? ` · ${w.totalMinutes} min` : ""}
       </Pill>
     </Link>
-  );
-}
-
-// ---------- Lesson times ----------
-
-function SlotList({ studentId, slots }: { studentId: string; slots: Slot[] }) {
-  const saved = slots.filter((s) => !s.fallback && s.student_id === studentId);
-  if (saved.length === 0) return <p className="mb-2 text-sm text-muted">No regular lesson yet.</p>;
-  return (
-    <ul className="mb-2 flex flex-col gap-1">
-      {saved.map((slot) => (
-        <li key={slot.id} className="flex flex-wrap items-center gap-2 text-[16px]">
-          <span>
-            Every {WEEKDAY_NAMES[slot.weekday]} at {formatTime(slot.start_time)}, {slot.minutes} min
-            {slot.starts_on ? ` (from ${formatDate(slot.starts_on)})` : ""}
-          </span>
-          <form action={removeSlot} className="ml-auto">
-            <input type="hidden" name="slot_id" value={slot.id} />
-            <button className="min-h-9 text-sm font-medium text-danger underline">Remove</button>
-          </form>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function AddSlotForm({ student }: { student: Student }) {
-  return (
-    <form action={addSlot} className="grid gap-2 sm:grid-cols-[1.3fr_1fr_1fr_auto]">
-      <input type="hidden" name="student_id" value={student.id} />
-      <Select name="weekday" aria-label="Day" defaultValue={String(fallbackSlot(student)?.weekday ?? 1)}>
-        {WEEKDAY_NAMES.map((d, i) => (
-          <option key={d} value={i}>
-            Every {d}
-          </option>
-        ))}
-      </Select>
-      <Input type="time" name="start_time" aria-label="Start time" required />
-      <MinutesSelect />
-      <Button variant="secondary">Add lesson time</Button>
-    </form>
-  );
-}
-
-function MinutesSelect({ value = 30 }: { value?: number }) {
-  const options = Array.from(new Set([15, 20, 30, 45, 60, 75, 90, value])).sort((a, b) => a - b);
-  return (
-    <Select name="minutes" aria-label="Length" defaultValue={String(value)}>
-      {options.map((m) => (
-        <option key={m} value={m}>
-          {m} min
-        </option>
-      ))}
-    </Select>
   );
 }
 

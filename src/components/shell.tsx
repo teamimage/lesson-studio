@@ -86,7 +86,7 @@ export function Shell({
           <nav aria-label="Sections" className="-mx-1 flex items-center gap-1 overflow-x-auto pb-1.5 pt-0.5 family:hidden">
             {!familyMode && (
               <>
-                <V3TabLink href="/downbeat" on={v3 === "downbeat"} label="Downbeat" icon="♩" />
+                <V3TabLink href="/downbeat" on={v3 === "downbeat"} label="Intro" icon="♩" />
                 <V3TabLink href="/v3" on={v3 === "today"} label="Today" icon="☀" />
                 <V3TabLink href="/v3/students" on={v3 === "students"} label="Students" icon="♪" />
               </>
