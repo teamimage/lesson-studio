@@ -1,6 +1,7 @@
 import type { LessonFull, Student } from "@/lib/data";
 import type { Tables } from "@/lib/supabase/types";
 import { capitalize, daysBetween, formatDate, parseISODate } from "@/lib/format";
+import { formatTime } from "@/lib/schedule";
 
 // The one-page printable lesson sheet for the parent. Plain, high-contrast,
 // letter-size. Shown on its own page and inline on the Desk student card.
@@ -11,17 +12,22 @@ export function LessonSheet({
   student,
   teacher,
   reminders = [],
+  next,
 }: {
   lesson: LessonFull;
   student: Student;
   teacher: Tables<"teachers"> | null;
   /** Standing technique and posture reminders (active only). */
   reminders?: Tables<"student_reminders">[];
+  /** The next lesson from the schedule; the lesson's own Next lesson date only when nothing is scheduled. */
+  next?: { date: string; time: string | null } | null;
 }) {
+  const nextDate = next?.date ?? lesson.next_lesson_date;
+  const nextTime = next ? (next.time ? formatTime(next.time) : null) : student.lesson_time;
   // One box per day from the day after this lesson up to the next one (a week
   // or two); a week when the next lesson date isn't set.
   const lessonDay = parseISODate(lesson.lesson_date);
-  const gap = lesson.next_lesson_date ? daysBetween(lesson.lesson_date, lesson.next_lesson_date) : 7;
+  const gap = nextDate ? daysBetween(lesson.lesson_date, nextDate) : 7;
   const dayCount = gap >= 1 && gap <= 21 ? gap : 7;
   const dayLabels = Array.from({ length: dayCount }, (_, i) => {
     const d = new Date(lessonDay);
@@ -120,12 +126,12 @@ export function LessonSheet({
               <dd className="italic">“{lesson.parent_message}”</dd>
             </>
           )}
-          {lesson.next_lesson_date && (
+          {nextDate && (
             <>
               <dt className="mt-3 pt-0.5 text-[11px] first:mt-0 sm:mt-0 print:mt-0 font-semibold uppercase tracking-[0.12em] text-[#8f4a2a]">Next lesson</dt>
               <dd>
-                {formatDate(lesson.next_lesson_date, "long")}
-                {student.lesson_time ? `, ${student.lesson_time}` : ""}
+                {formatDate(nextDate, "long")}
+                {nextTime ? `, ${nextTime}` : ""}
               </dd>
             </>
           )}

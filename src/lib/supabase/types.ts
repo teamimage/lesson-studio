@@ -499,9 +499,12 @@ export type Database = {
           starts_on: string | null;
           ends_on: string | null;
           created_at: string;
+          /** Missing until schedule-foundation.sql has run. */
+          every_weeks?: number;
         };
         Insert: {
           id?: string;
+          every_weeks?: number;
           teacher_id: string;
           student_id: string;
           weekday: number;
@@ -515,6 +518,7 @@ export type Database = {
           id?: string;
           teacher_id?: string;
           student_id?: string;
+          every_weeks?: number;
           weekday?: number;
           start_time?: string;
           minutes?: number;
@@ -530,20 +534,30 @@ export type Database = {
           teacher_id: string;
           student_id: string;
           slot_id: string | null;
-          kind: "cancel" | "move" | "extra";
+          kind: "cancel" | "move" | "extra" | "noshow";
           on_date: string;
           new_date: string | null;
           new_time: string | null;
           minutes: number | null;
           note: string;
           created_at: string;
+          /** Missing until schedule-foundation.sql has run. */
+          cancelled_by?: "teacher" | "family" | "studio" | null;
+          makeup_owed?: boolean;
+          makeup_for?: string | null;
+          closure_id?: string | null;
         };
         Insert: {
           id?: string;
           teacher_id: string;
           student_id: string;
           slot_id?: string | null;
-          kind: "cancel" | "move" | "extra";
+          kind: "cancel" | "move" | "extra" | "noshow";
+          /** Missing until schedule-foundation.sql has run. */
+          cancelled_by?: "teacher" | "family" | "studio" | null;
+          makeup_owed?: boolean;
+          makeup_for?: string | null;
+          closure_id?: string | null;
           on_date: string;
           new_date?: string | null;
           new_time?: string | null;
@@ -556,13 +570,79 @@ export type Database = {
           teacher_id?: string;
           student_id?: string;
           slot_id?: string | null;
-          kind?: "cancel" | "move" | "extra";
+          kind?: "cancel" | "move" | "extra" | "noshow";
+          /** Missing until schedule-foundation.sql has run. */
+          cancelled_by?: "teacher" | "family" | "studio" | null;
+          makeup_owed?: boolean;
+          makeup_for?: string | null;
+          closure_id?: string | null;
+
           on_date?: string;
           new_date?: string | null;
           new_time?: string | null;
           minutes?: number | null;
           note?: string;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      studio_closures: {
+        Row: {
+          id: string;
+          teacher_id: string;
+          starts_on: string;
+          ends_on: string;
+          note: string;
+          makeup_owed: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          teacher_id: string;
+          starts_on: string;
+          ends_on: string;
+          note?: string;
+          makeup_owed?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          teacher_id?: string;
+          starts_on?: string;
+          ends_on?: string;
+          note?: string;
+          makeup_owed?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      calendar_feeds: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: "teacher" | "family";
+          token: string;
+          created_at: string;
+          last_read_at: string | null;
+          revoked_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          kind: "teacher" | "family";
+          token?: string;
+          created_at?: string;
+          last_read_at?: string | null;
+          revoked_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          kind?: "teacher" | "family";
+          token?: string;
+          created_at?: string;
+          last_read_at?: string | null;
+          revoked_at?: string | null;
         };
         Relationships: [];
       };
@@ -1277,6 +1357,9 @@ export type Database = {
           /** Missing until studio-store.sql has run. */
           store_layout?: string;
           store_note?: string;
+          /** Missing until schedule-foundation.sql has run. */
+          time_zone?: string;
+          makeup_notice_hours?: number;
         };
         Insert: {
           created_at?: string;
@@ -1301,6 +1384,8 @@ export type Database = {
           /** Missing until studio-store.sql has run. */
           store_layout?: string;
           store_note?: string;
+          time_zone?: string;
+          makeup_notice_hours?: number;
         };
         Relationships: [];
       };
@@ -1604,6 +1689,7 @@ export type Database = {
         Returns: { student_first_name: string; instrument: string; teacher_name: string; state: string }[];
       };
       my_role: { Args: never; Returns: string | null };
+      calendar_feed: { Args: { p_token: string }; Returns: Json };
       family_invite_start: { Args: { p_token: string; p_email: string }; Returns: boolean };
       accept_my_family_invites: { Args: never; Returns: number };
       my_parent_ids: { Args: never; Returns: string[] };

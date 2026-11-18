@@ -5,6 +5,7 @@ import { todayISO } from "@/lib/format";
 import { findRunningLesson } from "@/lib/lesson-today";
 import { listPracticeSessions, type PracticeSessionView } from "@/lib/practice/data";
 import { getConsentStatus } from "@/lib/recording-consent-data";
+import { type Occurrence, isOn, nextOccurrence } from "@/lib/schedule";
 import { nextLesson } from "@/lib/teacher-data";
 
 // Version 3 (task-first) helpers: everything the Today screen needs about
@@ -19,14 +20,19 @@ export type TodayRow = {
   consent: "signed" | "needed" | "setup";
   /** A lesson started and not yet ended (at most 3 hours old), if any. */
   runningLessonId: string | null;
-  next: { date: string; source: "set" | "weekly" } | null;
+  /** The next lesson: from the schedule (Settings → Lesson times); the old Lesson day / Next lesson fields only when nothing is scheduled. */
+  next: { date: string; time: string | null; source: "schedule" | "set" | "weekly" } | null;
   /** Lesson day is today (by schedule, or a lesson was started today). */
   isToday: boolean;
   /** A lesson record dated today already exists. */
   hadLessonToday: boolean;
 };
 
-export async function loadTodayRow(student: Student, today = todayISO()): Promise<TodayRow> {
+/**
+ * `upcoming` is this student's scheduled lessons from today on (see
+ * loadUpcoming); pass it so every screen agrees on the next lesson.
+ */
+export async function loadTodayRow(student: Student, today = todayISO(), upcoming?: Occurrence[]): Promise<TodayRow> {
   const id = student.id;
   const [lessons, week, repertoire, sessions, consent, running] = await Promise.all([
     listLessons(id, 6),
@@ -36,8 +42,15 @@ export async function loadTodayRow(student: Student, today = todayISO()): Promis
     getConsentStatus(id),
     findRunningLesson(id),
   ]);
-  const next = nextLesson(student, lessons[0] ?? null, today);
   const hadLessonToday = lessons.some((l) => l.lesson_date === today);
+  const scheduled = upcoming?.length ? nextOccurrence(upcoming, today) : null;
+  const old = upcoming?.length ? null : nextLesson(student, lessons[0] ?? null, today);
+  const next = scheduled
+    ? { date: scheduled.date, time: scheduled.time, source: "schedule" as const }
+    : old
+      ? { ...old, time: null }
+      : null;
+  const lessonToday = upcoming?.length ? upcoming.some((o) => o.date === today && isOn(o)) : next?.date === today;
   return {
     student,
     lessons,
@@ -47,7 +60,7 @@ export async function loadTodayRow(student: Student, today = todayISO()): Promis
     consent: consent.state,
     runningLessonId: running,
     next,
-    isToday: next?.date === today || !!running || hadLessonToday,
+    isToday: lessonToday || !!running || hadLessonToday,
     hadLessonToday,
   };
 }

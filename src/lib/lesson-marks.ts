@@ -1,7 +1,7 @@
 import "server-only";
 import { getStudent } from "@/lib/data";
 import { loadSchedule } from "@/lib/schedule-data";
-import { occurrencesBetween } from "@/lib/schedule";
+import { isOn, occurrencesBetween } from "@/lib/schedule";
 import { todayISO } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import type { LessonMark } from "@/lib/lesson-mark-types";
@@ -61,8 +61,8 @@ export async function listLessonMarks(
     try {
       const start = from > today ? from : today;
       const schedule = await loadSchedule([student], start);
-      for (const o of occurrencesBetween(schedule.slots, schedule.changes, start, to)) {
-        if (o.kind === "cancelled" || out[o.date]) continue;
+      for (const o of occurrencesBetween(schedule.slots, schedule.changes, start, to, schedule.closures)) {
+        if (!isOn(o) || out[o.date]) continue;
         add({ date: o.date, lessonId: null, status: null, time: o.time, minutes: o.minutes, upcoming: true });
       }
     } catch {

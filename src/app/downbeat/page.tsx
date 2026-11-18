@@ -6,10 +6,8 @@ import { InstrumentTag } from "@/components/instrument-tag";
 import { PreLessonBrief } from "@/components/pre-lesson-brief";
 import { ConsentNeeded } from "@/components/consent-needed";
 import { Fold } from "@/components/fold";
-import { Button, Card, EmptyState, Input, LinkButton, Pill, SectionTitle, cx } from "@/components/ui";
+import { Button, Card, EmptyState, LinkButton, Pill, SectionTitle, cx } from "@/components/ui";
 import { startLesson } from "@/app/lessons/live-actions";
-import { changeLesson, undoChange } from "./actions";
-import { MinutesSelect } from "@/components/lesson-times";
 import { requireTeacher } from "@/lib/auth";
 import { studentPhotoSrc } from "@/lib/constants";
 import { listDraftLessons, listStudents, practiceTone } from "@/lib/data";
@@ -17,15 +15,17 @@ import { addDays, formatDate, parseISODate, relativeDay, todayISO } from "@/lib/
 import { consentPath } from "@/lib/recording-consent";
 import {
   type Occurrence,
+  cancelLabel,
   endTime,
   formatTime,
+  isOn,
   nowMinutes,
-  occurrencesBetween,
+  occurrenceRef,
   toMinutes,
   untilLabel,
   weekStart,
 } from "@/lib/schedule";
-import { loadSchedule } from "@/lib/schedule-data";
+import { loadSchedule, scheduleBetween } from "@/lib/schedule-data";
 import { CraftLine } from "@/components/craft-line";
 import { CraftSection } from "@/components/craft-section";
 import { type TodayRow, loadTodayRow } from "@/lib/v3-data";
@@ -101,19 +101,15 @@ async function Body({ searchParams }: { searchParams: SP }) {
   const offset = Math.max(-WEEKS_BACK, Math.min(WEEKS_AHEAD, Math.round(Number(w) || 0)));
   const thisMonday = weekStart(today);
   const firstMonday = addDays(thisMonday, -WEEKS_BACK * 7);
-  const [schedule, rows] = await Promise.all([
-    loadSchedule(active, firstMonday),
-    Promise.all(active.map((s) => loadTodayRow(s, today))),
-  ]);
+  const schedule = await loadSchedule(active, firstMonday);
+  const ahead = scheduleBetween(schedule, today, addDays(today, 60));
+  const rows = await Promise.all(
+    active.map((s) => loadTodayRow(s, today, ahead.filter((o) => o.studentId === s.id))),
+  );
   const rowOf = new Map(rows.map((r) => [r.student.id, r]));
 
-  const allWeeks = occurrencesBetween(
-    schedule.slots,
-    schedule.changes,
-    firstMonday,
-    addDays(thisMonday, WEEKS_AHEAD * 7 + 6),
-  );
-  const ahead = occurrencesBetween(schedule.slots, schedule.changes, today, addDays(today, 21));
+  const allWeeks = scheduleBetween(schedule, firstMonday, addDays(thisMonday, WEEKS_AHEAD * 7 + 6));
+  const nameOf = new Map(active.map((s) => [s.id, s.name]));
   const todays = ahead.filter((o) => o.date === today);
   const now = nowMinutes();
 
@@ -121,11 +117,11 @@ async function Body({ searchParams }: { searchParams: SP }) {
   // ended and has no lesson record yet, else the first one on a later day.
   const running = rows.find((r) => r.runningLessonId);
   const upNext: { row: TodayRow; occ: Occurrence | null } | null = running
-    ? { row: running, occ: todays.find((o) => o.studentId === running.student.id && o.kind !== "cancelled") ?? null }
+    ? { row: running, occ: todays.find((o) => o.studentId === running.student.id && isOn(o)) ?? null }
     : (() => {
         const occ = ahead.find(
           (o) =>
-            o.kind !== "cancelled" &&
+            isOn(o) &&
             rowOf.has(o.studentId) &&
             (o.date > today ||
               (!rowOf.get(o.studentId)!.hadLessonToday &&
@@ -153,7 +149,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
       <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
         {/* Today */}
         <section className="min-w-0">
-          <SectionTitle action={<span className="text-sm text-muted">{todays.filter((o) => o.kind !== "cancelled").length} lessons</span>}>
+          <SectionTitle action={<span className="text-sm text-muted">{todays.filter(isOn).length} lessons</span>}>
             Today
           </SectionTitle>
           {todays.length === 0 ? (
@@ -161,9 +157,9 @@ async function Body({ searchParams }: { searchParams: SP }) {
               No lessons today.
             </p>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col divide-y divide-rule">
               {todays.map((o) => (
-                <OccurrenceRow key={o.key} occ={o} row={rowOf.get(o.studentId)} today={today} canChange={schedule.ready} big />
+                <OccurrenceRow key={o.key} occ={o} row={rowOf.get(o.studentId)} today={today} nameOf={nameOf} big />
               ))}
             </ul>
           )}
@@ -230,7 +226,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
                 week={allWeeks.filter((x) => x.date >= monday && x.date <= sunday)}
                 rowOf={rowOf}
                 today={today}
-                canChange={schedule.ready}
+                nameOf={nameOf}
               />
             ),
           };
@@ -331,38 +327,43 @@ function OccurrenceRow({
   occ,
   row,
   today,
-  canChange,
+  nameOf,
   big,
 }: {
   occ: Occurrence;
   row: TodayRow | undefined;
   today: string;
-  canChange: boolean;
+  nameOf: Map<string, string>;
   big?: boolean;
 }) {
   if (!row) return null;
   const s = row.student;
-  const cancelled = occ.kind === "cancelled";
+  const off = !isOn(occ);
   const record = row.lessons.find((l) => l.lesson_date === occ.date);
   const running = occ.date === today && row.runningLessonId;
   const past = occ.date < today;
+  const ref = occurrenceRef(occ);
   return (
-    <li className={cx("rounded-xl", big && "border border-rule bg-sheet px-3 py-2.5")}>
+    <li className={cx(big && "py-2.5")}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className={cx("w-[4.6rem] shrink-0 tabular-nums font-semibold", cancelled && "text-muted line-through")}>
+        <span className={cx("w-[4.6rem] shrink-0 tabular-nums font-semibold", off && "text-muted line-through")}>
           {occ.time ? formatTime(occ.time) : "—"}
         </span>
         <Link
           href={`/students/${s.id}`}
-          className={cx("min-w-0 font-semibold text-ink no-underline", big ? "text-[18px]" : "text-[16px]", cancelled && "text-muted line-through")}
+          className={cx("min-w-0 font-semibold text-ink no-underline", big ? "text-[18px]" : "text-[16px]", off && "text-muted line-through")}
         >
           {s.name}
         </Link>
         <span className="text-sm text-muted">{occ.minutes} min</span>
-        {cancelled && <Pill>cancelled</Pill>}
+        {off && <Pill tone={occ.kind === "noshow" ? "danger" : "muted"}>{cancelLabel(occ)}</Pill>}
+        {occ.makeupOwed && <Pill tone="amber">make-up owed</Pill>}
         {occ.kind === "moved" && occ.from && <Pill tone="plum">moved from {formatDate(occ.from, "weekday")}</Pill>}
-        {occ.kind === "extra" && <Pill tone="plum">one-off</Pill>}
-        {!cancelled && row.consent !== "signed" && <Pill tone="danger">consent needed</Pill>}
+        {occ.kind === "extra" && <Pill tone="plum">{occ.makeupFor ? "make-up" : "one-off"}</Pill>}
+        {!off && occ.overlaps.length > 0 && (
+          <Pill tone="danger">overlaps {occ.overlaps.map((id) => nameOf.get(id)?.split(" ")[0] ?? "another").join(", ")}</Pill>
+        )}
+        {!off && row.consent !== "signed" && <Pill tone="danger">consent needed</Pill>}
         {running ? (
           <Link href={`/lessons/${row.runningLessonId}/live`} className="no-underline">
             <Pill tone="accent">in lesson ›</Pill>
@@ -372,62 +373,23 @@ function OccurrenceRow({
             <Pill tone={record.status === "draft" ? "amber" : "sage"}>{record.status === "draft" ? "draft ›" : "✓ done ›"}</Pill>
           </Link>
         ) : (
-          past && !cancelled && <Pill>no record</Pill>
+          past && !off && <Pill>no record</Pill>
         )}
-        <span className="ml-auto flex items-center gap-2">
-          {big && !cancelled && !record && !running && row.consent === "signed" && occ.date === today && (
+        <span className="ml-auto flex items-center gap-3">
+          {big && !off && !record && !running && row.consent === "signed" && occ.date === today && (
             <form action={startLesson}>
               <input type="hidden" name="student_id" value={s.id} />
               <Button className="min-h-10 px-3 text-[15px]">Start</Button>
             </form>
           )}
+          {ref && !occ.fallback && (
+            <Link href={`/schedule/${ref}`} className="inline-flex min-h-10 items-center text-sm font-medium text-accent-ink">
+              {past || record ? "Details ›" : "Change ›"}
+            </Link>
+          )}
         </span>
       </div>
-      {canChange && !occ.fallback && !past && !record && <ChangeLesson occ={occ} />}
     </li>
-  );
-}
-
-function ChangeLesson({ occ }: { occ: Occurrence }) {
-  // Undo for a cancel / move / one-off; otherwise cancel or move this week.
-  if (occ.changeId && occ.kind !== "regular") {
-    return (
-      <form action={undoChange} className="mt-1">
-        <input type="hidden" name="change_id" value={occ.changeId} />
-        <button className="min-h-9 text-sm font-medium text-accent-ink underline">
-          {occ.kind === "cancelled" ? "Undo cancel" : occ.kind === "moved" ? "Move back" : "Remove this one-off"}
-        </button>
-      </form>
-    );
-  }
-  if (!occ.slotId || !occ.slotDate) return null;
-  return (
-    <details className="group mt-1">
-      <summary className="inline-flex min-h-9 cursor-pointer list-none items-center text-sm font-medium text-accent-ink [&::-webkit-details-marker]:hidden">
-        Change this week <span className="ml-1 transition-transform group-open:rotate-90" aria-hidden>›</span>
-      </summary>
-      <div className="mt-1 flex flex-col gap-3 rounded-xl border border-rule bg-paper p-3">
-        <form action={changeLesson} className="grid gap-2 sm:grid-cols-[1.3fr_1fr_1fr_auto]">
-          <input type="hidden" name="student_id" value={occ.studentId} />
-          <input type="hidden" name="slot_id" value={occ.slotId} />
-          <input type="hidden" name="on_date" value={occ.slotDate} />
-          <input type="hidden" name="kind" value="move" />
-          <Input type="date" name="new_date" aria-label="New date" defaultValue={occ.date} required />
-          <Input type="time" name="new_time" aria-label="New time" defaultValue={occ.time ?? ""} required />
-          <MinutesSelect value={occ.minutes} />
-          <Button variant="secondary">Move</Button>
-        </form>
-        <form action={changeLesson}>
-          <input type="hidden" name="student_id" value={occ.studentId} />
-          <input type="hidden" name="slot_id" value={occ.slotId} />
-          <input type="hidden" name="on_date" value={occ.slotDate} />
-          <input type="hidden" name="kind" value="cancel" />
-          <Button variant="danger" className="min-h-10 text-[15px]">
-            Cancel this lesson
-          </Button>
-        </form>
-      </div>
-    </details>
   );
 }
 
@@ -454,13 +416,13 @@ function WeekDays({
   week,
   rowOf,
   today,
-  canChange,
+  nameOf,
 }: {
   monday: string;
   week: Occurrence[];
   rowOf: Map<string, TodayRow>;
   today: string;
-  canChange: boolean;
+  nameOf: Map<string, string>;
 }) {
   return (
     <div className="flex flex-col divide-y divide-rule rounded-2xl border border-rule bg-sheet">
@@ -481,7 +443,7 @@ function WeekDays({
             ) : (
               <ul className="flex flex-col gap-1.5">
                 {list.map((o) => (
-                  <OccurrenceRow key={o.key} occ={o} row={rowOf.get(o.studentId)} today={today} canChange={canChange} />
+                  <OccurrenceRow key={o.key} occ={o} row={rowOf.get(o.studentId)} today={today} nameOf={nameOf} />
                 ))}
               </ul>
             )}

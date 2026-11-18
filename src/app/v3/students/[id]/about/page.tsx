@@ -17,6 +17,8 @@ import { capitalize, daysBetween, formatDate, todayISO } from "@/lib/format";
 import { getConsentStatus } from "@/lib/recording-consent-data";
 import { consentPath } from "@/lib/recording-consent";
 import { createClient } from "@/lib/supabase/server";
+import { loadSchedule } from "@/lib/schedule-data";
+import { slotSentence } from "@/lib/schedule";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ invite?: string; made?: string }>;
@@ -49,14 +51,16 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const student = await getStudent(id);
   if (!student) notFound();
   const supabase = await createClient();
-  const [parents, consent, repertoire, lessonRows, logRows, pinSet] = await Promise.all([
+  const [parents, consent, repertoire, lessonRows, logRows, pinSet, lessonSchedule] = await Promise.all([
     listParentsForStudent(id),
     getConsentStatus(id),
     listRepertoire(id),
     supabase.from("lessons").select("lesson_date").eq("student_id", id).order("lesson_date", { ascending: true }),
     supabase.from("practice_logs").select("practice_date, minutes").eq("student_id", id),
     practicePinSet(id),
+    loadSchedule([student], todayISO()).catch(() => null),
   ]);
+  const regular = (lessonSchedule?.slots ?? []).filter((x) => !x.ends_on || x.ends_on >= todayISO());
   const first = student.name.split(" ")[0];
   const lessonDates = (lessonRows.data ?? []).map((l) => l.lesson_date);
   const logs = logRows.data ?? [];
@@ -119,12 +123,18 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
                   <dd>{student.current_book}</dd>
                 </>
               )}
-              {student.lesson_day && (
+              {regular.length > 0 && (
                 <>
                   <dt className="text-muted">Lessons</dt>
                   <dd>
-                    {student.lesson_day}
-                    {student.lesson_time ? ` at ${student.lesson_time}` : ""}
+                    {regular.map((x) => (
+                      <span key={x.id} className="block">
+                        {slotSentence(x)}
+                      </span>
+                    ))}
+                    <Link href="/settings/lesson-times" className="text-sm font-medium text-accent-ink">
+                      Change in Lesson times ›
+                    </Link>
                   </dd>
                 </>
               )}

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { applyPhotoFromForm } from "@/lib/student-photos";
+import { fallbackSlot } from "@/lib/schedule";
 
 function str(fd: FormData, key: string): string | null {
   const v = String(fd.get(key) ?? "").trim();
@@ -36,6 +37,19 @@ export async function createStudent(fd: FormData) {
     .select("id")
     .single();
   if (error || !data) redirect("/students/new?error=save");
+
+  // The lesson day and time typed on the form become the student's regular
+  // lesson in Lesson times (30 min), the one schedule every screen reads.
+  const usual = fallbackSlot({ id: data.id, lesson_day: str(fd, "lesson_day"), lesson_time: str(fd, "lesson_time") });
+  if (usual?.start_time) {
+    await supabase.from("lesson_slots").insert({
+      teacher_id: teacher.id,
+      student_id: data.id,
+      weekday: usual.weekday,
+      start_time: usual.start_time,
+      minutes: 30,
+    });
+  }
 
   // A failed photo upload doesn't stop the new student; it can be added later.
   await applyPhotoFromForm(supabase, teacher.id, data.id, fd);
