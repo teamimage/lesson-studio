@@ -32,6 +32,12 @@ import { loadSchedule } from "@/lib/schedule-data";
 import { CraftLine } from "@/components/craft-line";
 import { CraftSection } from "@/components/craft-section";
 import { type TodayRow, loadTodayRow } from "@/lib/v3-data";
+import { WeekSwitcher } from "@/components/week-switcher";
+
+// How far Earlier / Later reach. Every week in range is sent with the page,
+// so switching weeks happens on the phone with no wait.
+const WEEKS_BACK = 8;
+const WEEKS_AHEAD = 8;
 
 type SP = Promise<{ w?: string }>;
 
@@ -95,16 +101,21 @@ async function Body({ searchParams }: { searchParams: SP }) {
     );
   }
 
-  const offset = Math.max(-8, Math.min(8, Math.round(Number(w) || 0)));
-  const monday = addDays(weekStart(today), offset * 7);
-  const sunday = addDays(monday, 6);
+  const offset = Math.max(-WEEKS_BACK, Math.min(WEEKS_AHEAD, Math.round(Number(w) || 0)));
+  const thisMonday = weekStart(today);
+  const firstMonday = addDays(thisMonday, -WEEKS_BACK * 7);
   const [schedule, rows] = await Promise.all([
-    loadSchedule(active, monday < today ? monday : today),
+    loadSchedule(active, firstMonday),
     Promise.all(active.map((s) => loadTodayRow(s, today))),
   ]);
   const rowOf = new Map(rows.map((r) => [r.student.id, r]));
 
-  const week = occurrencesBetween(schedule.slots, schedule.changes, monday, sunday);
+  const allWeeks = occurrencesBetween(
+    schedule.slots,
+    schedule.changes,
+    firstMonday,
+    addDays(thisMonday, WEEKS_AHEAD * 7 + 6),
+  );
   const ahead = occurrencesBetween(schedule.slots, schedule.changes, today, addDays(today, 21));
   const todays = ahead.filter((o) => o.date === today);
   const now = nowMinutes();
@@ -214,46 +225,28 @@ async function Body({ searchParams }: { searchParams: SP }) {
         </section>
       </div>
 
-      {/* The week */}
-      <section>
-        <SectionTitle
-          action={
-            <span className="flex items-center gap-1 text-sm">
-              <WeekLink offset={offset - 1}>‹ Earlier</WeekLink>
-              {offset !== 0 && <WeekLink offset={0}>This week</WeekLink>}
-              <WeekLink offset={offset + 1}>Later ›</WeekLink>
-            </span>
-          }
-        >
-          {offset === 0 ? "This week" : `Week of ${formatDate(monday)}`}
-        </SectionTitle>
-        <div className="flex flex-col divide-y divide-rule rounded-2xl border border-rule bg-sheet">
-          {Array.from({ length: 7 }, (_, i) => addDays(monday, i)).map((d) => {
-            const list = week.filter((o) => o.date === d);
-            return (
-              <div
-                key={d}
-                id={d === today ? "today" : undefined}
-                className={cx("grid gap-2 px-3 py-2.5 sm:grid-cols-[120px_1fr]", d === today && "bg-accent-soft/50")}
-              >
-                <div className={cx("pt-1 text-[15px]", d === today ? "font-semibold text-accent-ink" : "text-muted")}>
-                  {parseISODate(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                  {d === today && " · today"}
-                </div>
-                {list.length === 0 ? (
-                  <div className="pt-1 text-[15px] text-muted/70">—</div>
-                ) : (
-                  <ul className="flex flex-col gap-1.5">
-                    {list.map((o) => (
-                      <OccurrenceRow key={o.key} occ={o} row={rowOf.get(o.studentId)} today={today} canChange={schedule.ready} />
-                    ))}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      {/* The week: every week in range is rendered here; the switcher shows one. */}
+      <WeekSwitcher
+        initial={offset}
+        weeks={Array.from({ length: WEEKS_BACK + WEEKS_AHEAD + 1 }, (_, i) => {
+          const o = i - WEEKS_BACK;
+          const monday = addDays(thisMonday, o * 7);
+          const sunday = addDays(monday, 6);
+          return {
+            offset: o,
+            title: o === 0 ? "This week" : `Week of ${formatDate(monday)}`,
+            body: (
+              <WeekDays
+                monday={monday}
+                week={allWeeks.filter((x) => x.date >= monday && x.date <= sunday)}
+                rowOf={rowOf}
+                today={today}
+                canChange={schedule.ready}
+              />
+            ),
+          };
+        })}
+      />
 
       {/* Practice since the last lesson */}
       <section>
@@ -590,11 +583,46 @@ function MinutesSelect({ value = 30 }: { value?: number }) {
   );
 }
 
-function WeekLink({ offset, children }: { offset: number; children: React.ReactNode }) {
+function WeekDays({
+  monday,
+  week,
+  rowOf,
+  today,
+  canChange,
+}: {
+  monday: string;
+  week: Occurrence[];
+  rowOf: Map<string, TodayRow>;
+  today: string;
+  canChange: boolean;
+}) {
   return (
-    <Link href={offset === 0 ? "/downbeat" : `/downbeat?w=${offset}`} className="rounded-full px-2.5 py-1 font-medium text-accent-ink no-underline hover:bg-accent-soft">
-      {children}
-    </Link>
+    <div className="flex flex-col divide-y divide-rule rounded-2xl border border-rule bg-sheet">
+      {Array.from({ length: 7 }, (_, i) => addDays(monday, i)).map((d) => {
+        const list = week.filter((o) => o.date === d);
+        return (
+          <div
+            key={d}
+            id={d === today ? "today" : undefined}
+            className={cx("grid gap-2 px-3 py-2.5 sm:grid-cols-[120px_1fr]", d === today && "bg-accent-soft/50")}
+          >
+            <div className={cx("pt-1 text-[15px]", d === today ? "font-semibold text-accent-ink" : "text-muted")}>
+              {parseISODate(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+              {d === today && " · today"}
+            </div>
+            {list.length === 0 ? (
+              <div className="pt-1 text-[15px] text-muted/70">—</div>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {list.map((o) => (
+                  <OccurrenceRow key={o.key} occ={o} row={rowOf.get(o.studentId)} today={today} canChange={canChange} />
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
