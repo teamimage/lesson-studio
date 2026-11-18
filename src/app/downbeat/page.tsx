@@ -153,13 +153,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
       )}
 
       {/* Up next */}
-      {upNext ? (
-        <UpNext row={upNext.row} occ={upNext.occ} today={today} now={now} />
-      ) : (
-        <Card className="text-[16px]">
-          No lessons in the next three weeks. Add lesson times under <b>Lesson times</b> below.
-        </Card>
-      )}
+      {upNext && <UpNext row={upNext.row} occ={upNext.occ} today={today} now={now} />}
 
       <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
         {/* Today */}
