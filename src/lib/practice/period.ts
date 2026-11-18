@@ -10,7 +10,7 @@ import { DraftError } from "@/lib/ai/draft-lesson";
 import { MissingKeyError } from "@/lib/ai/assemblyai";
 import { claudeCost, type ClaudeUsage } from "@/lib/ai/pricing";
 import type { PracticeAnalysis, PeriodReview } from "./review-types";
-import type { PracticeSessionView } from "./data";
+import { mergedPartsOf, type PracticeSessionView } from "./data";
 import { handTicked } from "./hand-ticks";
 import { scaleLine } from "./scales";
 import { INTONATION_VERSION, tendencyText, verdictText } from "./intonation";
@@ -211,6 +211,9 @@ export async function getPeriod(studentId: string, day: string, today = todayISO
   const sessions: PracticeSessionView[] = periodSess.map((s) => ({
     ...s,
     activity: null,
+    // The original recordings of a joined session are only needed to split it back.
+    merged_from: null,
+    mergedParts: mergedPartsOf(s.merged_from),
     review: (s.analysis as PracticeAnalysis | null) ?? null,
     titles,
     handTicked: handTicked(

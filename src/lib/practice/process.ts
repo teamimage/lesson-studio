@@ -230,6 +230,11 @@ export async function retry(id: string): Promise<PracticeState | null> {
   return review(db, claimed);
 }
 
+/** Writes the review for a session that is already marked "analyzing" (used by merge.ts). */
+export async function reviewSession(db: Db, s: PracticeSession): Promise<PracticeState> {
+  return review(db, s);
+}
+
 async function review(db: Db, s: PracticeSession): Promise<PracticeState> {
   let usage: ClaudeUsage[] = [];
   let analysis: PracticeAnalysis;
@@ -528,6 +533,7 @@ async function contextFor(db: Db, s: PracticeSession) {
     durationSeconds: s.duration_seconds,
     playingSeconds: s.playing_seconds,
     withHelper: !!s.with_helper,
+    joinedAt: joinedAt(s),
     activity: activityText(activity),
     transcript: s.transcript ?? "",
     scales,
@@ -574,6 +580,12 @@ async function doneOffRecording(db: Db, s: PracticeSession): Promise<string[]> {
   ]);
   const own = new Set(heardIds(s.analysis as PracticeAnalysis | null));
   return handTicked(log?.completed_assignment_ids, others ?? []).filter((id) => !own.has(id));
+}
+
+/** Where each later recording starts on a merged session's timeline. */
+function joinedAt(s: PracticeSession): string[] {
+  const m = s.merged_from as { parts?: { offset?: number }[] } | null;
+  return (m?.parts ?? []).slice(1).map((p) => clock(p.offset ?? 0));
 }
 
 /** The code's matches against the uploaded music, as lines for Claude. */
