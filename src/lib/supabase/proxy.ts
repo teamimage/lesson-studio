@@ -6,7 +6,7 @@ import { ADMIN_COOKIE, ROLE_COOKIE, familyMayOpen, parseAdminCookie, parseRoleCo
 // itself to carry on a background job: it brings the user's access token and
 // checks it there, since it has no cookies.
 // /join/ is the family invite page, which shows who invited them before they sign in.
-const PUBLIC_PATHS = ["/login", "/auth", "/api/jobs/", "/join/"];
+const PUBLIC_PATHS = ["/login", "/auth", "/api/jobs/", "/join/", "/api/calendar/feed/"];
 
 // Refreshes the Supabase session cookie on every request and sends
 // signed-out visitors to /login.

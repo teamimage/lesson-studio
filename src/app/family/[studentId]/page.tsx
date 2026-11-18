@@ -27,6 +27,7 @@ import {
   practiceTone,
 } from "@/lib/data";
 import {
+  addDays,
   capitalize,
   formatDate,
   todayISO,
@@ -50,6 +51,10 @@ import { Fold } from "@/components/fold";
 import { StoreView } from "@/components/store-view";
 import { storeForStudent } from "@/lib/store-data";
 import { layoutOf } from "@/lib/store";
+import { FamilyLessons } from "@/components/family-lessons";
+import { feedLinks, getMyFeed, siteOrigin } from "@/lib/calendar-feeds";
+import { loadSchedule, scheduleBetween } from "@/lib/schedule-data";
+import { formatTime, makeupsOwed, nextOccurrence } from "@/lib/schedule";
 
 type Params = Promise<{ studentId: string }>;
 type SP = Promise<{ date?: string; saved?: string; error?: string; welcome?: string }>;
@@ -137,6 +142,13 @@ async function Body({
   const ownTeacher =
     !!viewer.teacher && viewer.teacher.id === student.teacher_id;
   const isTeacher = ownTeacher;
+  // Lessons from the schedule (Settings → Lesson times), the same one Intro and Today read.
+  const lessonSchedule = await loadSchedule([student], today).catch(() => null);
+  const comingLessons = lessonSchedule ? scheduleBetween(lessonSchedule, today, addDays(today, 42)) : [];
+  const nextLessonOcc = nextOccurrence(comingLessons, today);
+  const owedMakeups = lessonSchedule ? makeupsOwed(lessonSchedule.changes, student.id).length : 0;
+  const myFeed = isTeacher ? null : await getMyFeed("family");
+  const myFeedLinks = myFeed?.token ? feedLinks(await siteOrigin(), myFeed.token) : null;
   const firstName = student.name.split(" ")[0];
   // The last 30 logs cover every day back to the oldest of them, so the day
   // arrows switch instantly inside that stretch.
@@ -242,6 +254,13 @@ async function Body({
             />
           )}
 
+          <FamilyLessons
+            lessons={comingLessons.slice(0, 5)}
+            today={today}
+            makeupsOwed={owedMakeups}
+            calendar={isTeacher ? null : { links: myFeedLinks, ready: !!myFeed?.ready, back: `/family/${studentId}` }}
+          />
+
           <WorkingOnCard data={workingOn} studentId={studentId} />
 
           {plan && (
@@ -334,11 +353,18 @@ async function Body({
                     <span className="italic">“{plan.parent_message}”</span>
                   </Row>
                 )}
-                {plan.next_lesson_date && (
+                {nextLessonOcc ? (
                   <Row label="Next lesson">
-                    {formatDate(plan.next_lesson_date, "weekday")}
-                    {student.lesson_time ? `, ${student.lesson_time}` : ""}
+                    {formatDate(nextLessonOcc.date, "weekday")}
+                    {nextLessonOcc.time ? `, ${formatTime(nextLessonOcc.time)}` : ""}
                   </Row>
+                ) : (
+                  plan.next_lesson_date && (
+                    <Row label="Next lesson">
+                      {formatDate(plan.next_lesson_date, "weekday")}
+                      {student.lesson_time ? `, ${student.lesson_time}` : ""}
+                    </Row>
+                  )
                 )}
               </Card>
             </>

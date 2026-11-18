@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { InstrumentBookFields } from "@/components/instrument-book-fields";
 import { PhotoField } from "@/components/photo-field";
@@ -33,14 +34,28 @@ export function StudentForm({
           <Input name="method" defaultValue={student?.method ?? "Suzuki"} />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Lesson day">
-          <Input name="lesson_day" defaultValue={student?.lesson_day ?? ""} placeholder="Tuesday" />
-        </Field>
-        <Field label="Lesson time">
-          <Input name="lesson_time" defaultValue={student?.lesson_time ?? ""} placeholder="4:30 PM" />
-        </Field>
-      </div>
+      {student ? (
+        <>
+          {/* Lesson times live in Settings → Lesson times now; keep the old fields as they were. */}
+          <input type="hidden" name="lesson_day" value={student.lesson_day ?? ""} />
+          <input type="hidden" name="lesson_time" value={student.lesson_time ?? ""} />
+          <p className="text-[15px] text-muted">
+            Lesson day and time:{" "}
+            <Link href="/settings/lesson-times" className="font-medium text-accent-ink">
+              Settings → Lesson times ›
+            </Link>
+          </p>
+        </>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Lesson day">
+            <Input name="lesson_day" placeholder="Tuesday" />
+          </Field>
+          <Field label="Lesson time">
+            <Input name="lesson_time" placeholder="4:30 PM" />
+          </Field>
+        </div>
+      )}
       <Field label="Goals" hint="Shown to the parent.">
         <Textarea name="goals" defaultValue={student?.goals ?? ""} rows={2} />
       </Field>

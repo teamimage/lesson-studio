@@ -20,6 +20,18 @@ import { listDraftLessons, listStudents, practiceSpanLabel, practiceTone } from 
 import { capitalize, formatDate, relativeDay, todayISO } from "@/lib/format";
 import { listPracticeDays } from "@/lib/practice/data";
 import { type TodayRow, lessonMinutes, loadTodayRow } from "@/lib/v3-data";
+import { loadUpcoming } from "@/lib/schedule-data";
+import { formatTime } from "@/lib/schedule";
+
+/** The next lesson's time as text: scheduled, else the old Lesson time field. */
+function lessonTimeText(r: TodayRow): string | null {
+  return r.next?.time ? formatTime(r.next.time) : r.student.lesson_time;
+}
+
+/** Minutes after midnight of the row's lesson today (scheduled time, else the old Lesson time field). */
+function rowMinutes(r: TodayRow, today: string): number {
+  return r.next?.date === today && r.next.time ? lessonMinutes(r.next.time) : lessonMinutes(r.student.lesson_time);
+}
 
 type SP = Promise<{ mode?: string }>;
 
@@ -63,10 +75,9 @@ async function Body({ searchParams }: { searchParams: SP }) {
       </EmptyState>
     );
   }
-  const rows = await Promise.all(active.map((s) => loadTodayRow(s, today)));
-  const todays = rows
-    .filter((r) => r.isToday)
-    .sort((a, b) => lessonMinutes(a.student.lesson_time) - lessonMinutes(b.student.lesson_time));
+  const upcoming = await loadUpcoming(active, today);
+  const rows = await Promise.all(active.map((s) => loadTodayRow(s, today, upcoming.get(s.id))));
+  const todays = rows.filter((r) => r.isToday).sort((a, b) => rowMinutes(a, today) - rowMinutes(b, today));
   const mode = asked === "lesson" || asked === "between" ? asked : todays.length > 0 ? "lesson" : "between";
 
   return (
@@ -156,7 +167,7 @@ async function LessonDay({
             <div className="min-w-0 flex-1">
               <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-accent-ink">
                 {next.hadLessonToday ? "Today's lesson" : "Up next"}
-                {s.lesson_time ? ` · ${s.lesson_time}` : ""}
+                {lessonTimeText(next) ? ` · ${lessonTimeText(next)}` : ""}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Link href={`/v3/students/${s.id}`} className="font-display text-[28px] font-semibold leading-tight text-ink no-underline">
@@ -276,7 +287,7 @@ async function LessonDay({
                     {r.hadLessonToday && <Pill tone="sage">done</Pill>}
                   </span>
                 }
-                meta={[r.student.lesson_time, r.consent === "signed" ? "" : "consent needed"].filter(Boolean).join(" · ")}
+                meta={[lessonTimeText(r), r.consent === "signed" ? "" : "consent needed"].filter(Boolean).join(" · ")}
               >
                 {r.consent === "signed" ? (
                   <form action={startLesson}>
@@ -329,7 +340,7 @@ function Between({
   const notYet = rows.filter((r) => r.week.daysPracticed === 0);
   const coming = rows
     .filter((r) => r.next)
-    .sort((a, b) => a.next!.date.localeCompare(b.next!.date) || lessonMinutes(a.student.lesson_time) - lessonMinutes(b.student.lesson_time));
+    .sort((a, b) => a.next!.date.localeCompare(b.next!.date) || lessonMinutes(a.next!.time ?? a.student.lesson_time) - lessonMinutes(b.next!.time ?? b.student.lesson_time));
 
   return (
     <div className="flex flex-col gap-6">
@@ -394,7 +405,7 @@ function Between({
               <Link key={r.student.id} href={`/v3/students/${r.student.id}`} className="flex items-center gap-3 px-4 py-3">
                 <span className="w-32 shrink-0 font-semibold">
                   {capitalize(relativeDay(r.next!.date, today))}
-                  {r.student.lesson_time && <span className="block text-sm font-normal text-muted">{r.student.lesson_time}</span>}
+                  {lessonTimeText(r) && <span className="block text-sm font-normal text-muted">{lessonTimeText(r)}</span>}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[17px]">{r.student.name}</span>
                 {r.consent !== "signed" && <Pill tone="danger">consent needed</Pill>}

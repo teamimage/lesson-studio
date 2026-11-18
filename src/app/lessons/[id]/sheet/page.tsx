@@ -5,6 +5,8 @@ import { LessonSheet } from "@/components/lesson-sheet";
 import { PrintButton } from "@/components/print-button";
 import { getViewer } from "@/lib/auth";
 import { getLesson, getStudent, getTeacherForStudent } from "@/lib/data";
+import { todayISO } from "@/lib/format";
+import { nextScheduledLesson } from "@/lib/schedule-data";
 
 type Params = Promise<{ id: string }>;
 
@@ -24,7 +26,10 @@ async function Body({ params }: { params: Params }) {
   if (!lesson) notFound();
   const student = await getStudent(lesson.student_id);
   if (!student) notFound();
-  const teacher = await getTeacherForStudent(student);
+  const [teacher, next] = await Promise.all([
+    getTeacherForStudent(student),
+    nextScheduledLesson(student, todayISO(), lesson.lesson_date),
+  ]);
   const isTeacher = !!viewer.teacher && viewer.teacher.id === student.teacher_id;
   const backHref = isTeacher ? `/lessons/${id}` : `/family/${student.id}`;
 
@@ -42,7 +47,12 @@ async function Body({ params }: { params: Params }) {
         </div>
       </div>
 
-      <LessonSheet lesson={lesson} student={student} teacher={teacher} />
+      <LessonSheet
+        lesson={lesson}
+        student={student}
+        teacher={teacher}
+        next={next ? { date: next.date, time: next.time } : null}
+      />
     </div>
   );
 }
