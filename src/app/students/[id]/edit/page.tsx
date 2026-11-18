@@ -8,6 +8,17 @@ import { getStudent, listParentsForStudent } from "@/lib/data";
 import { addParent, removeParent, updateStudent } from "../../actions";
 import { getStudentOverview } from "@/lib/overview/data";
 import { ContactDetailsForm } from "@/components/student-overview-parts";
+import { createClient } from "@/lib/supabase/server";
+
+/** The length of the student's current regular lesson, else 30. */
+async function usualMinutes(studentId: string): Promise<number> {
+  const { data } = await (await createClient())
+    .from("lesson_slots")
+    .select("minutes, ends_on")
+    .eq("student_id", studentId)
+    .order("created_at", { ascending: false });
+  return (data ?? []).find((s) => !s.ends_on || s.ends_on >= new Date().toISOString().slice(0, 10))?.minutes ?? 30;
+}
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ error?: string }>;
@@ -34,7 +45,13 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
         {error === "save" && <Notice tone="danger">Something went wrong saving. Try again.</Notice>}
         {error === "photo" && <Notice tone="danger">The details were saved, but the photo didn&apos;t upload. Try it again.</Notice>}
         {error === "parent" && <Notice tone="danger">A parent needs an email address.</Notice>}
-        <StudentForm student={student} action={updateStudent} submitLabel="Save changes" />
+        <StudentForm
+          student={student}
+          action={updateStudent}
+          submitLabel="Save changes"
+          lengthReady={"lesson_minutes" in student}
+          defaultMinutes={await usualMinutes(student.id)}
+        />
 
         <section>
           <SectionTitle>Parents</SectionTitle>

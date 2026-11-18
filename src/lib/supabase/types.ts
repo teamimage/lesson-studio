@@ -1291,6 +1291,7 @@ export type Database = {
           instrument: string;
           lesson_day: string | null;
           lesson_time: string | null;
+          lesson_minutes?: number | null;
           method: string;
           name: string;
           notes: string | null;
@@ -1309,6 +1310,7 @@ export type Database = {
           instrument: string;
           lesson_day?: string | null;
           lesson_time?: string | null;
+          lesson_minutes?: number | null;
           method?: string;
           name: string;
           notes?: string | null;
@@ -1327,6 +1329,7 @@ export type Database = {
           instrument?: string;
           lesson_day?: string | null;
           lesson_time?: string | null;
+          lesson_minutes?: number | null;
           method?: string;
           name?: string;
           notes?: string | null;

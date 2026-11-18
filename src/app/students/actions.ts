@@ -28,6 +28,12 @@ function studentFields(fd: FormData) {
   };
 }
 
+/** The usual lesson length from the form, when it was sent (student-lesson-length.sql). */
+function lessonMinutes(fd: FormData): number | null {
+  const n = Math.round(Number(str(fd, "lesson_minutes")));
+  return Number.isFinite(n) && n >= 5 && n <= 240 ? n : null;
+}
+
 export async function createStudent(fd: FormData) {
   const { teacher } = await requireTeacher();
   const supabase = await createClient();
@@ -47,9 +53,11 @@ export async function createStudent(fd: FormData) {
       student_id: data.id,
       weekday: usual.weekday,
       start_time: usual.start_time,
-      minutes: 30,
+      minutes: lessonMinutes(fd) ?? 30,
     });
   }
+  const length = lessonMinutes(fd);
+  if (length) await supabase.from("students").update({ lesson_minutes: length }).eq("id", data.id);
 
   // A failed photo upload doesn't stop the new student; it can be added later.
   await applyPhotoFromForm(supabase, teacher.id, data.id, fd);
@@ -71,6 +79,8 @@ export async function updateStudent(fd: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.from("students").update(studentFields(fd)).eq("id", id);
   if (error) redirect(`/students/${id}/edit?error=save`);
+  const length = lessonMinutes(fd);
+  if (length) await supabase.from("students").update({ lesson_minutes: length }).eq("id", id);
   if (!(await applyPhotoFromForm(supabase, teacher.id, id, fd))) redirect(`/students/${id}/edit?error=photo`);
   revalidatePath("/");
   revalidatePath(`/students/${id}`);

@@ -34,6 +34,7 @@ function done(fd?: FormData) {
   revalidatePath("/downbeat");
   revalidatePath("/settings/lesson-times");
   revalidatePath("/v3");
+  revalidatePath("/calendar");
   const next = fd ? str(fd, "next") : "";
   // Only our own pages.
   if (next.startsWith("/") && !next.startsWith("//")) redirect(next);
@@ -185,6 +186,42 @@ export async function addExtraLesson(fd: FormData) {
     minutes: minutes(fd),
     ...(makeupFor ? { makeup_for: makeupFor } : {}),
   });
+  done(fd);
+}
+
+/**
+ * Add lesson (from a calendar): one student, a date, a time and a length
+ * (the student's usual length unless changed). Just this once makes a
+ * one-off; Every week starts a regular lesson on that weekday from that date.
+ */
+export async function addLesson(fd: FormData) {
+  const { teacher } = await requireTeacher();
+  const studentId = str(fd, "student_id");
+  const onDate = date(fd, "on_date");
+  const start = time(fd, "start_time");
+  if (!studentId || !onDate || !start) return;
+  const supabase = await createClient();
+  const repeat = str(fd, "repeat");
+  if (repeat === "weekly" || repeat === "every2") {
+    await supabase.from("lesson_slots").insert({
+      teacher_id: teacher.id,
+      student_id: studentId,
+      weekday: new Date(`${onDate}T12:00:00`).getDay(),
+      start_time: start,
+      minutes: minutes(fd),
+      starts_on: onDate,
+      ...(repeat === "every2" ? { every_weeks: 2 } : {}),
+    });
+  } else {
+    await supabase.from("lesson_slot_changes").insert({
+      teacher_id: teacher.id,
+      student_id: studentId,
+      kind: "extra",
+      on_date: onDate,
+      new_time: start,
+      minutes: minutes(fd),
+    });
+  }
   done(fd);
 }
 
