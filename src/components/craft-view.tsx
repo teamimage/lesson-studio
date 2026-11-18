@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Button, SectionTitle } from "@/components/ui";
 import { CraftCheckin } from "@/components/craft-checkin";
 import { CraftSources as Sources } from "@/components/craft-sources";
@@ -140,34 +141,37 @@ export function Programs({ running, ready }: { running: string | null; ready: bo
       <p className="m-0 mb-3 text-sm text-muted">
         Seven days, one habit. A two-minute read and one thing to try each day, measured from your recorded lessons.
       </p>
-      <ul className="m-0 flex list-none flex-col divide-y divide-rule p-0">
-        {PROGRAMS.map((p) => (
-          <li key={p.slug} className="flex items-center gap-3 py-3">
-            <div className="min-w-0 flex-1">
-              <div className="font-semibold">{p.name}</div>
-              <div className="text-sm text-muted">{p.line}</div>
+      <FirstThenMore
+        items={[...PROGRAMS]
+          .sort((a, b) => Number(b.slug === running) - Number(a.slug === running))
+          .map((p) => (
+            <div key={p.slug} className="flex items-center gap-3 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold">{p.name}</div>
+                <div className="text-sm text-muted">{p.line}</div>
+              </div>
+              {running === p.slug ? (
+                <span className="shrink-0 text-sm text-accent-ink">Running</span>
+              ) : (
+                ready && (
+                  <form action={startProgram} className="shrink-0">
+                    <input type="hidden" name="program" value={p.slug} />
+                    <Button type="submit" variant={running ? "secondary" : "primary"}>
+                      {running ? "Switch" : "Start"}
+                    </Button>
+                  </form>
+                )
+              )}
             </div>
-            {running === p.slug ? (
-              <span className="shrink-0 text-sm text-accent-ink">Running</span>
-            ) : (
-              ready && (
-                <form action={startProgram} className="shrink-0">
-                  <input type="hidden" name="program" value={p.slug} />
-                  <Button type="submit" variant={running ? "secondary" : "primary"}>
-                    {running ? "Switch" : "Start"}
-                  </Button>
-                </form>
-              )
-            )}
-          </li>
-        ))}
-      </ul>
+          ))}
+        noun="program"
+      />
     </section>
   );
 }
 
-export function Numbers({ lessons }: { lessons: HabitLesson[] }) {
-  const shown = lessons.slice(0, 8);
+export function Numbers({ lessons, limit = 8 }: { lessons: HabitLesson[]; limit?: number }) {
+  const shown = lessons.slice(0, limit);
   return (
     <section>
       <SectionTitle>Your lessons in numbers</SectionTitle>
@@ -225,19 +229,39 @@ export function Reading() {
   return (
     <section>
       <SectionTitle>Reading</SectionTitle>
-      <ul className="m-0 flex list-none flex-col divide-y divide-rule p-0">
-        {ARTICLES.map((a) => (
-          <li key={a.slug} className="py-3">
-            <Link href={`/craft/read/${a.slug}`} className="block text-ink no-underline">
-              <div className="font-semibold">{a.title}</div>
-              <div className="text-sm text-muted">
-                {INSTRUMENT_LABEL[a.instrument]} · {a.minutes} min · {a.summary}
-              </div>
-            </Link>
-          </li>
+      <FirstThenMore
+        items={ARTICLES.map((a) => (
+          <Link key={a.slug} href={`/craft/read/${a.slug}`} className="block py-3 text-ink no-underline">
+            <div className="font-semibold">{a.title}</div>
+            <div className="text-sm text-muted">
+              {INSTRUMENT_LABEL[a.instrument]} · {a.minutes} min · {a.summary}
+            </div>
+          </Link>
         ))}
-      </ul>
+        noun="article"
+      />
     </section>
+  );
+}
+
+// The first item, then one "Show N more" that opens the rest in place.
+function FirstThenMore({ items, noun }: { items: ReactNode[]; noun: string }) {
+  const [first, ...rest] = items;
+  return (
+    <div className="flex flex-col">
+      {first}
+      {rest.length > 0 && (
+        <details className="group">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center border-t border-rule text-sm font-medium text-accent-ink [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">
+              Show {rest.length} more {rest.length === 1 ? noun : `${noun}s`}
+            </span>
+            <span className="hidden group-open:inline">Show less</span>
+          </summary>
+          <div className="flex flex-col divide-y divide-rule border-t border-rule">{rest}</div>
+        </details>
+      )}
+    </div>
   );
 }
 
