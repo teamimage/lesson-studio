@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
 import { ConfirmSubmit } from "./confirm-submit";
 import { InviteLink } from "./invite-link";
 import { LocalDateTime } from "./local-time";
@@ -32,7 +34,14 @@ export async function FamilyAccess({
   /** Page to come back to after an invite action (default: the student page). */
   returnTo?: string;
 }) {
-  const [{ invites, setup }, origin] = await Promise.all([listFamilyInvites(student.id), siteOrigin()]);
+  const familyId = (student as { family_id?: string | null }).family_id ?? null;
+  const [{ invites, setup }, origin, family] = await Promise.all([
+    listFamilyInvites(student.id),
+    siteOrigin(),
+    familyId
+      ? createClient().then((sb) => sb.from("families").select("id, name").eq("id", familyId).maybeSingle())
+      : Promise.resolve({ data: null }),
+  ]);
   const firstName = student.name.split(" ")[0] || student.name;
   const teacherName = teacher.name || teacher.studio_name || "your teacher";
   const open = invites.filter((i) => inviteState(i) === "pending");
@@ -43,6 +52,9 @@ export async function FamilyAccess({
   return (
     <div id="family-access" className="flex scroll-mt-28 flex-col gap-3">
       <div className="text-[12px] font-semibold uppercase tracking-[0.1em] text-accent-ink">Family sign-in</div>
+      <Link href={family.data ? `/families/${family.data.id}` : "/families"} className="self-start text-[16px] text-accent-ink underline">
+        {family.data ? `${family.data.name}: parents, guardians and their invites ›` : "Families: parents, guardians and their invites ›"}
+      </Link>
       {notice && <Notice tone={notice.tone}>{notice.text}</Notice>}
       {!setup && !notice && <Notice tone="amber">{MESSAGES.setup.text}</Notice>}
 

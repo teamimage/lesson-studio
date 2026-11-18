@@ -87,18 +87,29 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   );
 
   if (signedIn) {
+    // The teacher opening their own invite (to try the parent side) would
+    // link their teacher account instead of making a separate parent login.
+    const { data: role } = await supabase.rpc("my_role");
+    const isTeacher = role === "teacher";
     return (
       <Frame title={`Join ${child}'s practice page`}>
         {intro}
         {error && <Notice tone="danger">{error}</Notice>}
+        {isTeacher && (
+          <Notice tone="amber">
+            You&apos;re signed in as a teacher ({email}). To see the app as this parent, sign out first (or open this link
+            in a private window) and join with the parent&apos;s own email. Joining here adds the children to your teacher
+            account instead.
+          </Notice>
+        )}
         <form action={acceptInvite} className="flex flex-col gap-3">
           <input type="hidden" name="token" value={token} />
           <label htmlFor="name" className="text-sm font-semibold">
             Your name
           </label>
           <Input id="name" name="name" autoComplete="name" placeholder="e.g. Maaike Kahn" />
-          <Button type="submit" variant="plum">
-            Join as {child}&apos;s family
+          <Button type="submit" variant={isTeacher ? "secondary" : "plum"}>
+            {isTeacher ? "Join with my teacher account anyway" : <>Join as {child}&apos;s family</>}
           </Button>
         </form>
         <form action={signOut} className="text-sm text-muted">

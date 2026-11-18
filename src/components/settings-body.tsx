@@ -73,6 +73,10 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
       )}
 
       {viewer.teacher && (
+        <RowLink href="/families" title="Families" hint="Parents and guardians, what they see, and their invites" />
+      )}
+
+      {viewer.teacher && (
         <Fold id="messages" title="Messages" meta="signature, reply address">
           <MessageSettings teacher={viewer.teacher} />
         </Fold>
