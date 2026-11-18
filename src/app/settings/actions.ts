@@ -49,8 +49,8 @@ export async function updateReviewTone(fd: FormData) {
     .from("teachers")
     .update({ review_tone: toneOf(fd.get("review_tone")) })
     .eq("id", teacher.id);
-  revalidatePath("/settings");
-  redirect(error ? "/settings?assistant=setup#assistant" : "/settings?assistant=saved#assistant");
+  revalidatePath("/settings/teaching");
+  redirect(error ? "/settings/teaching?assistant=setup#assistant" : "/settings/teaching?assistant=saved#assistant");
 }
 
 // Hand edits to the teaching profile, from the assistant page.

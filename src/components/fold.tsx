@@ -18,8 +18,8 @@ export function Fold({
   return (
     <details id={id} open={open} className="group scroll-mt-28 rounded-2xl border border-rule bg-sheet/60">
       <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-2 [&::-webkit-details-marker]:hidden">
-        <span className="font-display text-[19px] font-semibold">{title}</span>
-        {meta && <span className="text-sm text-muted">{meta}</span>}
+        <span className="shrink-0 font-display text-[19px] font-semibold">{title}</span>
+        {meta && <span className="min-w-0 truncate text-sm text-muted">{meta}</span>}
         <span aria-hidden className="ml-auto text-xl text-muted transition-transform group-open:rotate-90">
           ›
         </span>

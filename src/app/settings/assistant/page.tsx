@@ -50,7 +50,7 @@ async function Body({ searchParams }: { searchParams: SP }) {
   const current = sets.find((l) => l.id === profile.level && !l.complete)?.id;
 
   return (
-    <Shell title="Teaching assistant" back={{ href: "/settings#assistant", label: "Settings" }} tab="settings">
+    <Shell title="Teaching assistant" back={{ href: "/settings/teaching#assistant", label: "Teacher settings" }} tab="settings">
       <div className="flex flex-col gap-8">
         {error ? (
           <Notice tone="danger">

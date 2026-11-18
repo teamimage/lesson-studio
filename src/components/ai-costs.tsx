@@ -1,6 +1,7 @@
 import "server-only";
 import Link from "next/link";
-import { Card, SectionTitle } from "@/components/ui";
+import { SectionTitle } from "@/components/ui";
+import { Fold } from "@/components/fold";
 import { getUsageSummary } from "@/lib/ai/usage";
 import { formatUsd } from "@/lib/ai/pricing";
 import { formatDate } from "@/lib/format";
@@ -19,8 +20,8 @@ export async function AiCosts({ teacherId, title = "AI costs", admin = false }: 
   return (
     <section className="scroll-mt-6">
       <SectionTitle>{title}</SectionTitle>
-      <Card className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3 px-1">
           <div>
             <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">This month</div>
             <div className="font-display text-2xl">{formatUsd(usage.thisMonthUsd)}</div>
@@ -35,7 +36,7 @@ export async function AiCosts({ teacherId, title = "AI costs", admin = false }: 
             Nothing yet. Costs show up here after a lesson video is processed, sheet music is read or a practice session is reviewed.
           </p>
         ) : (
-          <>
+          <Fold title="All costs" meta="by month and by item">
             <div>
               <div className="mb-1 text-sm font-semibold">By month</div>
               <ul className="divide-y divide-rule text-sm">
@@ -89,9 +90,9 @@ export async function AiCosts({ teacherId, title = "AI costs", admin = false }: 
                 ))}
               </ul>
             </div>
-          </>
+          </Fold>
         )}
-      </Card>
+      </div>
     </section>
   );
 }
