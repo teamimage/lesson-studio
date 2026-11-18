@@ -195,9 +195,15 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
             practised {week.daysPracticed} of {week.days.length} days {practiceSpanLabel(week)}
           </Pill>
           {drafts.length > 0 && (
-            <Pill tone="amber">
-              {drafts.length} draft{drafts.length === 1 ? "" : "s"} to approve
-            </Pill>
+            // One draft opens that lesson; several open the full history, where each is marked Draft.
+            <Link
+              href={drafts.length === 1 ? `/v3/lessons/${drafts[0].id}` : `/v3/students/${id}/history`}
+              className="rounded-full focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <Pill tone="amber" className="underline decoration-1 underline-offset-2 hover:brightness-95">
+                {drafts.length} draft{drafts.length === 1 ? "" : "s"} to approve ›
+              </Pill>
+            </Link>
           )}
           {consent.state !== "signed" && <Pill tone="danger">consent needed</Pill>}
         </div>
