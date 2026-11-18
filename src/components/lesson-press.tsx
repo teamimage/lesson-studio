@@ -31,10 +31,12 @@ export function LessonPress({ lesson, children, className }: { lesson: PressLess
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const start = useRef<{ x: number; y: number } | null>(null);
   const fired = useRef(false);
+  const openedAt = useRef(0);
   const dialog = useRef<HTMLDialogElement>(null);
 
   function show() {
     fired.current = true;
+    openedAt.current = Date.now();
     setSure(false);
     setOpen(true);
     requestAnimationFrame(() => dialog.current?.showModal());
@@ -54,6 +56,7 @@ export function LessonPress({ lesson, children, className }: { lesson: PressLess
   return (
     <>
       <div
+        data-lesson
         className={cx("select-none [-webkit-touch-callout:none]", className)}
         onPointerDown={(e) => {
           fired.current = false;
@@ -87,7 +90,8 @@ export function LessonPress({ lesson, children, className }: { lesson: PressLess
           ref={dialog}
           onClose={() => setOpen(false)}
           onClick={(e) => {
-            if (e.target === dialog.current) close();
+            // Lifting the finger after the long press lands a click here; keep the menu open.
+            if (e.target === dialog.current && Date.now() - openedAt.current > 700) close();
           }}
           className="m-0 mt-auto w-full max-w-none rounded-t-2xl bg-paper p-0 text-ink backdrop:bg-black/40 sm:m-auto sm:max-w-sm sm:rounded-2xl"
         >

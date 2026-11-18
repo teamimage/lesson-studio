@@ -33,6 +33,7 @@ import { WeekSwitcher } from "@/components/week-switcher";
 import { IntroCalendar } from "@/components/intro-calendar";
 import { MonthGrid, addLessonHref, pressOf } from "@/components/calendar-views";
 import { LessonPress } from "@/components/lesson-press";
+import { PressToAdd } from "@/components/press-to-add";
 import { monthOf } from "@/lib/practice/month";
 import { createClient } from "@/lib/supabase/server";
 
@@ -489,8 +490,9 @@ function WeekDays({
       {Array.from({ length: 7 }, (_, i) => addDays(monday, i)).map((d) => {
         const list = week.filter((o) => o.date === d);
         return (
-          <div
+          <PressToAdd
             key={d}
+            date={d}
             id={d === today ? "today" : undefined}
             className={cx("grid gap-2 px-3 py-2.5 sm:grid-cols-[120px_1fr]", d === today && "bg-accent-soft/50")}
           >
@@ -507,7 +509,7 @@ function WeekDays({
                 ))}
               </ul>
             )}
-          </div>
+          </PressToAdd>
         );
       })}
     </div>
