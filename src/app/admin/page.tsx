@@ -4,7 +4,7 @@ import { AdminBody, type AdminSP } from "@/components/admin-body";
 
 export default function AdminPage({ searchParams }: { searchParams: AdminSP }) {
   return (
-    <Shell title="Admin" eyebrow="All accounts" back={{ href: "/settings", label: "Settings" }} wide>
+    <Shell v3Tab="admin" title="Admin" eyebrow="Running the app" wide>
       <Suspense>
         <AdminBody searchParams={searchParams} />
       </Suspense>

@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { ROLE_COOKIE, familyMayOpen, parseRoleCookie, type Role } from "@/lib/role";
+import { ADMIN_COOKIE, ROLE_COOKIE, familyMayOpen, parseAdminCookie, parseRoleCookie, type Role } from "@/lib/role";
 
 // Paths that don't need a signed-in user. /api/jobs/ is the server calling
 // itself to carry on a background job: it brings the user's access token and
@@ -66,6 +66,23 @@ export async function updateSession(request: NextRequest) {
     }
     if (role) {
       response.cookies.set(ROLE_COOKIE, `${role}.${userId}`, {
+        path: "/",
+        maxAge: 31536000,
+        sameSite: "lax",
+      });
+    }
+  }
+
+  // App admin? Also asked once per sign-in; it only shows the Admin tab.
+  if (role && pageLoad) {
+    const savedAdmin = parseAdminCookie(request.cookies.get(ADMIN_COOKIE)?.value);
+    if (!savedAdmin || savedAdmin.userId !== userId) {
+      let admin = false;
+      if (role === "teacher") {
+        const { data: isAdmin, error } = await supabase.rpc("is_app_admin");
+        admin = !error && isAdmin === true;
+      }
+      response.cookies.set(ADMIN_COOKIE, `${admin ? 1 : 0}.${userId}`, {
         path: "/",
         maxAge: 31536000,
         sameSite: "lax",

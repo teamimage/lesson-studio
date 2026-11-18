@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
-import { ROLE_COOKIE } from "@/lib/role";
+import { ADMIN_COOKIE, ROLE_COOKIE } from "@/lib/role";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createMailerClient } from "@/lib/supabase/mailer";
@@ -75,5 +75,6 @@ export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   (await cookies()).delete(ROLE_COOKIE);
+  (await cookies()).delete(ADMIN_COOKIE);
   redirect("/login");
 }

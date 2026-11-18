@@ -1,10 +1,10 @@
 import { Suspense } from "react";
 import { getViewer } from "@/lib/auth";
 
-// Version 3: the teacher's first name in the header, which opens Setup.
+// Version 3: the teacher's first name in the header, which opens Settings.
 export function Me() {
   return (
-    <Suspense fallback="Setup">
+    <Suspense fallback="Settings">
       <Name />
     </Suspense>
   );
@@ -12,5 +12,5 @@ export function Me() {
 
 async function Name() {
   const viewer = await getViewer();
-  return viewer.teacher?.name?.trim().split(/\s+/)[0] || "Setup";
+  return viewer.teacher?.name?.trim().split(/\s+/)[0] || "Settings";
 }

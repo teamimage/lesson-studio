@@ -13,7 +13,7 @@ type SP = Promise<{ saved?: string; deleted?: string; error?: string }>;
 
 export default function AdminLessonPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
-    <Suspense fallback={<Shell title="Lesson" back={{ href: "/admin", label: "All teachers" }} wide>{null}</Shell>}>
+    <Suspense fallback={<Shell v3Tab="admin" title="Lesson" back={{ href: "/admin", label: "All teachers" }} wide>{null}</Shell>}>
       <Body params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -38,7 +38,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const tasks = [...(lesson.assignments ?? [])].sort((a, b) => a.sort_order - b.sort_order);
 
   return (
-    <Shell
+    <Shell v3Tab="admin"
       title={formatDate(lesson.lesson_date, "long")}
       eyebrow={`Lesson · ${studentName}`}
       back={{ href: studentHref, label: studentName }}

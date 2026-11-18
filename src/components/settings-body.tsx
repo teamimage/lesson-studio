@@ -9,7 +9,6 @@ import Link from "next/link";
 import { signOut } from "@/app/login/actions";
 import { setPassword, updateReviewTone, updateTeacher } from "@/app/settings/actions";
 import { updateMessageSettings } from "@/app/students/overview-actions";
-import { channelReady } from "@/lib/overview/send";
 import { STANDARD_LABELS, SYSTEM_LABELS, parseGrading } from "@/lib/grading";
 import {
   PROFILE_SECTIONS,
@@ -22,9 +21,6 @@ import {
   toneOf,
 } from "@/lib/assistant/profile";
 import type { Json, Tables } from "@/lib/supabase/types";
-import { getUsageSummary } from "@/lib/ai/usage";
-import { formatUsd } from "@/lib/ai/pricing";
-import { formatDate } from "@/lib/format";
 
 const PASSWORD_NOTICES: Record<string, { tone: "sage" | "danger" | "plum"; text: string }> = {
   saved: { tone: "sage", text: "Password saved. Next time, sign in with your email and this password." },
@@ -89,8 +85,6 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
       {viewer.teacher && <TeachingAssistant teacher={viewer.teacher} notice={assistant} />}
       {viewer.teacher && <Grading teacher={viewer.teacher} />}
 
-      {viewer.teacher && <AiCosts teacherId={viewer.teacher.id} />}
-
       {!viewer.teacher && viewer.parentRows.length > 0 && <ParentPins />}
       <section>
         <SectionTitle>Account</SectionTitle>
@@ -136,95 +130,6 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
         </Card>
       </section>
     </div>
-  );
-}
-
-function monthLabel(ym: string): string {
-  const [y, m] = ym.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
-}
-
-// Running totals of what the AI has cost: lesson videos (transcription +
-// Claude) and reading uploaded sheet music.
-async function AiCosts({ teacherId }: { teacherId: string }) {
-  const usage = await getUsageSummary(teacherId);
-  return (
-    <section id="ai-costs" className="scroll-mt-6">
-      <SectionTitle>AI costs</SectionTitle>
-      <Card className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">This month</div>
-            <div className="font-display text-2xl">{formatUsd(usage.thisMonthUsd)}</div>
-          </div>
-          <div>
-            <div className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">All time</div>
-            <div className="font-display text-2xl">{formatUsd(usage.allTimeUsd)}</div>
-          </div>
-        </div>
-        {usage.lessons.length === 0 ? (
-          <p className="text-sm text-muted">
-            Nothing yet. Costs show up here after a lesson video is processed, sheet music is read or a practice session is reviewed.
-          </p>
-        ) : (
-          <>
-            <div>
-              <div className="mb-1 text-sm font-semibold">By month</div>
-              <ul className="divide-y divide-rule text-sm">
-                {usage.months.map((m) => (
-                  <li key={m.month} className="flex justify-between py-1.5">
-                    <span>{monthLabel(m.month)}</span>
-                    <span className="tabular-nums">{formatUsd(m.costUsd)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <div className="mb-1 text-sm font-semibold">By lesson, music and practice</div>
-              <ul className="divide-y divide-rule text-sm">
-                {usage.lessons.slice(0, 30).map((l) => (
-                  <li
-                    key={l.key}
-                    className="flex items-baseline justify-between gap-3 py-1.5"
-                  >
-                    <span className="min-w-0">
-                      {l.assistant ? (
-                        <span className="font-medium">Teaching assistant</span>
-                      ) : l.practice ? (
-                        <span className="font-medium">
-                          Practice reviews{l.studentName ? `: ${l.studentName}` : " (deleted sessions)"}
-                        </span>
-                      ) : l.music ? (
-                        l.scoreTitle ? (
-                          <span className="font-medium">
-                            Sheet music: {l.scoreTitle}
-                            {l.studentName ? ` (${l.studentName})` : ""}
-                          </span>
-                        ) : (
-                          <span className="text-muted">Deleted sheet music</span>
-                        )
-                      ) : l.lessonId ? (
-                        <Link href={`/lessons/${l.lessonId}`} className="font-medium text-accent-ink">
-                          {l.studentName ?? "Lesson"}
-                          {l.lessonDate ? `, ${formatDate(l.lessonDate)}` : ""}
-                        </Link>
-                      ) : (
-                        <span className="text-muted">Deleted lessons</span>
-                      )}
-                      <span className="block text-xs text-muted">
-                        {l.audioMinutes > 0 ? `${Math.round(l.audioMinutes)} min transcribed ${formatUsd(l.transcriptionUsd)} · ` : ""}
-                        Claude {formatUsd(l.claudeUsd)}
-                      </span>
-                    </span>
-                    <span className="tabular-nums">{formatUsd(l.costUsd)}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </>
-        )}
-      </Card>
-    </section>
   );
 }
 
@@ -336,19 +241,12 @@ async function ParentPins() {
 /** Settings, Messages: how emails and texts from the Contact buttons go out. */
 function MessageSettings({ teacher }: { teacher: Tables<"teachers"> }) {
   const t = teacher as Tables<"teachers"> & { message_signature?: string | null; message_reply_to?: string | null };
-  const ready = channelReady();
-  const ready_ = (on: boolean) => (on ? <span className="text-sage">set up</span> : <span className="text-amber">not set up yet</span>);
   return (
     <section>
       <SectionTitle>Messages</SectionTitle>
       <p className="mb-3 text-sm text-muted">
         Emails and texts sent from a student&apos;s Contact buttons go out from the app and are kept in that student&apos;s communication history.
       </p>
-      <ul className="mb-3 flex flex-col gap-0.5 text-[16px]">
-        <li>Email: {ready_(ready.email)}</li>
-        <li>Text: {ready_(ready.text)}</li>
-        <li>Push notifications: <span className="text-muted">come with the installed app</span></li>
-      </ul>
       {t.message_signature === undefined ? (
         <Notice tone="amber">Run student-overview.sql in Supabase to set a signature and reply address.</Notice>
       ) : (

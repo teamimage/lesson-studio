@@ -16,7 +16,7 @@ type SP = Promise<{ saved?: string; deleted?: string; error?: string }>;
 
 export default function AdminTeacherPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
-    <Suspense fallback={<Shell title="Teacher" back={{ href: "/admin", label: "All teachers" }} wide>{null}</Shell>}>
+    <Suspense fallback={<Shell v3Tab="admin" title="Teacher" back={{ href: "/admin", label: "All teachers" }} wide>{null}</Shell>}>
       <Body params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -40,7 +40,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const studentName = new Map((students ?? []).map((s) => [s.id, s.name]));
 
   return (
-    <Shell
+    <Shell v3Tab="admin"
       title={teacher.name || "No name yet"}
       eyebrow={`Teacher · ${email}`}
       back={{ href: "/admin", label: "All teachers" }}

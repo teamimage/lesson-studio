@@ -20,6 +20,22 @@ export function parseRoleCookie(v: string | undefined | null): { role: Role; use
   return { role, userId: v.slice(dot + 1) };
 }
 
+/**
+ * App admins (app_admins table) get the Admin tab. Kept as "<1|0>.<user id>"
+ * the same way as the role cookie. It only shows or hides the tab: every
+ * /admin page and action checks is_app_admin() itself.
+ */
+export const ADMIN_COOKIE = "ls_admin";
+
+export function parseAdminCookie(v: string | undefined | null): { admin: boolean; userId: string } | null {
+  if (!v) return null;
+  const dot = v.indexOf(".");
+  if (dot < 0) return null;
+  const flag = v.slice(0, dot);
+  if (flag !== "1" && flag !== "0") return null;
+  return { admin: flag === "1", userId: v.slice(dot + 1) };
+}
+
 export const INVITE_TOKEN = /^[0-9a-f]{64}$/;
 
 /**
@@ -38,6 +54,7 @@ export function familyMayOpen(pathname: string): boolean {
 }
 
 // Runs in <head> with the version script: marks <html data-role="family">
-// for family accounts so the header shows only the family tabs. Families
+// for family accounts so the header shows only the family tabs, and
+// data-admin="1" for app admins so the header shows the Admin tab. Families
 // always get the standard (Proposed) look; the version dropdown is teacher-only.
-export const ROLE_BOOT_SCRIPT = `try{var r=document.cookie.match(/(?:^|; )${ROLE_COOKIE}=([^;.]+)/);var f=r&&r[1]==="family";document.documentElement.dataset.role=f?"family":"teacher";if(f)document.documentElement.dataset.ui="proposed"}catch(e){}`;
+export const ROLE_BOOT_SCRIPT = `try{var r=document.cookie.match(/(?:^|; )${ROLE_COOKIE}=([^;.]+)/);var f=r&&r[1]==="family";document.documentElement.dataset.role=f?"family":"teacher";if(f)document.documentElement.dataset.ui="proposed";var a=document.cookie.match(/(?:^|; )${ADMIN_COOKIE}=([^;.]+)/);document.documentElement.dataset.admin=!f&&a&&a[1]==="1"?"1":"0"}catch(e){}`;

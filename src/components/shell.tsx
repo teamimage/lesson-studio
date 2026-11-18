@@ -2,10 +2,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cx } from "./ui";
 import { VersionSwitch } from "./version-switch";
+import { TabScroll } from "./tab-scroll";
 
 type Tab = "downbeat" | "studio" | "desk" | "family" | "settings";
 /** Version 3 sections. Family is a mode picked from the header, not a tab. */
-export type V3Tab = "downbeat" | "today" | "students" | "family" | "setup";
+export type V3Tab = "downbeat" | "today" | "students" | "family" | "setup" | "admin";
 const V3_OF: Record<Tab, V3Tab> = { downbeat: "downbeat", desk: "today", studio: "students", family: "family", settings: "setup" };
 
 // Page frame: header with the back link (or app name) top left, page actions
@@ -21,7 +22,6 @@ export function Shell({
   children,
   wide,
   v3Tab,
-  me,
   large,
 }: {
   title: ReactNode;
@@ -35,7 +35,7 @@ export function Shell({
   wide?: boolean;
   /** Version 3 section to light up (defaults from `tab`). */
   v3Tab?: V3Tab;
-  /** Version 3: the teacher's name, shown top right as the way into Setup. */
+  /** No longer shown: the top-right button always reads "Settings" (Nov 18). Kept so pages still compile. */
   me?: ReactNode;
   /** Bigger type for the whole page (version 3 Family mode). */
   large?: boolean;
@@ -82,12 +82,14 @@ export function Shell({
                 )}
               >
                 <span aria-hidden>⚙</span>
-                <span className="truncate">{me ?? "Setup"}</span>
+                <span className="truncate">Settings</span>
               </Link>
             </div>
           </div>
           {/* Version 3: Today and Students on the left, Teacher / Family
-              mode switch on the right. Family mode drops the teacher tabs. */}
+              mode switch on the right, then Admin for app admins only
+              (data-admin from the ls_admin cookie). Family mode drops the
+              teacher tabs and Admin. */}
           <nav aria-label="Sections" className="-mx-1 hidden items-center gap-1 overflow-x-auto pb-1.5 pt-0.5 v3:flex">
             {!familyMode && (
               <>
@@ -102,7 +104,7 @@ export function Shell({
                 href="/v3"
                 aria-current={!familyMode ? "true" : undefined}
                 className={cx(
-                  "flex min-h-10 items-center rounded-full px-3.5 text-[15px] font-semibold",
+                  "flex min-h-10 items-center rounded-full px-3 text-[15px] font-semibold sm:px-3.5",
                   !familyMode ? "bg-accent text-white" : "text-muted",
                 )}
               >
@@ -112,13 +114,29 @@ export function Shell({
                 href="/v3/family"
                 aria-current={familyMode ? "true" : undefined}
                 className={cx(
-                  "flex min-h-10 items-center rounded-full px-3.5 text-[15px] font-semibold",
+                  "flex min-h-10 items-center rounded-full px-3 text-[15px] font-semibold sm:px-3.5",
                   familyMode ? "bg-plum text-white" : "text-muted",
                 )}
               >
                 Family
               </Link>
             </div>
+            {!familyMode && (
+              <Link
+                href="/admin"
+                aria-current={v3 === "admin" ? "page" : undefined}
+                className={cx(
+                  "hidden min-h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 text-[16px] font-medium text-muted hover:text-ink admin:flex",
+                  v3 === "admin" && "bg-accent-soft font-semibold text-accent-ink",
+                )}
+              >
+                <span className="hidden text-base leading-none sm:inline" aria-hidden>
+                  ⚑
+                </span>
+                Admin
+              </Link>
+            )}
+            <TabScroll />
           </nav>
           {/* Family accounts: only their side of the app. */}
           <nav aria-label="Sections" className="-mx-1 hidden gap-1 overflow-x-auto pb-1.5 pt-0.5 family:flex sm:justify-center">
@@ -210,11 +228,11 @@ function V3TabLink({ href, on, label, icon }: { href: string; on: boolean; label
       href={href}
       aria-current={on ? "page" : undefined}
       className={cx(
-        "flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[16px] font-medium text-muted hover:text-ink",
+        "flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[16px] font-medium text-muted hover:text-ink sm:px-4",
         on && "bg-accent-soft font-semibold text-accent-ink",
       )}
     >
-      <span className="text-base leading-none" aria-hidden>
+      <span className="hidden text-base leading-none sm:inline" aria-hidden>
         {icon}
       </span>
       {label}

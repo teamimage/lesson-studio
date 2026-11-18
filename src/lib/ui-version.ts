@@ -30,7 +30,7 @@ const ID = "[0-9a-fA-F-]{8,}";
  */
 export function v3PathFor(pathname: string): string | null {
   if (pathname === "/" || pathname === "/teacher") return "/v3";
-  if (pathname === "/settings" || pathname === "/admin") return "/v3/setup";
+  if (pathname === "/settings") return "/v3/setup";
   if (pathname === "/family") return "/v3/family";
   let m = pathname.match(new RegExp(`^/(?:students|teacher)/(${ID})$`));
   if (m) return `/v3/students/${m[1]}`;

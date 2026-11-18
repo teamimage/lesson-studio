@@ -17,7 +17,7 @@ type SP = Promise<{ saved?: string; deleted?: string; error?: string }>;
 
 export default function AdminStudentPage({ params, searchParams }: { params: Params; searchParams: SP }) {
   return (
-    <Suspense fallback={<Shell title="Student" back={{ href: "/admin", label: "All teachers" }} wide>{null}</Shell>}>
+    <Suspense fallback={<Shell v3Tab="admin" title="Student" back={{ href: "/admin", label: "All teachers" }} wide>{null}</Shell>}>
       <Body params={params} searchParams={searchParams} />
     </Suspense>
   );
@@ -51,7 +51,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const scores = scoreRes.data ?? [];
 
   return (
-    <Shell
+    <Shell v3Tab="admin"
       title={
         <span className="flex items-center gap-3">
           <Avatar name={student.name} instrument={student.instrument} photoSrc={studentPhotoSrc(student)} />
