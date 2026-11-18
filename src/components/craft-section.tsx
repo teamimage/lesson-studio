@@ -23,8 +23,8 @@ export async function CraftSection({ teacherId }: { teacherId: string }) {
       )}
       {run && measure && <Running run={run} measure={measure} />}
       <Programs running={run?.program.slug ?? null} ready={ready} />
-      <Numbers lessons={lessons} />
       <Reading />
+      <Numbers lessons={lessons} />
     </section>
   );
 }
