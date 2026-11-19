@@ -1,3 +1,4 @@
+import { TimeZoneSelect } from "@/components/time-zone-select";
 import { listStudents } from "@/lib/data";
 import { PracticePinSetting } from "@/components/practice-pin-setting";
 import { practicePinSet } from "@/lib/practice-pin";
@@ -58,7 +59,7 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
         </Link>
       )}
       {viewer.teacher && (
-        <Fold id="studio" title="You and your studio" meta="names" open={!!saved}>
+        <Fold id="studio" title="You and your studio" meta={"time_zone" in viewer.teacher ? "names, time zone" : "names"} open={!!saved}>
           {saved && <Notice tone="sage">Saved.</Notice>}
           <form action={updateTeacher} className="flex flex-col gap-4">
             <Field label="Your name" hint="Appears on lesson sheets, e.g. “Ms. Ana”.">
@@ -67,6 +68,11 @@ export async function SettingsBody({ searchParams, adminLink = true }: { searchP
             <Field label="Studio name">
               <Input name="studio_name" defaultValue={viewer.teacher.studio_name} placeholder="Home Studio" />
             </Field>
+            {"time_zone" in viewer.teacher && (
+              <Field label="Time zone" hint="Your calendar links (Google, Outlook, Apple) show lessons in this time zone.">
+                <TimeZoneSelect value={viewer.teacher.time_zone || "America/New_York"} />
+              </Field>
+            )}
             <Button>Save</Button>
           </form>
         </Fold>
