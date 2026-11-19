@@ -1,4 +1,5 @@
 import { Button, Input, Select } from "@/components/ui";
+import { TimePicker } from "@/components/time-picker";
 import {
   addClosure,
   addExtraLesson,
@@ -93,7 +94,7 @@ export function LessonTimes({
             ))}
           </Select>
           <Input type="date" name="on_date" aria-label="Date" defaultValue={today} required />
-          <Input type="time" name="start_time" aria-label="Start time" required />
+          <TimePicker name="start_time" label="Start time" required />
           <MinutesSelect />
           {foundation && owedAll.length > 0 && (
             <Select name="makeup_for" aria-label="Make-up for" defaultValue="" className="sm:col-span-3">
@@ -230,7 +231,7 @@ function SlotList({ studentId, slots, today, foundation }: { studentId: string; 
                   <Input type="date" name="from" defaultValue={today} min={today} required />
                 </label>
                 <DaySelect value={slot.weekday} />
-                <Input type="time" name="start_time" aria-label="Start time" defaultValue={slot.start_time?.slice(0, 5) ?? ""} required />
+                <TimePicker name="start_time" label="Start time" defaultValue={slot.start_time?.slice(0, 5) ?? ""} required />
                 <MinutesSelect value={slot.minutes} />
                 {foundation && <EverySelect value={slot.every_weeks ?? 1} />}
                 <Button variant="secondary" className="sm:col-span-4 sm:justify-self-start">
@@ -261,7 +262,7 @@ function AddSlotForm({ student, today, foundation }: { student: Student; today: 
       <input type="hidden" name="student_id" value={student.id} />
       <input type="hidden" name="next" value={BACK} />
       <DaySelect value={fallbackSlot(student)?.weekday ?? 1} />
-      <Input type="time" name="start_time" aria-label="Start time" required />
+      <TimePicker name="start_time" label="Start time" required />
       <MinutesSelect />
       {foundation && <EverySelect value={1} />}
       {foundation && (

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { Shell } from "@/components/shell";
 import { Button, Input, Pill, Select, cx } from "@/components/ui";
 import { MinutesSelect } from "@/components/lesson-times";
+import { TimePicker } from "@/components/time-picker";
 import { startLesson } from "@/app/lessons/live-actions";
 import { changeLesson, moveExtraLesson, undoChange } from "@/app/downbeat/actions";
 import { requireTeacher } from "@/lib/auth";
@@ -147,7 +148,7 @@ async function Body({ params }: { params: Params }) {
               <input type="hidden" name="change_id" value={occ.changeId ?? ""} />
               <input type="hidden" name="next" value={here} />
               <Input type="date" name="on_date" aria-label="New date" defaultValue={occ.date} required />
-              <Input type="time" name="start_time" aria-label="New time" defaultValue={occ.time ?? ""} required />
+              <TimePicker name="start_time" label="New time" defaultValue={occ.time ?? ""} required />
               <MinutesSelect value={occ.minutes} />
               <Button variant="secondary">Move</Button>
             </form>
@@ -155,7 +156,7 @@ async function Body({ params }: { params: Params }) {
             <form action={changeLesson} className="grid gap-2 sm:grid-cols-[1.3fr_1fr_1fr_auto]">
               <ChangeKeys occ={occ} kind="move" next={here} />
               <Input type="date" name="new_date" aria-label="New date" defaultValue={occ.date} required />
-              <Input type="time" name="new_time" aria-label="New time" defaultValue={occ.time ?? ""} required />
+              <TimePicker name="new_time" label="New time" defaultValue={occ.time ?? ""} required />
               <MinutesSelect value={occ.minutes} />
               <Button variant="secondary">Move</Button>
             </form>
