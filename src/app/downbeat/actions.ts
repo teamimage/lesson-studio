@@ -7,6 +7,7 @@ import { listStudents } from "@/lib/data";
 import { addDays } from "@/lib/format";
 import { occurrencesBetween, type Slot, type SlotChange } from "@/lib/schedule";
 import { createClient } from "@/lib/supabase/server";
+import { validTimeZone } from "@/components/time-zone-select";
 
 // Schedule changes (Intro, Settings → Lesson times, a lesson's own schedule
 // page). Row-level security keeps every row to the teacher's own students;
@@ -298,19 +299,13 @@ export async function removeClosure(fd: FormData) {
 /** Time zone and how much notice a family cancellation needs to earn a make-up. */
 export async function saveScheduleSettings(fd: FormData) {
   const { teacher } = await requireTeacher();
-  const zone = str(fd, "time_zone");
-  let valid = true;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: zone });
-  } catch {
-    valid = false;
-  }
+  const zone = validTimeZone(str(fd, "time_zone"));
   const hours = Math.round(Number(str(fd, "makeup_notice_hours")));
   const supabase = await createClient();
   await supabase
     .from("teachers")
     .update({
-      ...(valid && zone ? { time_zone: zone } : {}),
+      ...(zone ? { time_zone: zone } : {}),
       ...(Number.isFinite(hours) && hours >= 0 && hours <= 336 ? { makeup_notice_hours: hours } : {}),
     })
     .eq("id", teacher.id);

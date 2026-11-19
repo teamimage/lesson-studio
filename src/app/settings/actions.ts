@@ -1,5 +1,6 @@
 "use server";
 
+import { validTimeZone } from "@/components/time-zone-select";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireTeacher } from "@/lib/auth";
@@ -15,10 +16,12 @@ export async function updateTeacher(fd: FormData) {
     .update({
       name: String(fd.get("name") ?? "").trim(),
       studio_name: String(fd.get("studio_name") ?? "").trim(),
+      ...(validTimeZone(String(fd.get("time_zone") ?? "")) ? { time_zone: String(fd.get("time_zone")) } : {}),
     })
     .eq("id", teacher.id);
   revalidatePath("/");
   revalidatePath("/settings");
+  revalidatePath("/settings/lesson-times");
   redirect("/settings?saved=1");
 }
 

@@ -1,5 +1,6 @@
 import { Button, Input, Select } from "@/components/ui";
 import { TimePicker } from "@/components/time-picker";
+import { TimeZoneSelect } from "@/components/time-zone-select";
 import {
   addClosure,
   addExtraLesson,
@@ -165,13 +166,7 @@ export function LessonTimes({
             <input type="hidden" name="next" value={BACK} />
             <label className="flex flex-col gap-1 text-sm text-muted">
               Your time zone
-              <Select name="time_zone" defaultValue={settings.timeZone}>
-                {timeZones(settings.timeZone).map((z) => (
-                  <option key={z} value={z}>
-                    {z.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </Select>
+              <TimeZoneSelect value={settings.timeZone} />
             </label>
             <label className="flex flex-col gap-1 text-sm text-muted">
               Notice for a make-up (hours)
@@ -191,17 +186,6 @@ export function LessonTimes({
 
 function H2({ children }: { children: React.ReactNode }) {
   return <h2 className="mb-1 font-display text-[21px] font-semibold">{children}</h2>;
-}
-
-function timeZones(current: string): string[] {
-  const common = ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu"];
-  let all: string[] = [];
-  try {
-    all = Intl.supportedValuesOf("timeZone");
-  } catch {
-    all = [];
-  }
-  return Array.from(new Set([current, ...common, ...all]));
 }
 
 function SlotList({ studentId, slots, today, foundation }: { studentId: string; slots: Slot[]; today: string; foundation: boolean }) {
