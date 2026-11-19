@@ -81,7 +81,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const [practiceDays, lessonDays, overview] = await Promise.all([
     listPracticeDays(id, ...monthSpan),
     listLessonMarks(id, ...monthSpan, today),
-    getStudentOverview(student, lessons),
+    getStudentOverview(student, lessons, music),
   ]);
   const first = student.name.split(" ")[0];
   const drafts = lessons.filter((l) => l.status === "draft");

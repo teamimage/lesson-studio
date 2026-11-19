@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui";
 import { InstrumentTag } from "@/components/instrument-tag";
 import { formatDate } from "@/lib/format";
@@ -123,20 +124,40 @@ export function StudentOverview({
               <h3 className="text-[15px] font-semibold">{g.label}</h3>
               <ul className="flex flex-col pl-3">
                 {g.items.map((r) => (
-                  <li key={r.title} className="flex items-baseline gap-2 py-0.5 text-[16px]">
-                    <span className="min-w-0 flex-1">{r.title}</span>
-                    <span className="shrink-0 text-[13px] text-muted">
-                      {[r.activity ? (ACTIVITY_WORD[r.activity] ?? r.activity) : null, r.lessons === 2 ? "both lessons" : r.latest ? null : "lesson before"]
-                        .filter(Boolean)
-                        .join(" · ")}
+                  <li key={r.title} className="flex flex-col py-0.5">
+                    <span className="flex items-baseline gap-2 text-[16px]">
+                      <span className="min-w-0 flex-1">
+                        {r.href ? (
+                          <Link href={r.href} className="underline decoration-rule decoration-2 underline-offset-4 hover:decoration-accent">
+                            {r.title}
+                          </Link>
+                        ) : (
+                          r.title
+                        )}
+                      </span>
+                      <span className="shrink-0 text-[13px] text-muted">
+                        {[r.activity ? (ACTIVITY_WORD[r.activity] ?? r.activity) : null, r.lessons === 2 ? "both lessons" : r.latest ? null : "lesson before"]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
                     </span>
+                    {r.spots.length > 0 && (
+                      <ul className="flex flex-col pl-3 text-[14px] text-muted">
+                        {r.spots.map((spot) => (
+                          <li key={spot}>{spot}</li>
+                        ))}
+                      </ul>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
           ))
         )}
-        <p className="text-[13px] text-muted">Everything played or assigned in the last two lessons.</p>
+        <p className="text-[13px] text-muted">
+          From the last two lessons.
+          {data.repertoire.some((g) => g.items.some((i) => i.href)) && " Underlined pieces open in the music library."}
+        </p>
       </Fold>
     </div>
   );
