@@ -20,6 +20,10 @@ export type RepertoireLine = {
   lessons: number;
   /** In the most recent lesson. */
   latest: boolean;
+  /** Pieces: the spots assigned in it ("m. 61: pedal"). */
+  spots: string[];
+  /** Pieces: opens it in the music library, when it's there. */
+  href: string | null;
 };
 
 export type RepertoireGroupKey = "pieces" | "scales" | "etudes" | "exercises" | "listening";
