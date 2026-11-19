@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { addLesson } from "@/app/downbeat/actions";
 import { Button, Field, Input, Select, cx } from "@/components/ui";
+import { TimePicker } from "@/components/time-picker";
 import { endTime, formatTime, toMinutes } from "@/lib/schedule";
 
 export type Pupil = { id: string; name: string; minutes: number };
@@ -73,7 +74,7 @@ export function AddLessonForm({
           <Input name="on_date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
         <Field label="Time">
-          <Input name="start_time" type="time" step={300} required value={time} onChange={(e) => setTime(e.target.value)} />
+          <TimePicker name="start_time" required value={time} onChange={setTime} />
         </Field>
       </div>
       <Field label="Length" hint={pupil ? `${pupil.name.split(" ")[0]}'s usual length is ${pupil.minutes} minutes.` : undefined}>
