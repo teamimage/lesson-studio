@@ -301,12 +301,15 @@ function DayList({
           <>
             <LessonNote upcoming={l.upcoming} />
             <span className="min-w-0">
-              <span className="block font-semibold">{l.upcoming ? "Lesson coming up" : "Lesson"}</span>
+              <span className="flex items-center gap-1.5 font-semibold">
+                {l.upcoming ? "Lesson coming up" : "Lesson"}
+                {l.pending && <PendingMark small />}
+              </span>
               <span className="block text-sm text-muted">
                 {[
                   l.time ? formatTime(l.time) : "",
                   l.minutes ? `${l.minutes} min` : "",
-                  l.status === "draft" ? "draft to approve" : l.status === "approved" ? "approved" : "",
+                  l.pending ? lessonPendingWords(l) : l.status === "approved" ? "approved" : "",
                 ]
                   .filter(Boolean)
                   .join(" · ") || (l.upcoming ? "from the schedule" : "")}
@@ -327,7 +330,7 @@ function DayList({
                 {go}
               </Link>
             ) : (
-              <div className={cx(row, "border-dashed border-rule")}>{body}</div>
+              <div className={cx(row, l.upcoming ? "border-dashed border-rule" : "border-accent/30 bg-accent-soft/60")}>{body}</div>
             )}
           </li>
         );
@@ -335,11 +338,18 @@ function DayList({
       {day && (
         <li>
           <Link href={practiceHref} className={cx(row, "border-sage/40 bg-sage-soft hover:border-sage")}>
-            {dayGrade ? <GradeBadge grade={dayGrade} small /> : <span className="h-5 w-5 shrink-0 rounded-full bg-sage" aria-hidden />}
+            {dayGrade ? (
+              <GradeBadge grade={dayGrade} small />
+            ) : day.pending ? (
+              <PendingMark stuck={day.pending === "stuck"} />
+            ) : (
+              <span className="h-5 w-5 shrink-0 rounded-full bg-sage" aria-hidden />
+            )}
             <span className="min-w-0">
-              <span className="block font-semibold">Practice{day.minutes ? `, ${day.minutes} min` : ""}</span>
+              <span className="block font-semibold">Practice{dayMinutes(day) ? `, ${dayMinutes(day)} min` : ""}</span>
               <span className="block text-sm text-muted">
                 {[
+                  practicePendingWords(day.pending),
                   day.sessions.length ? `${day.sessions.length} recorded` : "logged by hand",
                   day.ticked.length ? `${day.ticked.length} item${day.ticked.length === 1 ? "" : "s"} ticked` : "",
                   day.listened ? "listened" : "",
@@ -392,7 +402,15 @@ function DayList({
 function LessonRow({ lesson, teacherView }: { lesson: LessonMark; teacherView: boolean }) {
   const line = lesson.upcoming
     ? `Lesson scheduled${lesson.time ? ` at ${formatTime(lesson.time)}` : ""}${lesson.minutes ? `, ${lesson.minutes} min` : ""}.`
-    : `Lesson${lesson.minutes ? `, ${lesson.minutes} min` : ""}${lesson.status === "draft" ? " (write-up still a draft)" : ""}.`;
+    : `Lesson${lesson.minutes ? `, ${lesson.minutes} min` : ""}${
+        lesson.pending === "processing"
+          ? " (the video is being processed)"
+          : lesson.pending === "review"
+            ? teacherView && lesson.lessonId
+              ? " (write-up still a draft)"
+              : " (the write-up is on its way)"
+            : ""
+      }.`;
   return (
     <div className="flex items-center gap-3 rounded-xl border border-accent/40 bg-accent-soft px-3 py-2">
       <LessonNote upcoming={lesson.upcoming} />
@@ -423,6 +441,36 @@ export function LessonNote({ upcoming = false, small = false }: { upcoming?: boo
 }
 
 
+/**
+ * The mark for something finished that isn't done on record yet: a practice
+ * being uploaded or reviewed, or a lesson being processed or waiting for the
+ * teacher's approval ("…"); or an upload or review that didn't finish ("!").
+ */
+export function PendingMark({ stuck = false, small = false }: { stuck?: boolean; small?: boolean }) {
+  return (
+    <span
+      className={cx(
+        "inline-flex shrink-0 items-center justify-center rounded-full bg-amber font-bold leading-none text-white",
+        small ? "h-3.5 w-3.5 text-[9px]" : "h-5 w-5 text-[12px]",
+      )}
+      aria-hidden
+    >
+      {stuck ? "!" : "…"}
+    </span>
+  );
+}
+
+/** Words for a day's unfinished practice, for popups and day lists. */
+export function practicePendingWords(p: PracticeDay["pending"]): string {
+  return p === "stuck" ? "needs a look: the upload or review didn't finish" : p === "processing" ? "processing, review on its way" : "";
+}
+
+/** Words for a lesson that isn't approved yet. */
+export function lessonPendingWords(l: LessonMark, teacherView = true): string {
+  if (l.pending === "processing") return "processing the video";
+  if (l.pending === "review") return teacherView && l.lessonId ? "draft to approve" : "write-up on its way";
+  return "";
+}
 
 function GradeBadge({ grade, small }: { grade: string | null; small?: boolean }) {
   return (
@@ -453,6 +501,9 @@ function GradeBadgeRow({ grade, line, small }: { grade: string | null; line: Rea
 
 function gradeLine(s: DaySession): { grade: string | null; line: string } {
   const r = s.review;
+  if (s.pending === "stuck" && s.status === "uploading")
+    return { grade: null, line: "The recording didn't finish uploading. Open the day to delete it or record again." };
+  if (s.status === "uploading") return { grade: null, line: "Still sending the recording. The review and grade come after." };
   if (s.status === "transcribing" || s.status === "analyzing") return { grade: null, line: "Still listening back. The grade comes with the review." };
   if (s.status === "error") return { grade: null, line: "The review didn't finish, so there's no grade." };
   if (!r) return { grade: null, line: "No review yet." };
@@ -477,6 +528,8 @@ function DayTotals({ day }: { day: PracticeDay }) {
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap gap-1.5">
         {day.minutes > 0 && <Pill tone="sage">{day.minutes} min practiced</Pill>}
+        {!day.minutes && day.pendingMinutes > 0 && <Pill tone="sage">{day.pendingMinutes} min recorded</Pill>}
+        {day.pending && <Pill tone="amber">{day.pending === "stuck" ? "needs a look" : "processing"}</Pill>}
         {day.listened && <Pill tone="plum">listened</Pill>}
         {day.sessions.length > 1 && <Pill>{day.sessions.length} sessions</Pill>}
       </div>
@@ -536,4 +589,10 @@ function SessionBlock({
       {r && <PracticeReviewBody review={r} titles={titles} teacherView={teacherView} handTicked={handTicked} />}
     </section>
   );
+}
+
+/** Minutes for a day: the log's, or while the review is still coming, the recorded sessions'. */
+export function dayMinutes(day: PracticeDay | undefined): number {
+  if (!day) return 0;
+  return day.minutes || day.pendingMinutes;
 }

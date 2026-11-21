@@ -16,4 +16,12 @@ export type LessonMark = {
   videoMinutes?: number | null;
   /** From the schedule, not yet taught. */
   upcoming: boolean;
+  /**
+   * A lesson taught but not finished on record: "processing" while its video
+   * uploads or the write-up is being drafted, "review" while the draft waits
+   * for the teacher to approve it. Null once approved (and for upcoming ones).
+   */
+  pending?: LessonPending | null;
 };
+
+export type LessonPending = "processing" | "review";

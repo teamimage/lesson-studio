@@ -6,7 +6,9 @@ import type { PracticeDay } from "@/lib/practice/data";
 import { monthLabel, monthOf, monthWeeks, shiftMonth } from "@/lib/practice/month";
 import { type PracticeMonth, loadPracticeMonth } from "@/app/students/practice-month-actions";
 import type { LessonMark } from "@/lib/lesson-mark-types";
-import { LessonNote, PracticeDayCell } from "./practice-day-popup";
+import { LessonNote, PendingMark, PracticeDayCell, dayMinutes } from "./practice-day-popup";
+import { PendingPracticePoller } from "./pending-practice-poller";
+import { pendingSessionIds } from "@/lib/practice/pending-ids";
 import { addPracticeHref } from "./calendar-add";
 import { cx } from "./ui";
 
@@ -54,8 +56,10 @@ export function PracticeMonthCalendar({
   const [pending, startTransition] = useTransition();
   const touch = useRef<{ x: number; y: number } | null>(null);
 
-  const days = cache[month]?.days;
-  const lessonDays = cache[month]?.lessons;
+  // This month always comes from the page, so a refresh (a review finishing) shows at once.
+  const shown = month === thisMonth ? { days: initialDays, lessons: initialLessons } : cache[month];
+  const days = shown?.days;
+  const lessonDays = shown?.lessons;
   const canNext = month < lastMonth;
 
   function go(n: number) {
@@ -128,20 +132,25 @@ export function PracticeMonthCalendar({
           <span key={i}>{d}</span>
         ))}
       </div>
+      <PendingPracticePoller ids={pendingSessionIds(days)} />
       {failed && <p className="text-center text-xs text-danger">Couldn&rsquo;t load this month. Try the arrows again.</p>}
       <div className={cx("flex flex-col gap-1.5 transition-opacity", (pending || !days) && "opacity-50")}>
         {monthWeeks(month).map((week) => (
           <div key={week[0]} className="grid grid-cols-7 gap-1.5">
             {week.map((d) => {
               const day = days?.[d];
-              const minutes = day?.minutes ?? 0;
-              const did = !!day && (minutes > 0 || day.ticked.length > 0);
+              const minutes = dayMinutes(day);
+              // A finished practice still on its way to a review shows from the start, lightly.
+              const waiting = !!day?.pending && !day.minutes && day.ticked.length === 0;
+              const did = !!day && (minutes > 0 || day.ticked.length > 0 || !!day.pending);
               const short = did && minutes > 0 && minutes < 10;
               const sessions = day?.sessions.length ?? 0;
               const noRecording = !!day?.noRecording;
               const outside = monthOf(d) !== month;
               const lessons = lessonDays?.[d];
               const lesson = lessons?.[0];
+              const lessonPending = lessons?.some((l) => l.pending);
+              const pending = day?.pending ?? (lessonPending ? "processing" : null);
               return (
                 <PracticeDayCell
                   key={d}
@@ -153,10 +162,16 @@ export function PracticeMonthCalendar({
                   editHref={d <= today ? `/v3/students/${studentId}/practice/${d}${familyMode ? "?from=family" : ""}` : undefined}
                   addPracticeHref={eventLinks && d <= today ? addPracticeHref(studentId, d, familyMode) : undefined}
                   addLessonFor={eventLinks && canAddLesson && d <= today ? studentId : undefined}
-                  title={`${parseISODate(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${minutes ? ` · ${minutes} min` : ""}${day?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}${noRecording ? " · no recording" : ""}`}
+                  title={`${parseISODate(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${minutes ? ` · ${minutes} min` : ""}${day?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}${noRecording ? " · no recording" : ""}${pending ? (pending === "stuck" ? " · needs a look" : " · processing or waiting for review") : ""}`}
                   className={cx(
                     "relative flex h-11 flex-col items-center justify-center rounded-lg",
-                    did ? (short ? "bg-sage/40 text-ink" : "bg-sage text-white") : "bg-rule/50 text-muted",
+                    waiting
+                      ? "border border-dashed border-sage bg-sage-soft text-ink"
+                      : did
+                        ? short
+                          ? "bg-sage/40 text-ink"
+                          : "bg-sage text-white"
+                        : "bg-rule/50 text-muted",
                     d === today && "ring-2 ring-accent",
                     outside && "opacity-40",
                   )}
@@ -171,7 +186,11 @@ export function PracticeMonthCalendar({
                       <LessonNote small upcoming={lesson.upcoming} />
                     </span>
                   )}
-                  {noRecording ? (
+                  {pending ? (
+                    <span className="absolute -top-1 -right-1 flex rounded-full ring-2 ring-paper" aria-label={pending === "stuck" ? "needs a look" : "processing or waiting for review"}>
+                      <PendingMark small stuck={pending === "stuck"} />
+                    </span>
+                  ) : noRecording ? (
                     <span
                       className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger text-[9px] font-bold leading-none text-white ring-2 ring-paper"
                       aria-label="logged without a recording"
@@ -220,6 +239,12 @@ export function PracticeCalendarLegend() {
       <span className="flex items-center gap-1.5">
         <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white">!</span>
         Start/Stop logged, no recording
+      </span>
+      <span className="flex items-center gap-1.5">
+        <PendingMark small /> processing or waiting for review
+      </span>
+      <span className="flex items-center gap-1.5">
+        <PendingMark small stuck /> didn&rsquo;t finish, needs a look
       </span>
       <span className="flex items-center gap-1.5">
         <LessonNote small /> lesson
