@@ -79,7 +79,29 @@ export type DaySession = {
   recording_missing: boolean;
   /** "Practicing with someone else?" was ticked. */
   with_helper: boolean;
+  /** Where a finished practice still is on its way to a review; null once reviewed. */
+  pending: PracticePending | null;
 };
+
+/**
+ * A practice that has ended but isn't reviewed yet: "processing" while the
+ * recording uploads, is transcribed or is being reviewed; "stuck" when the
+ * upload or the review didn't finish and someone needs to look.
+ */
+export type PracticePending = "processing" | "stuck";
+
+/** Uploads still "uploading" after this long didn't finish (the phone left the page). */
+export const UPLOAD_STALE_MS = 30 * 60 * 1000;
+
+export function practicePending(
+  s: { status: string; created_at: string },
+  now = Date.now(),
+): PracticePending | null {
+  if (s.status === "transcribing" || s.status === "analyzing") return "processing";
+  if (s.status === "uploading") return now - Date.parse(s.created_at) > UPLOAD_STALE_MS ? "stuck" : "processing";
+  if (s.status === "error") return "stuck";
+  return null;
+}
 
 /** Everything the practice chart's popup shows for one day. */
 export type PracticeDay = {
@@ -96,6 +118,13 @@ export type PracticeDay = {
   titles: Record<string, string>;
   /** Ids ticked off that day by the family or teacher that no recording heard. */
   handTicked: string[];
+  /** Some practice that day has ended but isn't reviewed yet (the worst state wins). */
+  pending: PracticePending | null;
+  /**
+   * Minutes of those unreviewed sessions. The practice log gets its minutes
+   * when the review is written, so until then the calendar shows these.
+   */
+  pendingMinutes: number;
 };
 
 /**
@@ -133,7 +162,19 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
 
   const days: Record<string, PracticeDay> = {};
   const day = (date: string) =>
-    (days[date] ??= { date, minutes: 0, listened: false, ticked: [], parentNote: null, sessions: [], noRecording: false, titles, handTicked: [] });
+    (days[date] ??= {
+      date,
+      minutes: 0,
+      listened: false,
+      ticked: [],
+      parentNote: null,
+      sessions: [],
+      noRecording: false,
+      titles,
+      handTicked: [],
+      pending: null,
+      pendingMinutes: 0,
+    });
   for (const l of logs ?? []) {
     const d = day(l.practice_date);
     d.minutes = l.minutes ?? 0;
@@ -141,12 +182,20 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
     d.ticked = l.completed_assignment_ids.map((a) => titles[a]).filter((t): t is string => !!t);
     d.parentNote = l.parent_note?.trim() || null;
   }
+  const now = Date.now();
   for (const s of sessions) {
-    // Uploads that never finished have nothing to show.
-    if (s.status === "uploading") continue;
+    // Every practice shows from the moment Stop is pressed, also while its
+    // recording uploads and its review is written (or if either stalled).
     const missing = !!(s as { recording_missing?: boolean }).recording_missing;
-    if (missing) day(s.practice_date).noRecording = true;
-    day(s.practice_date).sessions.push({
+    const d = day(s.practice_date);
+    if (missing) d.noRecording = true;
+    const pending = practicePending(s, now);
+    if (pending) {
+      d.pending = d.pending === "stuck" || pending === "stuck" ? "stuck" : "processing";
+      // Minutes reach the log with the review (`applied`); count them here until then.
+      if (!s.applied) d.pendingMinutes += Math.round((s.duration_seconds ?? 0) / 60);
+    }
+    d.sessions.push({
       id: s.id,
       started_at: s.started_at,
       duration_seconds: s.duration_seconds,
@@ -157,6 +206,7 @@ export async function listPracticeDays(studentId: string, from: string, to: stri
       review: (s.analysis as PracticeAnalysis | null) ?? null,
       recording_missing: missing,
       with_helper: !!s.with_helper,
+      pending,
     });
   }
   for (const l of logs ?? []) {

@@ -13,7 +13,8 @@ import { heardOnDay } from "@/lib/practice/hand-ticks";
 import { practicePinSet } from "@/lib/practice-pin";
 import { getPracticeLog, getStudent } from "@/lib/data";
 import { capitalize, formatDate, relativeDay } from "@/lib/format";
-import { listPracticeSessions } from "@/lib/practice/data";
+import { listPracticeSessions, practicePending } from "@/lib/practice/data";
+import { PendingMark } from "@/components/practice-day-popup";
 import { createClient } from "@/lib/supabase/server";
 import { gradeMark, gradeName, gradingOfStudent } from "@/lib/grading";
 
@@ -77,6 +78,9 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const minutes = log?.minutes ?? Math.round(sessions.reduce((n, s) => n + (s.playing_seconds ?? 0), 0) / 60);
   const grades = sessions.map((s) => s.review?.grade).filter(Boolean);
   const nothing = !log && sessions.length === 0;
+  const states = sessions.map((s) => practicePending(s));
+  const processing = states.filter((p) => p === "processing").length;
+  const stuck = states.filter((p) => p === "stuck").length;
 
   return (
     <Shell
@@ -114,6 +118,29 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
               </Pill>
             )}
             {log?.listened && <Pill tone="plum">listened</Pill>}
+          </div>
+        )}
+        {(processing > 0 || stuck > 0) && (
+          <div className="flex flex-col gap-1.5 text-[16px]">
+            {processing > 0 && (
+              <p className="flex items-start gap-2">
+                <span className="mt-0.5"><PendingMark /></span>
+                <span>
+                  <span className="font-semibold">Processing.</span>{" "}
+                  {processing === sessions.length && sessions.length === 1 ? "This practice is" : `${processing} of the recorded sessions are`} being
+                  sent and listened back to. The review, grade and minutes appear here when it&rsquo;s done, usually within a few minutes.
+                </span>
+              </p>
+            )}
+            {stuck > 0 && (
+              <p className="flex items-start gap-2">
+                <span className="mt-0.5"><PendingMark stuck /></span>
+                <span>
+                  <span className="font-semibold">Needs a look.</span>{" "}
+                  {stuck === 1 ? "One recorded session" : `${stuck} recorded sessions`} didn&rsquo;t finish uploading or being reviewed. See below to try again or delete it.
+                </span>
+              </p>
+            )}
           </div>
         )}
         {nothing && <p className="text-[16px] text-muted">No practice on record for {first} this day yet.</p>}

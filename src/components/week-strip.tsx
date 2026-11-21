@@ -2,7 +2,9 @@ import type { PracticeWeek } from "@/lib/data";
 import type { PracticeDay } from "@/lib/practice/data";
 import { parseISODate, todayISO } from "@/lib/format";
 import type { LessonMark } from "@/lib/lesson-mark-types";
-import { LessonNote, PracticeDayCell } from "./practice-day-popup";
+import { LessonNote, PendingMark, PracticeDayCell } from "./practice-day-popup";
+import { PendingPracticePoller } from "./pending-practice-poller";
+import { pendingSessionIds } from "@/lib/practice/pending-ids";
 import { cx } from "./ui";
 
 // One circle per day, oldest first, with the weekday above and the date
@@ -31,6 +33,7 @@ export function WeekStrip({
   const today = todayISO();
   return (
     <div className="grid grid-cols-7 gap-1.5">
+      <PendingPracticePoller ids={pendingSessionIds(days)} />
       {week.days.map((day) => {
         const log = week.logs.find((l) => l.practice_date === day);
         const practiced = !!log && ((log.minutes ?? 0) > 0 || log.completed_assignment_ids.length > 0);
@@ -40,6 +43,9 @@ export function WeekStrip({
         const noRecording = !!days?.[day]?.noRecording;
         const lessonMarks = lessons?.[day];
         const lesson = lessonMarks?.[0];
+        // Finished but not reviewed (or a lesson not approved) yet: shown from the start, lightly.
+        const pending = days?.[day]?.pending ?? (lessonMarks?.some((l) => l.pending) ? "processing" : null);
+        const waiting = !practiced && !!days?.[day]?.pending;
         return (
           <div key={day} className="flex flex-col items-center gap-1">
             <span className="text-[11px] leading-none text-muted">{letter}</span>
@@ -49,20 +55,26 @@ export function WeekStrip({
               lessons={lessonMarks}
               teacherView={teacherView}
               editHref={studentId && day <= today ? `/v3/students/${studentId}/practice/${day}${familyMode ? "?from=family" : ""}` : undefined}
-              title={`${day}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${log?.minutes ? ` · ${log.minutes} min` : ""}${recorded ? " · recorded" : ""}${noRecording ? " · no recording" : ""}`}
+              title={`${day}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${log?.minutes ? ` · ${log.minutes} min` : ""}${recorded ? " · recorded" : ""}${noRecording ? " · no recording" : ""}${pending ? (pending === "stuck" ? " · needs a look" : " · processing or waiting for review") : ""}`}
               className={cx(
                 "relative flex items-center justify-center rounded-full border text-xs font-semibold",
                 large ? "h-10 w-10 text-sm" : "h-8 w-8",
                 practiced
                   ? "border-sage bg-sage text-white"
-                  : day === today
+                  : waiting
+                    ? "border-dashed border-sage bg-sage-soft text-ink"
+                    : day === today
                     ? "border-accent text-accent-ink"
                     : "border-rule text-muted",
                 recorded && "ring-2 ring-plum/60 ring-offset-1 ring-offset-paper",
               )}
             >
               {d.getDate()}
-              {noRecording && (
+              {pending ? (
+                <span className="absolute -top-1 -right-1 flex rounded-full ring-2 ring-paper" aria-label={pending === "stuck" ? "needs a look" : "processing or waiting for review"}>
+                  <PendingMark small stuck={pending === "stuck"} />
+                </span>
+              ) : noRecording && (
                 <span
                   className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-bold leading-none text-white ring-2 ring-paper"
                   aria-label="logged without a recording"

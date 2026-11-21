@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deletePracticeSession, retryPracticeReview } from "@/app/family/practice-actions";
+import { deletePracticeSession, finishPracticeUpload, retryPracticeReview } from "@/app/family/practice-actions";
 import { PracticeToLesson } from "@/components/switch-recording";
 
 /** Keeps an unfinished session moving while it is on screen, then refreshes. */
@@ -35,9 +35,12 @@ export function PracticeSessionButtons({
   canRetry,
   canRedo = false,
   canSwitch = false,
+  canFinishWithout = false,
 }: {
   id: string;
   canRetry: boolean;
+  /** The upload stalled: review from the sound timeline the phone sent at Stop. */
+  canFinishWithout?: boolean;
   canRedo?: boolean;
   /** "This was a lesson": switch a session that was really a lesson. */
   canSwitch?: boolean;
@@ -62,6 +65,23 @@ export function PracticeSessionButtons({
           }
         >
           Review again
+        </button>
+      )}
+      {canFinishWithout && (
+        <button
+          type="button"
+          disabled={pending}
+          className="font-medium text-accent-ink underline disabled:opacity-50"
+          onClick={() =>
+            start(async () => {
+              setMsg("Reviewing without the recording…");
+              await finishPracticeUpload(id, true).catch(() => null);
+              setMsg(null);
+              router.refresh();
+            })
+          }
+        >
+          Review without the recording
         </button>
       )}
       {canRetry && (

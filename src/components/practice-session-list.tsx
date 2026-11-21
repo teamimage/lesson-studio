@@ -86,8 +86,8 @@ function SessionCard({
                 <Pill tone="danger">! no recording</Pill>
               )}
               {s.status === "done" && s.counted === false && <Pill tone="amber">not counted</Pill>}
-              {working && <Pill tone="plum">listening…</Pill>}
-              {s.status === "uploading" && <Pill>{stuckUpload ? "upload didn't finish" : "sending…"}</Pill>}
+              {working && <Pill tone="amber">processing…</Pill>}
+              {s.status === "uploading" && <Pill tone="amber">{stuckUpload ? "upload didn't finish" : "sending the recording…"}</Pill>}
               {s.status === "error" && <Pill tone="danger">review didn&apos;t finish</Pill>}
             </div>
             <div className="text-sm text-muted">
@@ -104,9 +104,16 @@ function SessionCard({
         </div>
         <div className="flex flex-col gap-3 text-[16px]">
           {s.status === "error" && <div className="text-sm text-danger">{s.error || "The review didn't finish."}</div>}
-          {working && <div className="text-sm text-muted">Listening back to the practice. This takes a minute or two.</div>}
+          {working && <div className="text-sm text-muted">Processing: listening back to the practice. The review appears here in a minute or two.</div>}
+          {s.status === "uploading" && (
+            <div className="text-sm text-muted">
+              {stuckUpload
+                ? "The recording didn't finish uploading (the phone may have left the page). It can still be reviewed from the sound notes the phone took while recording, without the transcript."
+                : "Sending the recording from the phone. Keep the practice page open on that phone until it's done."}
+            </div>
+          )}
           {r && <PracticeReviewBody review={r} titles={s.titles} compact={compact} teacherView={teacherView} handTicked={s.handTicked} />}
-          <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canRedo={teacherView && s.status === "done" && !!r}
+          <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canFinishWithout={stuckUpload} canRedo={teacherView && s.status === "done" && !!r}
             canSwitch={canSwitch && (s.status === "done" || s.status === "error")}
           />
         </div>
@@ -131,8 +138,8 @@ function SessionCard({
                 <Pill tone="danger">! no recording</Pill>
               )}
               {s.status === "done" && s.counted === false && <Pill tone="amber">not counted</Pill>}
-              {working && <Pill tone="plum">listening…</Pill>}
-              {s.status === "uploading" && <Pill>{stuckUpload ? "upload didn't finish" : "sending…"}</Pill>}
+              {working && <Pill tone="amber">processing…</Pill>}
+              {s.status === "uploading" && <Pill tone="amber">{stuckUpload ? "upload didn't finish" : "sending the recording…"}</Pill>}
               {s.status === "error" && <Pill tone="danger">review didn&apos;t finish</Pill>}
             </div>
             <div className="text-sm text-muted">
@@ -153,9 +160,16 @@ function SessionCard({
 
         <div className="flex flex-col gap-3 border-t border-rule px-4 py-3 text-[16px]">
           {s.status === "error" && <div className="text-sm text-danger">{s.error || "The review didn't finish."}</div>}
-          {working && <div className="text-sm text-muted">Listening back to the practice. This takes a minute or two.</div>}
+          {working && <div className="text-sm text-muted">Processing: listening back to the practice. The review appears here in a minute or two.</div>}
+          {s.status === "uploading" && (
+            <div className="text-sm text-muted">
+              {stuckUpload
+                ? "The recording didn't finish uploading (the phone may have left the page). It can still be reviewed from the sound notes the phone took while recording, without the transcript."
+                : "Sending the recording from the phone. Keep the practice page open on that phone until it's done."}
+            </div>
+          )}
           {r && <PracticeReviewBody review={r} titles={s.titles} compact={compact} teacherView={teacherView} handTicked={s.handTicked} />}
-          <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canRedo={teacherView && s.status === "done" && !!r}
+          <PracticeSessionButtons id={s.id} canRetry={s.status === "error"} canFinishWithout={stuckUpload} canRedo={teacherView && s.status === "done" && !!r}
             canSwitch={canSwitch && (s.status === "done" || s.status === "error")}
           />
         </div>
