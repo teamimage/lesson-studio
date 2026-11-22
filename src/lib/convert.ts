@@ -1,7 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { PRACTICE_BUCKET, RECORDINGS_BUCKET } from "@/lib/constants";
-import type { Json } from "@/lib/supabase/types";
+import type { Json, Tables } from "@/lib/supabase/types";
 import { deleteStream } from "@/lib/stream";
 import { lessonMainId } from "@/lib/main-camera";
 import { writeLength } from "@/lib/lesson-length";
@@ -34,7 +34,7 @@ type Db = Awaited<ReturnType<typeof createClient>>;
 /** Files bigger than this aren't listened through in the browser (phones run out of memory). */
 export const LISTEN_MAX_BYTES = 250 * 1024 * 1024;
 
-export type ConvertResult = { ok: true; href: string } | { ok: false; error: string };
+export type ConvertResult = { ok: true; href: string; sessionId?: string } | { ok: false; error: string };
 
 /** The draft lesson's main recording, with a link the browser can listen through, if it's small enough. */
 export async function lessonAudioForPractice(lessonId: string): Promise<{ url: string | null; tooBig: boolean }> {
@@ -55,7 +55,11 @@ async function mainRecording(db: Db, lessonId: string) {
   return live.find((r) => r.id === mainId) ?? live[0] ?? null;
 }
 
-export async function lessonToPractice(lessonId: string, rawActivity: unknown): Promise<ConvertResult> {
+export async function lessonToPractice(
+  lessonId: string,
+  rawActivity: unknown,
+  opts: { review?: boolean } = {},
+): Promise<ConvertResult> {
   const db = await createClient();
   const { data: lesson } = await db.from("lessons").select("*").eq("id", lessonId).maybeSingle();
   if (!lesson) return { ok: false, error: "That lesson wasn't found." };
@@ -127,8 +131,13 @@ export async function lessonToPractice(lessonId: string, rawActivity: unknown): 
   if (paths.length) await db.storage.from(RECORDINGS_BUCKET).remove(paths);
   await db.from("lessons").delete().eq("id", lessonId);
 
-  await reviewConverted(session.id);
-  return { ok: true, href: `/v3/students/${lesson.student_id}` };
+  if (opts.review === false) {
+    // About to be joined with other recordings, which reviews them all at once.
+    await db.from("practice_sessions").update({ status: "done" }).eq("id", session.id);
+  } else {
+    await reviewConverted(session.id);
+  }
+  return { ok: true, href: `/v3/students/${lesson.student_id}`, sessionId: session.id };
 }
 
 export async function practiceToLesson(sessionId: string): Promise<ConvertResult> {
@@ -188,3 +197,106 @@ export async function practiceToLesson(sessionId: string): Promise<ConvertResult
   if (transcript) await draftFromTranscript(s.teacher_id, lessonId, transcript, s.duration_seconds);
   return { ok: true, href: `/v3/lessons/${lessonId}?switched=1` };
 }
+
+/**
+ * Several practice recordings of one day (and, optionally, that day's draft
+ * lesson) become one lesson: the recordings' transcripts are added after the
+ * lesson's own, the practices come off the practice log and are removed, and
+ * Claude drafts the lesson again from everything together. Without a lesson
+ * picked, an empty draft that day is used or a new one is made.
+ */
+export async function practicesToLesson(sessionIds: string[], lessonId: string | null): Promise<ConvertResult> {
+  const db = await createClient();
+  const ids = [...new Set(sessionIds)];
+  const { data: rows } = ids.length
+    ? await db.from("practice_sessions").select("*").in("id", ids)
+    : { data: [] as PracticeSessionRow[] };
+  const sessions = (rows ?? []).slice().sort((a, b) => a.started_at.localeCompare(b.started_at));
+  if (sessions.length !== ids.length) return { ok: false, error: "One of those practices wasn't found." };
+  if (sessions.some((s) => s.status !== "done" && s.status !== "error"))
+    return { ok: false, error: "A practice is still being reviewed. Try again in a minute or two." };
+
+  let lesson: { id: string; student_id: string; teacher_id: string; lesson_date: string; status: string } | null = null;
+  if (lessonId) {
+    const { data } = await db.from("lessons").select("id, student_id, teacher_id, lesson_date, status").eq("id", lessonId).maybeSingle();
+    if (!data) return { ok: false, error: "That lesson wasn't found." };
+    if (data.status !== "draft") return { ok: false, error: "That lesson is already approved. Move it back to draft first." };
+    lesson = data;
+  }
+  const first = sessions[0];
+  const studentId = lesson?.student_id ?? first?.student_id;
+  const date = lesson?.lesson_date ?? first?.practice_date;
+  if (!studentId || !date) return { ok: false, error: "Pick at least one practice or lesson." };
+  if (sessions.some((s) => s.student_id !== studentId || s.practice_date !== date))
+    return { ok: false, error: "Only recordings of the same student on the same day can be combined." };
+
+  const practiceSeconds = sessions.reduce((n, s) => n + s.duration_seconds, 0);
+  let targetId = lesson?.id ?? null;
+  let lessonText = "";
+  let lessonSeconds = 0;
+  if (targetId) {
+    const t = await latestTranscript(db, targetId);
+    if (t && (t.status === "transcribing" || t.status === "drafting"))
+      return { ok: false, error: "The lesson recording is still being processed. Try again in a few minutes." };
+    lessonText = t?.transcript?.trim() ?? "";
+    lessonSeconds = Number(t?.audio_seconds) || 0;
+  } else {
+    const { data: sameDay } = await db
+      .from("lessons")
+      .select("id, summary, recordings(id), lesson_transcripts(id)")
+      .eq("student_id", studentId)
+      .eq("lesson_date", date)
+      .eq("status", "draft");
+    const empty = (sameDay ?? []).find((l) => !l.summary && !l.recordings.length && !l.lesson_transcripts.length);
+    const minutes = Math.max(1, Math.round(practiceSeconds / 60));
+    if (empty) {
+      targetId = empty.id;
+      await writeLength(db, targetId, minutes, "practice");
+    } else {
+      const { data: made } = await db
+        .from("lessons")
+        .insert({
+          student_id: studentId,
+          teacher_id: first.teacher_id,
+          lesson_date: date,
+          duration_minutes: minutes,
+          status: "draft",
+          created_at: first.started_at,
+        })
+        .select("id")
+        .single();
+      targetId = made?.id ?? null;
+    }
+  }
+  if (!targetId) return { ok: false, error: "Couldn't make the lesson. Only the teacher's account can add lessons." };
+
+  const parts = [
+    ...(lessonText ? [`[Lesson recording]\n${lessonText}`] : []),
+    ...sessions.flatMap((s, i) =>
+      s.transcript?.trim() ? [`[${sessions.length > 1 ? `Practice recording ${i + 1}` : "Practice recording"}]\n${s.transcript.trim()}`] : [],
+    ),
+  ];
+  const transcript = parts.length > 1 || lessonText ? parts.join("\n\n") : (sessions.find((s) => s.transcript?.trim())?.transcript?.trim() ?? "");
+
+  if (!transcript) {
+    const heard = sessions.map((s) => (s.analysis as PracticeAnalysis | null)?.summary).filter(Boolean);
+    const note = [
+      `Made from ${sessions.length === 1 ? "a practice recording" : `${sessions.length} practice recordings`} (${Math.max(1, Math.round(practiceSeconds / 60))} min). No talking was transcribed, so there's no AI draft; fill this lesson in by hand.`,
+      heard.length ? `What the practice review heard: ${heard.join(" ")}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    await db.from("lessons").update({ teacher_notes: note }).eq("id", targetId);
+  }
+
+  for (const s of sessions) {
+    await unapplyFromLog(db, s);
+    if (s.storage_path) await db.storage.from(PRACTICE_BUCKET).remove([s.storage_path]);
+    await db.from("practice_sessions").delete().eq("id", s.id);
+  }
+
+  if (transcript) await draftFromTranscript(first?.teacher_id ?? lesson!.teacher_id, targetId, transcript, lessonSeconds + practiceSeconds);
+  return { ok: true, href: `/v3/lessons/${targetId}?switched=1` };
+}
+
+type PracticeSessionRow = Tables<"practice_sessions">;

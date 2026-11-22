@@ -162,6 +162,7 @@ export function PracticeMonthCalendar({
                   editHref={d <= today ? `/v3/students/${studentId}/practice/${d}${familyMode ? "?from=family" : ""}` : undefined}
                   addPracticeHref={eventLinks && d <= today ? addPracticeHref(studentId, d, familyMode) : undefined}
                   addLessonFor={eventLinks && canAddLesson && d <= today ? studentId : undefined}
+                  manageFor={eventLinks && canAddLesson ? studentId : undefined}
                   title={`${parseISODate(d).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}${lesson ? (lesson.upcoming ? " · lesson coming up" : " · lesson") : ""}${minutes ? ` · ${minutes} min` : ""}${day?.listened ? " · listened" : ""}${sessions ? ` · ${sessions} recorded` : ""}${noRecording ? " · no recording" : ""}${pending ? (pending === "stuck" ? " · needs a look" : " · processing or waiting for review") : ""}`}
                   className={cx(
                     "relative flex h-11 flex-col items-center justify-center rounded-lg",

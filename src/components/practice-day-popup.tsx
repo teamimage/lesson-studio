@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AddLessonOnDay } from "@/components/calendar-add";
+import { DayRecordings } from "@/components/day-recordings";
 import { cx, Pill } from "@/components/ui";
 import { LocalTime } from "@/components/local-time";
 import { PracticeReviewBody } from "@/components/practice-review";
@@ -32,8 +33,11 @@ export function PracticeDayCell({
   editHref,
   addPracticeHref,
   addLessonFor,
+  manageFor,
   children,
 }: {
+  /** The teacher's student page: delete and combine a day's recordings from the list (the student's id). */
+  manageFor?: string;
   /** The day can take a hand-added practice: its page, opened ready to fill in. */
   addPracticeHref?: string;
   /** The teacher can add a lesson on this day (the student's id). */
@@ -118,6 +122,7 @@ export function PracticeDayCell({
           editHref={editHref}
           addPracticeHref={addPracticeHref}
           addLessonFor={addLessonFor}
+          manageFor={manageFor}
           onClose={() => setOpen(false)}
         />
       )}
@@ -134,6 +139,7 @@ function DayPopup({
   editHref,
   addPracticeHref,
   addLessonFor,
+  manageFor,
   onClose,
 }: {
   date: string;
@@ -144,6 +150,7 @@ function DayPopup({
   editHref?: string;
   addPracticeHref?: string;
   addLessonFor?: string;
+  manageFor?: string;
   onClose: () => void;
 }) {
   useBackToClose(true, onClose);
@@ -195,6 +202,8 @@ function DayPopup({
             dayGrade={dayGrade}
             addPracticeHref={addPracticeHref}
             addLessonFor={addLessonFor}
+            manageFor={manageFor}
+            onClose={onClose}
           />
         ) : (
         <div className="flex flex-col gap-4 px-4 py-4 text-[16px]">
@@ -279,10 +288,14 @@ function DayList({
   dayGrade,
   addPracticeHref,
   addLessonFor,
+  manageFor,
+  onClose,
 }: {
   date: string;
   addPracticeHref?: string;
   addLessonFor?: string;
+  manageFor?: string;
+  onClose: () => void;
   day?: PracticeDay;
   lessons: LessonMark[];
   practiceHref: string;
@@ -295,47 +308,9 @@ function DayList({
     </span>
   );
   return (
-    <ul className="flex flex-col gap-2 px-4 py-4 text-[16px]">
-      {lessons.map((l, i) => {
-        const body = (
-          <>
-            <LessonNote upcoming={l.upcoming} />
-            <span className="min-w-0">
-              <span className="flex items-center gap-1.5 font-semibold">
-                {l.upcoming ? "Lesson coming up" : "Lesson"}
-                {l.pending && <PendingMark small />}
-              </span>
-              <span className="block text-sm text-muted">
-                {[
-                  l.time ? formatTime(l.time) : "",
-                  l.minutes ? `${l.minutes} min` : "",
-                  l.pending ? lessonPendingWords(l) : l.status === "approved" ? "approved" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || (l.upcoming ? "from the schedule" : "")}
-              </span>
-              {l.lengthFlag && (
-                <span className="block text-sm text-accent-ink">
-                  {l.lengthFlag === "unknown" ? "Video length not read. Set the length." : `Video is ${l.videoMinutes} min.`}
-                </span>
-              )}
-            </span>
-          </>
-        );
-        return (
-          <li key={l.lessonId ?? `${l.date}-${i}`}>
-            {l.lessonId ? (
-              <Link href={`/v3/lessons/${l.lessonId}`} className={cx(row, "border-accent/40 bg-accent-soft hover:border-accent")}>
-                {body}
-                {go}
-              </Link>
-            ) : (
-              <div className={cx(row, l.upcoming ? "border-dashed border-rule" : "border-accent/30 bg-accent-soft/60")}>{body}</div>
-            )}
-          </li>
-        );
-      })}
-      {day && (
+    <ul className="flex flex-col gap-2 px-4 pt-4 pb-4 text-[16px]">
+      <DayRecordings date={date} day={day} lessons={lessons} practiceHref={practiceHref} manageFor={manageFor} onClose={onClose} go={go} />
+      {day && day.sessions.length === 0 && (
         <li>
           <Link href={practiceHref} className={cx(row, "border-sage/40 bg-sage-soft hover:border-sage")}>
             {dayGrade ? (
