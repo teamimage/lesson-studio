@@ -5,6 +5,9 @@ import { getViewer } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { mergeSessions, splitSession } from "@/lib/practice/merge";
 import { checkPracticePinFor, pinMessage } from "@/lib/practice-pin";
+import { unapplyFromLog } from "@/lib/practice/process";
+import { PRACTICE_BUCKET } from "@/lib/constants";
+import { deleteStream } from "@/lib/stream";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -56,4 +59,37 @@ export async function splitPracticeSession(input: {
   const r = await splitSession(input.id);
   refresh(input.studentId, input.date);
   return r.ok ? { ok: true } : r;
+}
+
+/** Deletes one practice recording: its minutes and ticks come off the day's log first. */
+export async function deleteDayPractice(input: {
+  studentId: string;
+  date: string;
+  id: string;
+  pin?: string;
+  familyMode?: boolean;
+}): Promise<Result> {
+  const blocked = await pinOk(input.studentId, input.pin ?? "", !!input.familyMode);
+  if (blocked) return { ok: false, error: blocked };
+  const db = await createClient();
+  const { data: s } = await db.from("practice_sessions").select("*").eq("id", input.id).maybeSingle();
+  if (!s || s.student_id !== input.studentId) return { ok: false, error: "That practice wasn't found." };
+  await unapplyFromLog(db, s);
+  if (s.storage_path) await db.storage.from(PRACTICE_BUCKET).remove([s.storage_path]);
+  const { error } = await db.from("practice_sessions").delete().eq("id", s.id);
+  refresh(input.studentId, input.date);
+  return error ? { ok: false, error: "Couldn't delete that practice." } : { ok: true };
+}
+
+/** Deletes a lesson from the calendar (teacher only), with its streaming copies. */
+export async function deleteDayLesson(input: { studentId: string; date: string; lessonId: string }): Promise<Result> {
+  const viewer = await getViewer();
+  if (!viewer.teacher) return { ok: false, error: "Only the teacher can delete a lesson." };
+  const db = await createClient();
+  const { data: recs } = await db.from("recordings").select("stream_uid").eq("lesson_id", input.lessonId);
+  await Promise.all((recs ?? []).flatMap((r) => (r.stream_uid ? [deleteStream(r.stream_uid).catch(() => {})] : [])));
+  const { error } = await db.from("lessons").delete().eq("id", input.lessonId);
+  refresh(input.studentId, input.date);
+  revalidatePath("/", "layout");
+  return error ? { ok: false, error: "Couldn't delete that lesson." } : { ok: true };
 }
