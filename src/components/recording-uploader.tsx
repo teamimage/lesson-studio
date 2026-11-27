@@ -102,7 +102,9 @@ export function RecordingUploader({ lessonId, autoOpen = false }: { lessonId: st
       {busy && (
         <p className="text-sm text-muted">
           Keep Lesson Studio open on the screen until this finishes. You can move to other pages in Lesson Studio. If you
-          switch apps or lock the phone, the upload pauses and carries on from the same spot when you come back.
+          switch apps or lock the phone, the upload pauses and carries on from the same spot when you come back. If the
+          screen still turns off, turn off Low Power Mode, or set Settings, Display &amp; Brightness, Auto-Lock to Never
+          for the upload.
         </p>
       )}
     </div>
