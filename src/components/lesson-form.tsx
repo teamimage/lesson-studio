@@ -51,6 +51,7 @@ export function LessonForm({
     lesson_date: initial.lesson_date,
     duration_minutes: initial.duration_minutes?.toString() ?? "",
     next_lesson_date: initial.next_lesson_date ?? "",
+    guest_teacher: initial.guest_teacher ?? "",
     summary: initial.summary,
     focus_points: initial.focus_points,
     suggestions: initial.suggestions,
@@ -70,6 +71,7 @@ export function LessonForm({
     duration_minutes: basics.duration_minutes ? Number(basics.duration_minutes) : null,
     duration_touched: durationTouched,
     next_lesson_date: basics.next_lesson_date || null,
+    guest_teacher: basics.guest_teacher,
     summary: basics.summary,
     focus_points: basics.focus_points,
     suggestions: basics.suggestions,
@@ -177,6 +179,15 @@ export function LessonForm({
         </div>
         <Field label="Next lesson">
           <Input type="date" value={basics.next_lesson_date} onChange={(e) => set("next_lesson_date", e.target.value)} />
+        </Field>
+        <Field label="Guest instructor" hint="Only if someone other than the usual teacher taught this lesson.">
+          <Input
+            value={basics.guest_teacher}
+            maxLength={80}
+            autoComplete="off"
+            placeholder="Their name"
+            onChange={(e) => set("guest_teacher", e.target.value)}
+          />
         </Field>
       </Section>
 

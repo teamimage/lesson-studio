@@ -1,4 +1,5 @@
 import type { LessonFull, Student } from "@/lib/data";
+import { guestOf } from "@/lib/guest";
 import type { Tables } from "@/lib/supabase/types";
 import { capitalize, daysBetween, formatDate, parseISODate } from "@/lib/format";
 import { formatTime } from "@/lib/schedule";
@@ -51,7 +52,11 @@ export function LessonSheet({
           </div>
           <div className="text-sm text-[#5d524a] sm:text-right print:text-right">
             <div className="font-medium text-[#1b1613]">{formatDate(lesson.lesson_date, "long")}</div>
-            {teacher?.name && <div>{teacher.name}</div>}
+            {guestOf(lesson) ? (
+              <div>Guest instructor: {guestOf(lesson)}</div>
+            ) : (
+              teacher?.name && <div>{teacher.name}</div>
+            )}
             {teacher?.studio_name && <div>{teacher.studio_name}</div>}
           </div>
         </header>

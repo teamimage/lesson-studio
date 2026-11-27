@@ -1,4 +1,5 @@
 import "server-only";
+import { guestOf } from "@/lib/guest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { proposePlaybook } from "@/lib/ai/propose-playbook";
@@ -45,7 +46,7 @@ async function unreadLessons(db: Db, teacherId: string): Promise<Unread[]> {
   const [{ data: rows }, { data: reads }] = await Promise.all([
     db
       .from("lesson_transcripts")
-      .select("lesson_id, recording_id, transcript, lessons!inner(lesson_date, status, students!inner(instrument))")
+      .select("lesson_id, recording_id, transcript, lessons!inner(*, students!inner(instrument))")
       .eq("teacher_id", teacherId)
       .eq("status", "done")
       .not("transcript", "is", null)
@@ -59,8 +60,10 @@ async function unreadLessons(db: Db, teacherId: string): Promise<Unread[]> {
     lesson_id: string;
     recording_id: string | null;
     transcript: string | null;
-    lessons: { lesson_date: string; status: string; students: { instrument: string } };
+    lessons: { lesson_date: string; status: string; guest_teacher?: string | null; students: { instrument: string } };
   }[]) {
+    // A guest taught it: their cues and words aren't this teacher's playbook.
+    if (guestOf(r.lessons)) continue;
     // Only lessons the teacher has approved: a draft may be a home practice saved as a lesson by mistake.
     if (read.has(r.lesson_id) || seen.has(r.lesson_id) || r.lessons.status !== "approved") continue;
     if (!r.transcript || r.transcript.length < 2000) continue;
