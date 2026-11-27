@@ -265,6 +265,8 @@ export type Database = {
           duration_minutes: number | null;
           duration_source: string | null;
           focus_points: string | null;
+          /** Comes with guest-teacher.sql; missing before it is run. */
+          guest_teacher?: string | null;
           id: string;
           lesson_date: string;
           main_recording_id: string | null;
@@ -284,6 +286,7 @@ export type Database = {
           duration_minutes?: number | null;
           duration_source?: string | null;
           focus_points?: string | null;
+          guest_teacher?: string | null;
           id?: string;
           lesson_date?: string;
           main_recording_id?: string | null;
@@ -303,6 +306,7 @@ export type Database = {
           duration_minutes?: number | null;
           duration_source?: string | null;
           focus_points?: string | null;
+          guest_teacher?: string | null;
           id?: string;
           lesson_date?: string;
           main_recording_id?: string | null;

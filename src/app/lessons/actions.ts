@@ -12,6 +12,7 @@ import type { Enums } from "@/lib/supabase/types";
 import { Constants } from "@/lib/supabase/types";
 import { todayISO } from "@/lib/format";
 import { isNoteSection, isTextSection, type SectionProposal, type TextSection } from "@/lib/note-sections";
+import { cleanGuest, guestColumnMissing } from "@/lib/guest";
 
 export type PieceInput = {
   title: string;
@@ -41,6 +42,8 @@ export type LessonInput = {
   teacher_notes: string;
   parent_message: string;
   next_lesson_date: string | null;
+  /** A guest instructor who taught this lesson instead of the regular teacher; "" for none. */
+  guest_teacher?: string;
   pieces: PieceInput[];
   assignments: AssignmentInput[];
 };
@@ -71,6 +74,7 @@ function parsePayloadObject(raw: Partial<LessonInput>): LessonInput {
     teacher_notes: clean(raw.teacher_notes),
     parent_message: clean(raw.parent_message),
     next_lesson_date: orNull(clean(raw.next_lesson_date)),
+    guest_teacher: cleanGuest(raw.guest_teacher) ?? "",
     pieces: (raw.pieces ?? [])
       .map((p) => ({
         title: clean(p.title),
@@ -149,6 +153,9 @@ export async function saveLesson(fd: FormData) {
       : undefined;
   // Best effort: the column comes with lesson-length-source.sql.
   if (source !== undefined) await supabase.from("lessons").update({ duration_source: source }).eq("id", id);
+  // Best effort too: before guest-teacher.sql is run the lesson saves without it.
+  if (input.guest_teacher || lessonId)
+    await supabase.from("lessons").update({ guest_teacher: orNull(input.guest_teacher ?? "") }).eq("id", id);
 
   await writePieces(supabase, id, input.pieces);
   await writeAssignments(supabase, id, input.student_id, input.assignments);
@@ -276,6 +283,27 @@ export async function saveLessonSection(
   }
   revalidateLesson(lessonId, lesson.student_id);
   return { ok: true };
+}
+
+/**
+ * Sets or clears the guest instructor on one lesson, from the lesson page.
+ * Works on drafts and approved lessons alike.
+ */
+export async function setGuestTeacher(
+  lessonId: string,
+  name: string,
+): Promise<{ ok: true; guest: string | null } | { error: string }> {
+  await requireTeacher();
+  const supabase = await createClient();
+  const { data: lesson } = await supabase.from("lessons").select("id, student_id").eq("id", lessonId).maybeSingle();
+  if (!lesson) return { error: "Lesson not found." };
+  const guest = cleanGuest(name);
+  const { error } = await supabase.from("lessons").update({ guest_teacher: guest }).eq("id", lessonId);
+  if (guestColumnMissing(error))
+    return { error: "Run guest-teacher.sql in the Lesson Studio Supabase SQL Editor first, then try again." };
+  if (error) return { error: "Couldn't save. Try again." };
+  revalidateLesson(lessonId, lesson.student_id);
+  return { ok: true, guest };
 }
 
 export async function approveLesson(fd: FormData) {

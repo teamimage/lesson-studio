@@ -1,4 +1,5 @@
 import "server-only";
+import { guestOf } from "@/lib/guest";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, daysBetween, todayISO } from "@/lib/format";
 import { type Program, programBySlug } from "./content";
@@ -98,10 +99,13 @@ export async function loadHabitLessons(teacherId: string, limit = 40): Promise<H
 
   const { data: lessons } = await supabase
     .from("lessons")
-    .select("id, lesson_date, students(name)")
+    // "*" so this still works before guest-teacher.sql adds guest_teacher.
+    .select("*, students(name)")
     .in("id", [...best.keys()]);
   const out: HabitLesson[] = [];
   for (const l of lessons ?? []) {
+    // A guest taught it: their habits aren't this teacher's.
+    if (guestOf(l)) continue;
     const t = best.get(l.id);
     const habits = lessonHabits(t?.transcript);
     if (!t || !habits || habits.words < 200) continue;

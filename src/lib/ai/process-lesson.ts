@@ -1,4 +1,5 @@
 import "server-only";
+import { guestOf } from "@/lib/guest";
 import { createClient } from "@/lib/supabase/server";
 import { RECORDINGS_BUCKET } from "@/lib/constants";
 import { booksFor } from "@/lib/suzuki";
@@ -493,6 +494,7 @@ async function draftContext(db: Db, row: Transcript) {
       text: r.text,
     })),
     transcript: row.transcript ?? "",
+    guestTeacher: guestOf(lesson),
   };
 }
 

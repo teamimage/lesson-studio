@@ -49,6 +49,8 @@ export type DraftContext = {
   transcript: string;
   /** The teacher's review tone and teaching profile. */
   style?: TeachingStyle;
+  /** A guest instructor who taught this lesson instead of the regular teacher. */
+  guestTeacher?: string | null;
 };
 
 const SCHEMA = {
@@ -165,6 +167,10 @@ function contextText(c: DraftContext): string {
     `Current book: ${c.currentBook || "not set"}.`,
     `Lesson date: ${c.lessonDate}.`,
   ];
+  if (c.guestTeacher)
+    lines.push(
+      `This lesson was taught by a guest instructor, ${c.guestTeacher}, not by the student's regular teacher. The teacher speaking in the transcript is ${c.guestTeacher}. Name them where the record says who taught or asked for something (for example "Today with ${c.guestTeacher} we..."), and report their instructions and terms as theirs. The teaching profile and playbook in your instructions describe the regular teacher: use them for how to write to the family, never as what ${c.guestTeacher} said or did. teacher_notes and suggestions are for the regular teacher, who reads and approves this record.`,
+    );
   if (c.bookPieces.length) lines.push(`Pieces in the student's books, in order:\n${c.bookPieces.join("\n")}`);
   if (c.repertoire.length)
     lines.push(`Student's repertoire list:\n${c.repertoire.map((r) => `${r.title} (${r.status})`).join("\n")}`);

@@ -32,6 +32,8 @@ import { LinkMusic } from "@/components/link-music";
 import { VoiceEditSection } from "@/components/voice-edit";
 import { Fold } from "@/components/fold";
 import { LessonToPractice } from "@/components/switch-recording";
+import { GuestTeacher } from "@/components/guest-teacher";
+import { guestOf } from "@/lib/guest";
 import {
   assignmentJumps,
   buildMoments,
@@ -216,6 +218,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           </Card>
         )}
         <LengthFlag check={lengthCheck} lessonId={id} studentId={student.id} />
+        <GuestTeacher key={guestOf(lesson) ?? ""} lessonId={id} guest={guestOf(lesson)} />
         {closedPeriod && <PeriodReviewWriter studentId={student.id} start={closedPeriod.start} auto quiet />}
 
         {/* The summary */}

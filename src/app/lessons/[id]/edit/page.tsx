@@ -70,6 +70,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
           lesson_date: lesson.lesson_date,
           duration_minutes: lesson.duration_minutes,
           next_lesson_date: lesson.next_lesson_date,
+          guest_teacher: lesson.guest_teacher ?? "",
           summary: lesson.summary ?? "",
           focus_points: lesson.focus_points ?? "",
           suggestions: lesson.suggestions ?? "",

@@ -1,4 +1,5 @@
 import "server-only";
+import { guestOf } from "@/lib/guest";
 import { Entry, type TimelineEntry } from "@/components/v3/timeline";
 import { PeriodReviewWriter } from "@/components/period-review-writer";
 import { Pill } from "@/components/ui";
@@ -69,7 +70,7 @@ export function buildEntries({
           title={`Lesson${l.lesson_pieces.length ? `: ${l.lesson_pieces.map((p) => p.title).join(", ")}` : ""}`}
           href={`/v3/lessons/${l.id}`}
           meta={
-            [!l.summary && l.status === "draft" ? "Draft, not written up yet" : "", videos > 0 ? `${videos} video${videos === 1 ? "" : "s"}` : ""]
+            [!l.summary && l.status === "draft" ? "Draft, not written up yet" : "", guestOf(l) ? `Guest instructor ${guestOf(l)}` : "", videos > 0 ? `${videos} video${videos === 1 ? "" : "s"}` : ""]
               .filter(Boolean)
               .join(" · ") || undefined
           }

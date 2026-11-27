@@ -1,4 +1,5 @@
 import { checklistTags, getWorkingOn } from "@/lib/focus/data";
+import { guestOf } from "@/lib/guest";
 import { WorkingOnCard } from "@/components/working-on";
 import { GradeLegend } from "@/components/grade-legend";
 import { Suspense } from "react";
@@ -340,6 +341,7 @@ async function Body({
                   <div className="font-semibold">Practice plan</div>
                   <span className="text-sm text-muted">
                     lesson {formatDate(plan.lesson_date, "weekday")}
+                    {guestOf(plan) ? ` · guest instructor ${guestOf(plan)}` : ""}
                   </span>
                 </div>
                 {plan.focus_points && (
