@@ -179,23 +179,26 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const running = useRef(false);
   const current = useRef<{ key: string; upload: tus.Upload; stop: () => void } | null>(null);
 
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
   // Read after hydration so the server and first client render match.
   useEffect(() => {
     const t = setTimeout(() => setInterrupted(readInterrupted()), 0);
     return () => clearTimeout(t);
   }, []);
 
-  const patch = useCallback((key: string, change: Partial<UploadItem>) => {
-    setItems((all) => {
-      const next = all.map((i) => (i.key === key ? { ...i, ...change } : i));
-      itemsRef.current = next;
-      return next;
-    });
+  // The ref is the source of truth and is updated straight away, so the
+  // queue sees a change at once. (Updating it inside a setItems callback
+  // left new uploads stuck on "Waiting": React runs that callback later.)
+  const commit = useCallback((next: UploadItem[]) => {
+    itemsRef.current = next;
+    setItems(next);
   }, []);
+
+  const patch = useCallback(
+    (key: string, change: Partial<UploadItem>) => {
+      commit(itemsRef.current.map((i) => (i.key === key ? { ...i, ...change } : i)));
+    },
+    [commit],
+  );
 
   const busy = items.some((i) => ["waiting", "preparing", "uploading", "paused", "saving"].includes(i.state));
 
@@ -231,7 +234,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           startedAt: startedAt?.toISOString() ?? null,
         }).catch(() => ({ error: "Couldn't reach Lesson Studio. Check the connection and press Retry." }));
         if ("error" in started) {
-          patch(key, { state: "error", error: started.error });
+          patch(key, { state: "error", error: started.error, retryable: true });
           return;
         }
         recording = { id: started.id, path: started.path };
@@ -263,7 +266,16 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       let last = { t: performance.now(), bytes: 0 };
       let lastSaved = 0;
 
-      await new Promise<void>((resolve) => {
+      let lastMove = Date.now();
+      let watchdog: ReturnType<typeof setInterval> | null = null;
+      await new Promise<void>((outerResolve) => {
+        let settled = false;
+        const resolve = () => {
+          if (settled) return;
+          settled = true;
+          if (watchdog) clearInterval(watchdog);
+          outerResolve();
+        };
         const upload = new tus.Upload(file, {
           endpoint: resumableEndpoint(),
           retryDelays: RETRY_DELAYS,
@@ -296,6 +308,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
             return status === 0 || status === 409 || status === 423 || status >= 500 || status === 429;
           },
           onProgress: (sent, total) => {
+            lastMove = Date.now();
             const now = performance.now();
             const dt = (now - last.t) / 1000;
             const cur = itemsRef.current.find((i) => i.key === key);
@@ -339,10 +352,26 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           },
         });
         current.current = { key, upload, stop: resolve };
-        upload.findPreviousUploads().then((previous) => {
-          if (previous.length) upload.resumeFromPreviousUpload(previous[0]);
-          upload.start();
-        });
+        upload
+          .findPreviousUploads()
+          .then((previous) => {
+            if (previous.length) upload.resumeFromPreviousUpload(previous[0]);
+          })
+          .catch(() => {})
+          .finally(() => upload.start());
+        // If nothing moves for 2 minutes while the page is on screen, the
+        // connection is stuck without an error: stop and pick up again.
+        watchdog = setInterval(() => {
+          if (document.visibilityState !== "visible") {
+            lastMove = Date.now();
+            return;
+          }
+          if (Date.now() - lastMove < 120_000) return;
+          void upload.abort();
+          current.current = null;
+          patch(key, { state: "waiting" });
+          resolve();
+        }, 15_000);
       });
     },
     [patch, router],
@@ -365,6 +394,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   const add = useCallback(
     (lessonId: string, files: File[]) => {
+      // The same video already on its way: leave it running.
+      const moving = (f: File) =>
+        itemsRef.current.some(
+          (i) => i.lessonId === lessonId && i.file.size === f.size && !["done", "error"].includes(i.state),
+        );
+      files = files.filter((f) => !moving(f));
+      if (!files.length) return;
       const added: UploadItem[] = files.map((file) => ({
         key: `${lessonId}-${file.size}-${Math.random()}`,
         lessonId,
@@ -372,17 +408,15 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         progress: interrupted.find((u) => u.lessonId === lessonId && u.size === file.size)?.progress ?? 0,
         state: "waiting",
       }));
-      setItems((all) => {
-        const next = [
-          ...all.filter((i) => i.state !== "done" && !added.some((a) => a.lessonId === i.lessonId && a.file.size === i.file.size)),
-          ...added,
-        ];
-        itemsRef.current = next;
-        return next;
-      });
+      commit([
+        ...itemsRef.current.filter(
+          (i) => i.state !== "done" && !added.some((a) => a.lessonId === i.lessonId && a.file.size === i.file.size),
+        ),
+        ...added,
+      ]);
       void pump();
     },
-    [interrupted, pump],
+    [commit, interrupted, pump],
   );
 
   const retry = useCallback(
@@ -401,12 +435,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       current.current.stop();
       current.current = null;
     }
-    setItems((all) => {
-      const next = all.filter((i) => i.key !== key);
-      itemsRef.current = next;
-      return next;
-    });
-  }, []);
+    commit(itemsRef.current.filter((i) => i.key !== key));
+  }, [commit]);
+
+  // Safety net: anything left waiting gets started.
+  useEffect(() => {
+    if (items.some((i) => i.state === "waiting") && !running.current) void pump();
+  }, [items, pump]);
 
   const forget = useCallback((lessonId: string, size: number) => {
     unremember(lessonId, size);
