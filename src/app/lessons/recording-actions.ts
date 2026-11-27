@@ -55,7 +55,8 @@ export async function startRecording(input: StartRecordingInput): Promise<StartR
     .from("recordings")
     .select("id, storage_path")
     .eq("lesson_id", lesson.id)
-    .eq("file_name", fileName)
+    // Same lesson and same size is the same video, even if iOS hands it over
+    // under a new name when it is picked again to finish an upload.
     .eq("size_bytes", sizeBytes)
     .eq("status", "uploading")
     .limit(1)
