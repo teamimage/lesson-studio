@@ -40,6 +40,8 @@ import { getWorkingOn } from "@/lib/focus/data";
 import { WorkingOnCard } from "@/components/working-on";
 import { StudentOverview } from "@/components/student-overview";
 import { getStudentOverview } from "@/lib/overview/data";
+import { getTakeaways } from "@/lib/takeaways/data";
+import { LessonTakeaways } from "@/components/lesson-takeaways";
 
 type Params = Promise<{ id: string }>;
 type SP = Promise<{ show?: string; consent?: string }>;
@@ -47,7 +49,8 @@ type SP = Promise<{ show?: string; consent?: string }>;
 // Version 3 student page, top to bottom: Start lesson (its ▾ drops down
 // "Write up by hand") and Music stand; the student overview box (who, years
 // playing, parents, Contact buttons, history, balance, current repertoire);
-// the full practice calendar; "What we're working on"; the last
+// "Main takeaways" from the last three approved lessons; the full practice
+// calendar; "What we're working on"; the last
 // 10 days of history in one box of sections (Everything, Lessons, Practice,
 // Videos, Reviews) picked from buttons on the left (across the top on a
 // phone), with "See all history"; then the pre-lesson brief, music and bar
@@ -68,13 +71,14 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
   const sp = await searchParams;
   const student = await getStudent(id);
   if (!student) notFound();
-  const [{ lessons, entries: all }, week, repertoire, music, consent, workingOn] = await Promise.all([
+  const [{ lessons, entries: all }, week, repertoire, music, consent, workingOn, takeaways] = await Promise.all([
     loadHistory(id),
     getPracticeWeek(id),
     listRepertoire(id),
     listScoreIndex(id),
     getConsentStatus(id),
     getWorkingOn(id),
+    getTakeaways(id),
   ]);
   const today = todayISO();
   const monthSpan = monthRange(monthOf(today));
@@ -244,6 +248,7 @@ async function Body({ params, searchParams }: { params: Params; searchParams: SP
 
         <StudentOverview studentId={id} name={student.name} instrument={student.instrument} data={overview} year={Number(today.slice(0, 4))} />
         {waitingOnTeacher && workingOnCard}
+        <LessonTakeaways view={takeaways} studentId={id} teacherView />
 
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">

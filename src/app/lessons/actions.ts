@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { reviewAgainstNewList } from "@/lib/practice/process";
 import { proposeFromLesson } from "@/lib/focus/propose";
+import { writeTakeaways } from "@/lib/takeaways/data";
 import { requireTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Enums } from "@/lib/supabase/types";
@@ -356,6 +357,11 @@ async function approveById(id: string) {
   // And the app suggests "What we're working on" from this lesson, for the
   // teacher to accept on the student's page.
   after(() => proposeFromLesson(id).catch(() => {}));
+  // And the student page's "Main takeaways" now compares this lesson too.
+  after(async () => {
+    const { data } = await supabase.from("lessons").select("student_id").eq("id", id).maybeSingle();
+    if (data) await writeTakeaways(data.student_id).catch(() => {});
+  });
 }
 
 // Every piece named in the lesson gets (or updates) a repertoire row.
