@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Lora, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 import { ROLE_BOOT_SCRIPT } from "@/lib/role";
+import { UploadProvider } from "@/components/upload-manager";
 
 // Headings: Lora, a warm old-style serif whose capital J sits on the
 // baseline (David disliked Fraunces' descending J in "James").
@@ -43,7 +44,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: ROLE_BOOT_SCRIPT }} />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/* Lesson video uploads keep running while you move between pages. */}
+        <UploadProvider>{children}</UploadProvider>
+      </body>
     </html>
   );
 }
